@@ -1350,7 +1350,6 @@ async function finalizar(){
     });
     const paiData = await paiRes.json();
     const paiId = paiData.addedRowIds?.[0];
-    console.log('ORC_PAI:', paiRes.status, JSON.stringify(paiData));
 
     // 2. Cria uma subrow por item linkada ao pai
     if (paiId) {
@@ -1384,10 +1383,7 @@ async function finalizar(){
         body: JSON.stringify({ rows: subrows })
       });
       const subData = await subRes.json();
-      console.log('ORC_SUBROWS:', subRes.status, JSON.stringify(subData));
-      if (!subRes.ok) throw new Error(`Subrows 400: ${JSON.stringify(subData)}`);
-    } else {
-      console.warn('ORC_PAI sem paiId — subrows não criados', paiData);
+      if (!subRes.ok) throw new Error(`Erro subrows: ${JSON.stringify(subData)}`);
     }
     document.getElementById('coda-note').textContent='✅ Pedido registrado em Orçamentos!';
   }catch(e){
