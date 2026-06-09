@@ -1633,16 +1633,40 @@ function loadUserData(){
 function formatCep(v){return v.replace(/\D/g,'').replace(/^(\d{5})(\d)/,'$1-$2').slice(0,9);}
 
 
-// ── CONFIGURAÇÃO TAXA DE ENTREGA ──────────────────────────────
-// ⚠️  Ajuste os valores abaixo com a tabela real da Moblets
+// ── TABELA DE TAXA DE ENTREGA (Moblets) ──────────────────────
 const ENTREGA_CONFIG = {
-  LAT_LOJA: -16.7262,    // Latitude da D'Luh Festas (Montes Claros) — ajuste se necessário
-  LNG_LOJA: -43.8645,    // Longitude da D'Luh Festas — ajuste se necessário
-  TAXA_BASE: 5.00,        // R$ — taxa mínima (confirmar com Moblets)
-  TAXA_POR_KM: 2.50,      // R$ por km — confirmar com Moblets
-  TAXA_MINIMA: 5.00,      // R$ — nunca cobrar abaixo disso
-  FATOR_ROTA: 1.35,       // Fator rota real ÷ linha reta (1.35 = +35%)
+  LAT_LOJA: -16.7262,  // Coordenadas da D'Luh Festas — ajuste se necessário
+  LNG_LOJA: -43.8645,
+  FATOR_ROTA: 1.35,    // Fator rota real ÷ linha reta
+  TABELA: [
+    { ate: 2.00,  valor: 6.60  },
+    { ate: 3.00,  valor: 7.80  },
+    { ate: 4.00,  valor: 9.70  },
+    { ate: 5.00,  valor: 10.80 },
+    { ate: 6.50,  valor: 11.90 },
+    { ate: 8.00,  valor: 13.10 },
+    { ate: 9.00,  valor: 14.50 },
+    { ate: 10.00, valor: 16.90 },
+    { ate: 11.00, valor: 18.50 },
+    { ate: 13.00, valor: 19.90 },
+    { ate: 15.00, valor: 21.00 },
+    { ate: 17.00, valor: 22.70 },
+    { ate: 19.00, valor: 25.90 },
+    { ate: 22.00, valor: 28.50 },
+    { ate: 50.00, valor: 50.00 },
+    { ate: 60.00, valor: 60.00 },
+    { ate: 70.00, valor: 70.00 },
+    { ate: 80.00, valor: 80.00 },
+    { ate: 90.00, valor: 90.00 },
+    { ate: 100.00,valor: 100.00},
+  ],
 };
+function taxaPorKm(km) {
+  for (const faixa of ENTREGA_CONFIG.TABELA) {
+    if (km <= faixa.ate) return faixa.valor;
+  }
+  return ENTREGA_CONFIG.TABELA.at(-1).valor;
+}
 // ─────────────────────────────────────────────────────────────
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -1679,7 +1703,7 @@ async function calcDeliveryFee() {
     const lng = parseFloat(data[0].lon);
     const distLinha = haversineKm(ENTREGA_CONFIG.LAT_LOJA, ENTREGA_CONFIG.LNG_LOJA, lat, lng);
     const distRota = distLinha * ENTREGA_CONFIG.FATOR_ROTA;
-    const taxa = Math.max(ENTREGA_CONFIG.TAXA_MINIMA, ENTREGA_CONFIG.TAXA_BASE + distRota * ENTREGA_CONFIG.TAXA_POR_KM);
+    const taxa = taxaPorKm(distRota);
     _taxaEntregaAtual = taxa;
 
     if(valEl) valEl.textContent = fmtBRL(taxa);
