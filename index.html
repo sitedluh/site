@@ -33,8 +33,21 @@ html,body{height:100%;overflow:hidden}body{font-family:'DM Sans',sans-serif;back
 .hero-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:14px 28px;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s;text-decoration:none}
 .hero-btn:hover{background:var(--accent-dark)}
 @media(max-width:600px){
-  .hero-overlay{background:linear-gradient(180deg,rgba(31,20,16,.45) 0%,rgba(31,20,16,.8) 100%);align-items:flex-end;padding:0 5% 10%}
-  .hero-content{max-width:100%}
+  .hero-overlay{
+    background:linear-gradient(180deg,rgba(31,20,16,.3) 0%,rgba(31,20,16,.85) 100%);
+    align-items:flex-end;
+    padding:0 5% 18%;
+  }
+  .hero-content{max-width:100%;text-align:center}
+  .hero-tag{font-size:10px}
+  .hero-title{font-size:clamp(26px,8vw,38px);margin-bottom:10px}
+  .hero-sub{font-size:13px;margin-bottom:20px}
+  .hero-btn{width:100%;justify-content:center;padding:14px;font-size:15px}
+  .ticker-section{padding:12px 0;bottom:0}
+  .ticker-item{padding:9px 14px;gap:8px;border-radius:10px}
+  .ticker-item-emoji{font-size:22px}
+  .ticker-item-name{font-size:13px}
+  .ticker-item-price{font-size:12px}
 }
 
 /* TICKER */
