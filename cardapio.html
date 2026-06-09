@@ -1676,9 +1676,9 @@ function formatCep(v){return v.replace(/\D/g,'').replace(/^(\d{5})(\d)/,'$1-$2')
 
 // ── TABELA DE TAXA DE ENTREGA (Moblets) ──────────────────────
 const ENTREGA_CONFIG = {
-  LAT_LOJA: -16.7262,  // Coordenadas da D'Luh Festas — ajuste se necessário
-  LNG_LOJA: -43.8645,
-  FATOR_ROTA: 1.35,    // Fator rota real ÷ linha reta
+  LAT_LOJA: -16.7286406,  // Rua Visconde de Taunay 278, Vila Maria Cândida, Montes Claros
+  LNG_LOJA: -43.8582139,
+  FATOR_ROTA: 1.80,    // Fator calibrado com rota real Montes Claros (2.33km linha × 1.80 = 4.19km rota)
   TABELA: [
     { ate: 2.00,  valor: 6.60  },
     { ate: 3.00,  valor: 7.80  },
