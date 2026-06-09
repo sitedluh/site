@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste — /gerar-cobranca</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; background:#111; color:#eee; }
+  button { font-size: 16px; padding: 10px 20px; cursor: pointer; border-radius: 8px; border: none; background:#3b82f6; color:#fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  pre { background:#1d1d1d; padding: 16px; border-radius: 8px; overflow:auto; white-space: pre-wrap; word-break: break-word; }
+  a { color: #60a5fa; }
+  .ok { color: #4ade80; }
+  .erro { color: #f87171; }
+</style>
+</head>
+<body>
+  <h1>Teste do endpoint /gerar-cobranca</h1>
+  <p>Isso envia um pedido de teste fictício (<code>pedidoId: "TESTE-001"</code>, total R$ 100,00 →
+  sinal de 50% = R$ 50,00) pro Worker, que por sua vez chama a API da InfinitePay e
+  devolve o link de pagamento gerado.</p>
+  <p><strong>Observação:</strong> como "TESTE-001" não existe de verdade na sua tabela
+  Orçamentos, o Worker vai gerar o link normalmente, mas não vai achar nenhuma linha
+  pra atualizar o Status/Link de Pagamento — isso é esperado neste teste e não é erro.</p>
+  <button id="btn">Gerar cobrança de teste</button>
+  <pre id="out">Clique no botão acima para testar…</pre>
+
+  <script>
+    const btn = document.getElementById('btn');
+    const out = document.getElementById('out');
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      out.textContent = 'Chamando o Worker...';
+      out.className = '';
+      try {
+        const res = await fetch('https://coda-proxy.sitedluh.workers.dev/gerar-cobranca', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pedidoId: 'TESTE-001',
+            total: 100,
+            cliente: { nome: 'Cliente Teste', telefone: '5511999999999' }
+          })
+        });
+        const json = await res.json();
+        out.textContent = `Status HTTP: ${res.status}\n\n` + JSON.stringify(json, null, 2);
+        if (res.ok && json.link) {
+          out.className = 'ok';
+          out.textContent += `\n\n✅ Deu certo! Link de pagamento gerado:\n${json.link}`;
+        } else {
+          out.className = 'erro';
+          out.textContent += `\n\n❌ Algo deu errado — leia o "detalhe" acima.`;
+        }
+      } catch (e) {
+        out.className = 'erro';
+        out.textContent = 'Erro ao chamar o Worker: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

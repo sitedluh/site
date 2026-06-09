@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste — /webhook-pagamento</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; background:#111; color:#eee; }
+  label { display:block; font-size:13px; color:#aaa; margin:14px 0 4px; }
+  input { width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#1d1d1d; color:#eee; font-size:14px; box-sizing:border-box; }
+  button { margin-top:20px; font-size:16px; padding:10px 20px; cursor:pointer; border-radius:8px; border:none; background:#3b82f6; color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  pre { background:#1d1d1d; padding:16px; border-radius:8px; overflow:auto; white-space:pre-wrap; word-break:break-word; margin-top:20px; }
+  .ok  { color:#4ade80; }
+  .err { color:#f87171; }
+  small { color:#666; font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>Simular webhook da InfinitePay</h1>
+  <p>Isso envia um POST direto pro <code>/webhook-pagamento</code> fingindo que a InfinitePay confirmou um pagamento.</p>
+
+  <label>ID do pedido (row pai no Coda — ex: i-abc123)</label>
+  <input id="pedidoId" placeholder="i-xxxxxxxxxx" />
+  <small>Pega na URL da row no Coda, ou no admin.html no "Pedido #..."</small>
+
+  <label>Valor pago (em reais)</label>
+  <input id="valor" type="number" value="50" />
+
+  <label>URL do comprovante (opcional)</label>
+  <input id="receipt" value="https://exemplo.com/comprovante-teste" />
+
+  <button id="btn" onclick="testar()">Simular pagamento confirmado</button>
+  <pre id="out">Preencha o ID do pedido e clique no botão…</pre>
+
+  <script>
+    async function testar() {
+      const pedidoId = document.getElementById('pedidoId').value.trim();
+      const valor    = parseFloat(document.getElementById('valor').value) || 50;
+      const receipt  = document.getElementById('receipt').value.trim();
+      const out      = document.getElementById('out');
+      const btn      = document.getElementById('btn');
+
+      if (!pedidoId) { out.textContent = '❌ Preencha o ID do pedido!'; out.className='err'; return; }
+
+      btn.disabled = true;
+      out.textContent = 'Chamando o Worker…';
+      out.className = '';
+
+      try {
+        const res = await fetch('https://coda-proxy.sitedluh.workers.dev/webhook-pagamento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_nsu:   pedidoId,
+            order_id:    pedidoId,
+            amount:      valor,      // em reais (o worker detecta automaticamente)
+            receipt_url: receipt,
+          })
+        });
+
+        const json = await res.json();
+        out.textContent = `Status HTTP: ${res.status}\n\n` + JSON.stringify(json, null, 2);
+
+        if (res.ok && json.success) {
+          out.className = 'ok';
+          out.textContent += '\n\n✅ Webhook processado! Verifique no Coda:\n  • Orçamentos: status → "Pedido confirmado e agendado"\n  • Pedidos: nova row adicionada\n  • Google Calendar: evento criado';
+        } else {
+          out.className = 'err';
+          out.textContent += '\n\n❌ Algo deu errado — leia o detalhe acima.';
+        }
+      } catch(e) {
+        out.className = 'err';
+        out.textContent = 'Erro ao chamar o Worker: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

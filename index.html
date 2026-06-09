@@ -36,7 +36,7 @@ html,body{height:100%;overflow:hidden}body{font-family:'DM Sans',sans-serif;back
   .hero-overlay{
     background:linear-gradient(180deg,rgba(31,20,16,.3) 0%,rgba(31,20,16,.85) 100%);
     align-items:flex-end;
-    padding:0 5% 18%;
+    padding:0 5% 22%;
   }
   .hero-content{max-width:100%;text-align:center}
   .hero-tag{font-size:10px}
@@ -51,7 +51,7 @@ html,body{height:100%;overflow:hidden}body{font-family:'DM Sans',sans-serif;back
 }
 
 /* TICKER */
-.ticker-section{position:absolute;bottom:0;left:0;right:0;overflow:hidden;padding:18px 0;z-index:10}
+.ticker-section{position:absolute;bottom:0;left:0;right:0;overflow:hidden;padding:14px 0 18px;z-index:10}
 .ticker-track{display:flex;gap:20px;animation:ticker 35s linear infinite;width:max-content}
 .ticker-track:hover{animation-play-state:paused}
 @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
@@ -102,7 +102,7 @@ async function loadTicker() {
       a.innerHTML =
         '<span class="ticker-item-emoji">' + emoji(p) + '</span>' +
         '<span class="ticker-item-name">' + p.nome + '</span>' +
-        (p.valor ? '<span class="ticker-item-price">·' + fmt(p.valor) + '</span>' : '');
+        (p.valor ? '<span class="ticker-item-price">· A partir de ' + fmt(p.valor * (p.qtdMin || 1)) + '</span>' : '');
       return a;
     };
     track.innerHTML = '';
