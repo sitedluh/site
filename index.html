@@ -766,7 +766,7 @@ async function loadProducts(){
     if(resRec.ok){
       const dataRec=await resRec.json();
       const recList=dataRec.recheios||dataRec.items||[];
-      recheios=recList.map(r=>typeof r==='string'?r:(r.values?.['Recheios']||r.name||'')).filter(Boolean);
+      recheios=recList.map(r=>typeof r==='string'?r:(r.nome||r.values?.['Recheios']||r.name||'')).filter(Boolean);
     }
 
     renderCats();
