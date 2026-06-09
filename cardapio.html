@@ -201,6 +201,23 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .btn-checkout{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:15px;font-size:15px;font-weight:600;transition:background .15s}
 .btn-checkout:hover{background:var(--accent-dark)}
 .btn-checkout:disabled{opacity:.35;cursor:not-allowed}
+/* ── Phone validation indicator ── */
+.tel-wrap{position:relative}
+.tel-wrap input{padding-right:38px}
+.tel-status{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;transition:opacity .2s}
+/* ── Confirm phone modal ── */
+.confirm-phone-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
+.confirm-phone-overlay.open{display:flex}
+.confirm-phone-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:360px;padding:28px 24px;text-align:center}
+.confirm-phone-icon{font-size:40px;margin-bottom:12px}
+.confirm-phone-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:500;color:var(--text);margin-bottom:6px}
+.confirm-phone-num{font-size:22px;font-weight:700;color:var(--accent);letter-spacing:.5px;margin:14px 0 20px}
+.confirm-phone-actions{display:flex;flex-direction:column;gap:10px}
+.confirm-phone-yes{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:13px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.confirm-phone-yes:hover{background:var(--accent-dark)}
+.confirm-phone-no{background:none;color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.confirm-phone-no:hover{border-color:var(--accent);color:var(--accent)}
+
 
 /* ══════════════════════════════════════
    CHECKOUT
@@ -523,7 +540,10 @@ body.checkout-active .cat-mobile{display:none!important}
       <div class="form-row" id="frow-nome"><label>Nome completo *</label><input type="text" id="f-nome" placeholder="Seu nome" autocomplete="name"><div class="form-error-msg">Informe seu nome</div></div>
       <div class="form-row saved-field" id="frow-tel">
         <label>WhatsApp *</label>
-        <input type="tel" id="f-tel" placeholder="(38) 9 9999-9999" autocomplete="tel" oninput="saveUserData()">
+        <div class="tel-wrap">
+          <input type="tel" id="f-tel" placeholder="(38) 9 9999-9999" autocomplete="tel" oninput="maskPhone(this);saveUserData();updateTelStatus()">
+          <span class="tel-status" id="tel-status"></span>
+        </div>
         <div class="form-error-msg">Informe seu WhatsApp</div>
       </div>
     </div>
@@ -1284,10 +1304,53 @@ function validate(){
   return ok;
 }
 let _enviandoPedido=false;
+
+// ── Phone mask & validation ──
+function maskPhone(input){
+  let v=input.value.replace(/\D/g,'');
+  if(v.length>11)v=v.slice(0,11);
+  if(v.length<=10){
+    v=v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  } else {
+    v=v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  }
+  input.value=v.replace(/-$/,'');
+}
+function updateTelStatus(){
+  const inp=document.getElementById('f-tel');
+  const st=document.getElementById('tel-status');
+  if(!inp||!st)return;
+  const digits=inp.value.replace(/\D/g,'');
+  if(digits.length===10||digits.length===11){st.textContent='✅';}
+  else if(digits.length>0){st.textContent='❌';}
+  else{st.textContent='';}
+}
+let _pendingFinalizar=false;
+function showConfirmPhone(){
+  const tel=document.getElementById('f-tel')?.value||'';
+  document.getElementById('confirm-phone-display').textContent=tel;
+  document.getElementById('confirm-phone-overlay').classList.add('open');
+}
+function closeConfirmPhone(){
+  document.getElementById('confirm-phone-overlay').classList.remove('open');
+  _pendingFinalizar=false;
+  // Focus back on the phone field
+  setTimeout(()=>document.getElementById('f-tel')?.focus(),100);
+}
+function confirmPhoneAndSend(){
+  document.getElementById('confirm-phone-overlay').classList.remove('open');
+  _pendingFinalizar=false;
+  _doFinalizar();
+}
+
 async function finalizar(){
+  if(!validate())return;
+  showConfirmPhone();
+  return;
+}
+async function _doFinalizar(){
   // Proteção contra envio duplicado (clique duplo / reenvio)
   if(_enviandoPedido)return;
-  if(!validate())return;
   const items=Object.values(cart).filter(i=>i.qty>0);if(!items.length)return;
   _enviandoPedido=true;
   const btnEnviar=document.querySelector('.btn-wpp');
@@ -1541,7 +1604,7 @@ function loadUserData(){
     if(!saved) return;
     const data = JSON.parse(saved);
     const set=(id,val)=>{const el=document.getElementById(id);if(el&&val)el.value=val;};
-    set('f-tel',data.tel);
+    set('f-tel',data.tel);if(document.getElementById('f-tel')){maskPhone(document.getElementById('f-tel'));updateTelStatus();}
     set('f-cep',data.cep);
     set('f-rua',data.rua);
     set('f-num',data.num);
@@ -1916,5 +1979,18 @@ document.addEventListener('DOMContentLoaded', () => { loadTicker(); });
 
 </script>
 
+
+<!-- Confirm phone modal -->
+<div class="confirm-phone-overlay" id="confirm-phone-overlay">
+  <div class="confirm-phone-box">
+    <div class="confirm-phone-icon">📱</div>
+    <div class="confirm-phone-title">Seu número está correto?</div>
+    <div class="confirm-phone-num" id="confirm-phone-display"></div>
+    <div class="confirm-phone-actions">
+      <button class="confirm-phone-yes" onclick="confirmPhoneAndSend()">✅ Sim, está correto</button>
+      <button class="confirm-phone-no" onclick="closeConfirmPhone()">✏️ Corrigir número</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
