@@ -201,6 +201,20 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .btn-checkout{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:15px;font-size:15px;font-weight:600;transition:background .15s}
 .btn-checkout:hover{background:var(--accent-dark)}
 .btn-checkout:disabled{opacity:.35;cursor:not-allowed}
+/* ── STATUS BAR ── */
+#status-bar{display:none;background:var(--surface);border-bottom:2px solid var(--accent);padding:0}
+.status-bar-inner{max-width:700px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.status-bar-label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.status-bar-nome{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.status-bar-steps{display:flex;align-items:center;gap:4px;flex:1;min-width:200px}
+.status-step{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text3);white-space:nowrap}
+.status-step.active{color:var(--accent);font-weight:700}
+.status-step.done{color:#4caf50;font-weight:600}
+.status-step-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0}
+.status-step.active .status-step-dot{background:var(--accent)}
+.status-step.done .status-step-dot{background:#4caf50}
+.status-step-sep{color:var(--border);font-size:10px}
+
 /* ── Phone validation indicator ── */
 .tel-wrap{position:relative}
 .tel-wrap input{padding-right:38px}
@@ -405,7 +419,7 @@ body.checkout-active .cat-mobile{display:none!important}
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp, onSnapshot, updateDoc, doc, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -444,6 +458,23 @@ body.checkout-active .cat-mobile{display:none!important}
       return snap.docs.map(d => ({id:d.id,...d.data()}));
     };
     window._fbServerTimestamp = serverTimestamp;
+    window._fbUpdatePedido = (id, data) => updateDoc(doc(db, 'pedidos', id), data);
+    window._fbWatchPedidoAtivo = (uid, callback) => {
+      const q = query(
+        collection(db, 'pedidos'),
+        where('uid','==',uid),
+        orderBy('criadoEm','desc'),
+        limit(1)
+      );
+      return onSnapshot(q, snap => {
+        if(snap.empty){ callback(null); return; }
+        const d = snap.docs[0];
+        const p = {id: d.id, ...d.data()};
+        // Só mostra se não finalizado
+        const fim = ['Entregue','Cancelado'];
+        callback(fim.includes(p.status) ? null : p);
+      });
+    };
 
     onAuthStateChanged(auth, user => {
       window._fbUser = user || null;
@@ -453,6 +484,15 @@ body.checkout-active .cat-mobile{display:none!important}
 </head>
 <body>
 
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <div class="status-bar-inner">
+    <span class="status-bar-label">📦 Seu pedido</span>
+    <span class="status-bar-nome" id="sb-nome"></span>
+    <div class="status-steps" id="sb-steps"></div>
+  </div>
+</div>
 <!-- HEADER -->
 <header class="header">
   <div class="header-top">
@@ -554,6 +594,7 @@ body.checkout-active .cat-mobile{display:none!important}
           <div class="radio-opt active" data-val="Retirada no local" onclick="selectRadio(this,'rg-entrega')">🏪 Retirada no local (grátis)</div>
           <div class="radio-opt" data-val="Entrega em endereço" onclick="selectRadio(this,'rg-entrega')">🚗 Entrega em endereço</div>
         </div>
+      <div id="dinheiro-note" style="display:none;font-size:12px;color:#c0392b;margin-top:6px;padding:6px 10px;background:#fdf0ee;border-radius:6px;border-left:3px solid #c0392b">💵 Pagamento em dinheiro disponível apenas para retirada no local.</div>
       </div>
       <div id="row-end" style="display:none" class="form-row">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -595,10 +636,10 @@ body.checkout-active .cat-mobile{display:none!important}
       <h3>Pagamento & Agendamento</h3>
       <div class="form-row"><label>Pagamento *</label>
         <div class="radio-group" id="rg-pgto">
-          <div class="radio-opt active" data-val="PIX" onclick="selectRadio(this,'rg-pgto')">PIX</div>
+          <div class="radio-opt active" data-val="PIX" onclick="selectRadio(this,'rg-pgto');liberarEntrega()">PIX</div>
           <div class="radio-opt" data-val="Cartão de crédito" onclick="selectRadio(this,'rg-pgto')">Crédito</div>
           <div class="radio-opt" data-val="Cartão de débito" onclick="selectRadio(this,'rg-pgto')">Débito</div>
-          <div class="radio-opt" data-val="Dinheiro" onclick="selectRadio(this,'rg-pgto')">Dinheiro</div>
+          <div class="radio-opt" data-val="Dinheiro" onclick="selectRadio(this,'rg-pgto');forcarRetirada()">Dinheiro</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="form-row">
@@ -1719,6 +1760,81 @@ async function calcDeliveryFee() {
   }
 }
 
+
+// ── STATUS BAR em tempo real ──────────────────────────────────
+const STATUS_STEPS = [
+  'Aguardando confirmação',
+  'Confirmado',
+  'Em preparo',
+  'Saiu para entrega',
+  'Pronto para retirada',
+];
+
+let _unsubStatusBar = null;
+
+function initStatusBar(user) {
+  if (_unsubStatusBar) { _unsubStatusBar(); _unsubStatusBar = null; }
+  if (!user || !window._fbWatchPedidoAtivo) {
+    document.getElementById('status-bar').style.display = 'none';
+    return;
+  }
+  _unsubStatusBar = window._fbWatchPedidoAtivo(user.uid, (pedido) => {
+    const bar = document.getElementById('status-bar');
+    if (!pedido) { bar.style.display = 'none'; return; }
+    bar.style.display = 'block';
+    document.getElementById('sb-nome').textContent = pedido.nome?.split(' ')[0] || '';
+    const status = pedido.status || STATUS_STEPS[0];
+    const idx = STATUS_STEPS.indexOf(status);
+    // Use retirada step label if not delivery
+    const steps = pedido.entrega === 'Entrega em endereço' ? STATUS_STEPS : STATUS_STEPS.map(s => s === 'Saiu para entrega' ? 'Pronto para retirada' : s).filter((s,i) => i !== 4 || pedido.entrega !== 'Entrega em endereço');
+    const stepsEl = document.getElementById('sb-steps');
+    stepsEl.innerHTML = STATUS_STEPS
+      .filter(s => !(s === 'Pronto para retirada' && pedido.entrega === 'Entrega em endereço'))
+      .filter(s => !(s === 'Saiu para entrega' && pedido.entrega !== 'Entrega em endereço'))
+      .map((s, i, arr) => {
+        const stepIdx = STATUS_STEPS.indexOf(s);
+        const cls = stepIdx < idx ? 'done' : stepIdx === idx ? 'active' : '';
+        const sep = i < arr.length - 1 ? '<span class="status-step-sep">›</span>' : '';
+        return `<span class="status-step ${cls}"><span class="status-step-dot"></span>${s}</span>${sep}`;
+      }).join('');
+  });
+}
+
+// Hook into auth change
+const _origOnAuth = window._onAuthChange;
+window._onAuthChange = (user) => {
+  if (_origOnAuth) _origOnAuth(user);
+  initStatusBar(user);
+};
+// ─────────────────────────────────────────────────────────────
+
+
+// ── Dinheiro = apenas retirada ─────────────────────────────
+function forcarRetirada() {
+  const opts = document.querySelectorAll('#rg-entrega .radio-opt');
+  opts.forEach(o => {
+    if (o.dataset.val === 'Retirada no local') {
+      o.click();
+    } else {
+      o.style.opacity = '0.4';
+      o.style.pointerEvents = 'none';
+      o.title = 'Entrega não disponível para pagamento em dinheiro';
+    }
+  });
+  const note = document.getElementById('dinheiro-note');
+  if (note) note.style.display = 'block';
+}
+function liberarEntrega() {
+  document.querySelectorAll('#rg-entrega .radio-opt').forEach(o => {
+    o.style.opacity = '';
+    o.style.pointerEvents = '';
+    o.title = '';
+  });
+  const note = document.getElementById('dinheiro-note');
+  if (note) note.style.display = 'none';
+}
+// ──────────────────────────────────────────────────────────
+
 function onCepInput(el){
   el.value=formatCep(el.value);
   const cep=el.value.replace(/\D/g,'');
@@ -2008,6 +2124,7 @@ async function salvarPedidoFirebase(dados) {
       obs: dados.obs,
       total: dados.total,
       itensTexto: dados.itensTexto,
+      status: 'Aguardando confirmação',
       criadoEm: window._fbServerTimestamp()
     });
   } catch(e) {
