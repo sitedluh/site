@@ -1319,12 +1319,15 @@ async function finalizar(){
   }).join('\n');
   // Salva no Firebase (não bloqueia)
   salvarPedidoFirebase({nome,tel,entrega,endereco,pagamento,data,hora:horaVal,obs,total,itensTexto});
-  // Upload de imagens de topper para Firebase Storage
+  // Upload de imagens de topper para Firebase Storage (com timeout de 8s)
   for(const item of items){
     const td=topperPorProduto[item.id];
-    if(td?.quero&&td.refFile){
-      try{td.refUrl=await window._fbUploadTopper(item.id,td.refFile);}
-      catch(e){console.warn('Topper upload fail:',e);td.refUrl='';}
+    if(td?.quero&&td.refFile&&window._fbUploadTopper){
+      try{
+        const _uploadP=window._fbUploadTopper(item.id,td.refFile);
+        const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000));
+        td.refUrl=await Promise.race([_uploadP,_timeout]);
+      }catch(e){console.warn('Topper upload fail:',e);td.refUrl='';}
     }
   }
   // Envia para o Coda ANTES de abrir o WhatsApp
