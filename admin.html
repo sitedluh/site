@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — D'Luh Festas</title>
+<style>
+  :root{
+    --accent:#c0725a;--accent-light:#fdf3f0;
+    --text:#1a1a1a;--text2:#555;--text3:#999;
+    --surface:#fff;--surface2:#f9f7f5;
+    --border:#e8e0d8;--radius:12px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);min-height:100vh}
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap');
+
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+  .header-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:600;color:var(--text)}
+  .header-sub{font-size:13px;color:var(--text3);margin-top:2px}
+  .btn-refresh{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;transition:all .15s}
+  .btn-refresh:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-refresh.loading svg{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  main{max-width:800px;margin:0 auto;padding:20px 16px}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--text3);font-size:15px}
+  .empty-icon{font-size:40px;margin-bottom:12px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .card-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .card-id{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase}
+  .card-nome{font-size:16px;font-weight:600;color:var(--text)}
+  .card-meta{font-size:13px;color:var(--text3);margin-top:3px}
+  .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3cd;color:#856404;border:1px solid #ffc107}
+
+  .card-body{padding:14px 18px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-bottom:14px}
+  @media(max-width:480px){.info-grid{grid-template-columns:1fr}}
+  .info-item label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:2px}
+  .info-item span{font-size:14px;color:var(--text)}
+
+  .itens-titulo{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+  .item-row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border);gap:12px}
+  .item-info{flex:1}
+  .item-nome{font-size:14px;font-weight:500;color:var(--text)}
+  .item-sub{font-size:12px;color:var(--text3);margin-top:3px;line-height:1.4}
+  .item-topper{font-size:12px;color:var(--accent);margin-top:4px;background:var(--accent-light);padding:4px 8px;border-radius:6px;line-height:1.5}
+  .item-valor{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap}
+
+  .card-footer{padding:14px 18px;border-top:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .total-txt{font-size:15px;font-weight:700;color:var(--text)}
+  .total-label{font-size:12px;color:var(--text3);font-weight:400;margin-right:6px}
+
+  .btn-confirmar{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;transition:opacity .15s;white-space:nowrap}
+  .btn-confirmar:hover{opacity:.87}
+  .btn-confirmar:disabled{opacity:.4;cursor:not-allowed}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#222;color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;opacity:0;transition:all .25s;pointer-events:none;z-index:999;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .loading-state{text-align:center;padding:60px 20px;color:var(--text3)}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="header-title">🎂 D'Luh Festas</div>
+    <div class="header-sub">Pedidos aguardando confirmação de estoque</div>
+  </div>
+  <button class="btn-refresh" id="btn-refresh" onclick="carregarPedidos()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 9M21 3v6h-6M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64L3 15M3 21v-6h6"/></svg>
+    Atualizar
+  </button>
+</header>
+
+<main id="main">
+  <div class="loading-state" id="loading">
+    <div class="spinner"></div>
+    Carregando pedidos…
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WORKER = 'https://coda-proxy.sitedluh.workers.dev';
+
+function fmtBRL(v){return'R$ '+Number(v||0).toFixed(2).replace('.',',');}
+function fmtData(d){if(!d)return'—';const p=d.split('-');return p.length===3?p.reverse().join('/'):d;}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+async function carregarPedidos(){
+  const btn=document.getElementById('btn-refresh');
+  btn.classList.add('loading');btn.disabled=true;
+  try{
+    const res=await fetch(`${WORKER}/pedidos-pendentes`);
+    const data=await res.json();
+    renderPedidos(data.pedidos||[]);
+  }catch(e){
+    document.getElementById('main').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar pedidos.<br><small>${e.message}</small></div>`;
+  }finally{
+    btn.classList.remove('loading');btn.disabled=false;
+  }
+}
+
+function renderPedidos(pedidos){
+  const main=document.getElementById('main');
+  if(!pedidos.length){
+    main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação de estoque.</div>';
+    return;
+  }
+  main.innerHTML=pedidos.map(p=>cardPedido(p)).join('');
+}
+
+function cardPedido(p){
+  const total=p.total||p.itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+  const itensHtml=p.itens.map(i=>{
+    const subs=[];
+    if(i.recheios)subs.push(i.recheios);
+    const topper=i.topoInfo?`<div class="item-topper">🎨 Topper: ${i.topoInfo.replace(/\n/g,' · ')}</div>`:'';
+    return`<div class="item-row">
+      <div class="item-info">
+        <div class="item-nome">${esc(i.produto)}</div>
+        ${subs.length?`<div class="item-sub">${esc(subs.join(' | '))}</div>`:''}
+        ${topper}
+      </div>
+      <div class="item-valor">${fmtBRL(i.valorItem)}</div>
+    </div>`;
+  }).join('');
+
+  const confirmarUrl=`${WORKER}/confirmar-estoque?pedidoId=${enc(p.idPedido)}&total=${enc(total)}&telefone=${enc(p.telefone)}&cliente=${enc(p.cliente)}`;
+
+  return`<div class="card" id="card-${esc(p.idPedido)}">
+    <div class="card-header">
+      <div>
+        <div class="card-id">Pedido #${esc(p.idPedido)}</div>
+        <div class="card-nome">${esc(p.cliente)}</div>
+        <div class="card-meta">📱 ${esc(p.telefone)} · ${esc(p.entrega||'—')} · ${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</div>
+      </div>
+      <span class="badge">Verificando estoque</span>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-item"><label>Pagamento</label><span>${esc(p.pagamento||'—')}</span></div>
+        <div class="info-item"><label>Entrega</label><span>${esc(p.entrega||'—')}</span></div>
+        ${p.endereco?`<div class="info-item" style="grid-column:1/-1"><label>Endereço</label><span>${esc(p.endereco)}</span></div>`:''}
+        ${p.obs?`<div class="info-item" style="grid-column:1/-1"><label>Observações</label><span>${esc(p.obs)}</span></div>`:''}
+      </div>
+      <div class="itens-titulo">Itens do pedido</div>
+      ${itensHtml}
+    </div>
+    <div class="card-footer">
+      <div class="total-txt"><span class="total-label">Total:</span>${fmtBRL(total)}</div>
+      <button class="btn-confirmar" onclick="confirmarEstoque('${esc(p.idPedido)}','${confirmarUrl}')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Confirmar estoque &amp; enviar link
+      </button>
+    </div>
+  </div>`;
+}
+
+function confirmarEstoque(idPedido, url){
+  const btn=document.querySelector(`#card-${CSS.escape(idPedido)} .btn-confirmar`);
+  if(btn){btn.disabled=true;btn.textContent='Abrindo…';}
+  window.open(url,'_blank');
+  showToast('Link de pagamento gerado! WhatsApp abrirá em instantes.');
+  setTimeout(()=>{if(btn){btn.disabled=false;btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Confirmar estoque &amp; enviar link';}},4000);
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function enc(s){return encodeURIComponent(s||'');}
+
+carregarPedidos();
+</script>
+</body>
+</html>
