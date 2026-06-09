@@ -1350,6 +1350,7 @@ async function finalizar(){
     });
     const paiData = await paiRes.json();
     const paiId = paiData.addedRowIds?.[0];
+    console.log('ORC_PAI:', paiRes.status, JSON.stringify(paiData));
 
     // 2. Cria uma subrow por item linkada ao pai
     if (paiId) {
@@ -1363,29 +1364,30 @@ async function finalizar(){
           : '';
         const obsItem = topperTxt ? (obs?obs+'\n\n':'')+'TOPPER:\n'+topperTxt : obs;
         return { cells: [
-          { column: 'Pedido', value: [paiId] },
-          { column: 'Produto', value: i.nome },
+          { column: 'Pedido',       value: [paiId] },
+          { column: 'Produto',      value: i.nome },
           { column: 'Row ID Produto', value: i.id },
-          { column: 'Quantidade', value: i.qty * i.qtdMin },
-          { column: 'Valor Unit', value: i.valorUnit },
-          { column: 'Valor Item', value: i.valor * i.qty },
-          { column: 'Recheios', value: recheiosTxt },
-          { column: 'Cliente', value: nome },
-          { column: 'WhatsApp', value: tel },
-          { column: 'Entrega', value: entrega },
-          { column: 'Endereço', value: endereco },
-          { column: 'Pagamento', value: pagamento },
+          { column: 'Quantidade',   value: i.qty * i.qtdMin },
+          { column: 'Valor Unit',   value: i.valorUnit },
+          { column: 'Recheios',     value: recheiosTxt },
+          { column: 'Cliente',      value: nome },
+          { column: 'WhatsApp',     value: tel },
           { column: 'Data Desejada', value: data },
-          { column: 'Hora', value: horaVal },
-          { column: 'Observações', value: obsItem },
-          { column: 'Topo Info', value: topperTxt },
+          { column: 'Hora',         value: horaVal },
+          { column: 'Observações',  value: obsItem },
+          { column: 'Topo Info',    value: topperTxt },
         ]};
       });
-      await fetch(`${CONFIG.WORKER_URL}/orcamentos`, {
+      const subRes = await fetch(`${CONFIG.WORKER_URL}/orcamentos`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ rows: subrows })
       });
+      const subData = await subRes.json();
+      console.log('ORC_SUBROWS:', subRes.status, JSON.stringify(subData));
+      if (!subRes.ok) throw new Error(`Subrows 400: ${JSON.stringify(subData)}`);
+    } else {
+      console.warn('ORC_PAI sem paiId — subrows não criados', paiData);
     }
     document.getElementById('coda-note').textContent='✅ Pedido registrado em Orçamentos!';
   }catch(e){
