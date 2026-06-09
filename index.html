@@ -1365,6 +1365,7 @@ async function finalizar(){
         return { cells: [
           { column: 'Pedido', value: [paiId] },
           { column: 'Produto', value: i.nome },
+          { column: 'Tipo', value: i.tipo || '' },
           { column: 'Row ID Produto', value: i.id },
           { column: 'Quantidade', value: i.qty * i.qtdMin },
           { column: 'Valor Unit', value: i.valorUnit },
