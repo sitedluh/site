@@ -368,6 +368,22 @@ body.checkout-active .hero,
 body.checkout-active .search-section,
 body.checkout-active .cat-desktop,
 body.checkout-active .cat-mobile{display:none!important}
+
+/* ══════════════════════════════════════
+   TICKER LANDING
+══════════════════════════════════════ */
+.ticker-section{background:var(--surface2);overflow:hidden;padding:14px 0;border-top:1px solid var(--border)}
+.ticker-track{display:flex;gap:14px;animation:ticker 35s linear infinite;width:max-content}
+.ticker-track:hover{animation-play-state:paused}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ticker-item{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;white-space:nowrap;cursor:pointer;transition:border-color .2s}
+.ticker-item:hover{border-color:var(--accent)}
+.ticker-item-emoji{font-size:22px;line-height:1}
+.ticker-item-name{font-size:13px;font-weight:500;color:var(--text)}
+.ticker-item-price{font-size:12px;color:var(--accent);font-weight:600;margin-left:4px}
+/* Elementos escondidos na landing */
+.landing-hidden{display:none!important}
+
 </style>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -447,15 +463,23 @@ body.checkout-active .cat-mobile{display:none!important}
       <div class="hero-tag">🎉 Encomendas especiais</div>
       <h1 class="hero-title">Doces & Salgados para sua festa</h1>
       <p class="hero-sub">Brigadeiros, bolos personalizados, salgados artesanais e muito mais. Feitos com amor em Montes Claros.</p>
-      <button class="hero-btn" onclick="document.querySelector('.cat-mobile,.cat-desktop').scrollIntoView({behavior:'smooth'})">
+      <button class="hero-btn" onclick="verCardapio()">
         Ver cardápio →
       </button>
     </div>
   </div>
 </div>
 
+
+<!-- TICKER LANDING -->
+<div class="ticker-section" id="ticker-section">
+  <div class="ticker-track" id="ticker-track">
+    <div class="ticker-item"><span class="ticker-item-emoji">🎂</span><span class="ticker-item-name">Carregando produtos...</span></div>
+  </div>
+</div>
+
 <!-- SEARCH BAR -->
-<div class="search-section">
+<div class="search-section landing-hidden" id="search-section">
   <div class="search-bar-outer">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input type="text" id="search-input" placeholder="Buscar produtos, ingredientes..." oninput="handleSearch()">
@@ -464,17 +488,17 @@ body.checkout-active .cat-mobile{display:none!important}
 </div>
 
 <!-- CATEGORIAS DESKTOP -->
-<div class="cat-desktop" id="cat-desktop"></div>
+<div class="cat-desktop landing-hidden" id="cat-desktop"></div>
 
 <!-- CATEGORIAS MOBILE -->
-<div class="cat-mobile">
+<div class="cat-mobile landing-hidden" id="cat-mobile">
   <div class="cat-bar" id="cat-bar">
     <div class="cat-indicator" id="cat-indicator"></div>
   </div>
   <span class="cat-hint" id="cat-hint">← deslize para ver categorias →</span>
 </div>
 
-<div class="page-wrap">
+<div class="page-wrap landing-hidden" id="page-wrap">
 <main class="main" id="main-content">
   <!-- CATALOG -->
   <div class="catalog-page" id="catalog-page">
@@ -1848,6 +1872,58 @@ async function salvarPedidoFirebase(dados) {
 })();
 
 loadProducts();
+
+// ── LANDING PAGE ──
+function verCardapio() {
+  document.getElementById('ticker-section').style.display = 'none';
+  // Esconde botão do hero (hero-content)
+  const heroBtn = document.querySelector('.hero-btn');
+  if (heroBtn) heroBtn.style.display = 'none';
+  // Mostra elementos do catálogo
+  ['search-section','cat-desktop','cat-mobile','page-wrap'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('landing-hidden');
+  });
+  // Rola suavemente para o catálogo
+  setTimeout(() => {
+    const cat = document.getElementById('cat-desktop') || document.getElementById('cat-bar');
+    if (cat) cat.scrollIntoView({behavior:'smooth'});
+  }, 100);
+}
+
+async function loadTicker() {
+  try {
+    const res = await fetch(CONFIG.WORKER_URL + '/produtos');
+    const data = await res.json();
+    const items = (data.items || []);
+    if (!items.length) return;
+    const track = document.getElementById('ticker-track');
+    if (!track) return;
+    const formatPrice = v => v ? ' — R$ ' + Number(v).toFixed(2).replace('.',',') : '';
+    const makeItem = p => {
+      const vals = p.values || {};
+      const nome  = vals['Produto'] || vals['Nome'] || '';
+      const preco = vals['Preço'] || vals['Valor'] || vals['Preco'] || '';
+      const emoji = vals['Emoji'] || '🎂';
+      const div = document.createElement('div');
+      div.className = 'ticker-item';
+      div.onclick = verCardapio;
+      div.innerHTML = '<span class="ticker-item-emoji">' + emoji + '</span>' +
+        '<span class="ticker-item-name">' + nome + '</span>' +
+        '<span class="ticker-item-price">' + formatPrice(preco) + '</span>';
+      return div;
+    };
+    // Duplica para loop contínuo
+    const all = [...items, ...items];
+    track.innerHTML = '';
+    all.forEach(p => track.appendChild(makeItem(p)));
+    const dur = Math.max(20, items.length * 3);
+    track.style.animationDuration = dur + 's';
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadTicker(); });
+
 </script>
 
 </body>
