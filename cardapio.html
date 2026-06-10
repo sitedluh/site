@@ -1720,6 +1720,17 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 let _taxaEntregaAtual = 0;
 
+async function geocodeByAddress(street, neighborhood, city, state) {
+  // Fallback: Nominatim geocoding usando dados de endereço da BrasilAPI
+  const q = [street, neighborhood, city, state, 'Brasil'].filter(Boolean).join(', ');
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=br`;
+  const r = await fetch(url, { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'DLuhFestas/1.0' } });
+  if (!r.ok) throw new Error('nominatim falhou');
+  const results = await r.json();
+  if (!results.length) throw new Error('endereço não encontrado');
+  return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+}
+
 async function calcDeliveryFee() {
   const cep = document.getElementById('f-cep')?.value.replace(/\D/g,'') || '';
   if (!cep || cep.length < 8) return;
@@ -1733,15 +1744,24 @@ async function calcDeliveryFee() {
   if(loading) loading.style.display = 'block';
 
   try {
-    // BrasilAPI retorna coordenadas precisas pelo CEP — muito mais confiável que Nominatim
+    // 1) BrasilAPI: retorna rua/bairro + coordenadas (quando disponíveis)
     const res  = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
     if (!res.ok) throw new Error('CEP não encontrado');
     const data = await res.json();
-    const coords = data?.location?.coordinates;
-    if (!coords?.latitude || !coords?.longitude) throw new Error('sem coordenadas');
 
-    const lat = parseFloat(coords.latitude);
-    const lng = parseFloat(coords.longitude);
+    let lat, lng;
+    const coords = data?.location?.coordinates;
+    if (coords?.latitude && coords?.longitude) {
+      // Coordenadas diretas
+      lat = parseFloat(coords.latitude);
+      lng = parseFloat(coords.longitude);
+    } else {
+      // 2) Fallback: geocodificar pelo endereço via Nominatim
+      const geo = await geocodeByAddress(data.street, data.neighborhood, data.city, data.state);
+      lat = geo.lat;
+      lng = geo.lng;
+    }
+
     const distLinha = haversineKm(ENTREGA_CONFIG.LAT_LOJA, ENTREGA_CONFIG.LNG_LOJA, lat, lng);
     const distRota  = distLinha * ENTREGA_CONFIG.FATOR_ROTA;
     const taxa = taxaPorKm(distRota);
@@ -2189,30 +2209,4 @@ async function loadTicker() {
       return div;
     };
     // Duplica para loop contínuo
-    const all = [...items, ...items];
-    track.innerHTML = '';
-    all.forEach(p => track.appendChild(makeItem(p)));
-    const dur = Math.max(20, items.length * 3);
-    track.style.animationDuration = dur + 's';
-  } catch(e) {}
-}
-
-document.addEventListener('DOMContentLoaded', () => { loadTicker(); });
-
-</script>
-
-
-<!-- Confirm phone modal -->
-<div class="confirm-phone-overlay" id="confirm-phone-overlay">
-  <div class="confirm-phone-box">
-    <div class="confirm-phone-icon">📱</div>
-    <div class="confirm-phone-title">Seu número está correto?</div>
-    <div class="confirm-phone-num" id="confirm-phone-display"></div>
-    <div class="confirm-phone-actions">
-      <button class="confirm-phone-yes" onclick="confirmPhoneAndSend()">✅ Sim, está correto</button>
-      <button class="confirm-phone-no" onclick="closeConfirmPhone()">✏️ Corrigir número</button>
-    </div>
-  </div>
-</div>
-</body>
-</html>
+    const all = 
