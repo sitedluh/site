@@ -1722,28 +1722,28 @@ let _taxaEntregaAtual = 0;
 
 async function calcDeliveryFee() {
   const cep = document.getElementById('f-cep')?.value.replace(/\D/g,'') || '';
-  const rua = document.getElementById('f-rua')?.value.trim() || '';
-  const bairro = document.getElementById('f-bairro')?.value.trim() || '';
   if (!cep || cep.length < 8) return;
 
-  const box = document.getElementById('taxa-entrega-box');
+  const box    = document.getElementById('taxa-entrega-box');
   const loading = document.getElementById('taxa-entrega-loading');
-  const valEl = document.getElementById('taxa-entrega-val');
+  const valEl  = document.getElementById('taxa-entrega-val');
   const infoEl = document.getElementById('taxa-entrega-info');
 
   if(box) box.style.display = 'none';
   if(loading) loading.style.display = 'block';
 
   try {
-    const query = [rua, bairro, 'Montes Claros', 'MG', 'Brasil'].filter(Boolean).join(', ');
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=br&limit=1`);
+    // BrasilAPI retorna coordenadas precisas pelo CEP — muito mais confiável que Nominatim
+    const res  = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+    if (!res.ok) throw new Error('CEP não encontrado');
     const data = await res.json();
-    if (!data.length) throw new Error('não geocodificado');
+    const coords = data?.location?.coordinates;
+    if (!coords?.latitude || !coords?.longitude) throw new Error('sem coordenadas');
 
-    const lat = parseFloat(data[0].lat);
-    const lng = parseFloat(data[0].lon);
+    const lat = parseFloat(coords.latitude);
+    const lng = parseFloat(coords.longitude);
     const distLinha = haversineKm(ENTREGA_CONFIG.LAT_LOJA, ENTREGA_CONFIG.LNG_LOJA, lat, lng);
-    const distRota = distLinha * ENTREGA_CONFIG.FATOR_ROTA;
+    const distRota  = distLinha * ENTREGA_CONFIG.FATOR_ROTA;
     const taxa = taxaPorKm(distRota);
     _taxaEntregaAtual = taxa;
 
