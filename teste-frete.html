@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Teste Cálculo de Frete</title>
 <style>
-  body{font-family:monospace;max-width:620px;margin:40px auto;padding:0 20px;background:#f5f5f5}
+  body{font-family:monospace;max-width:640px;margin:40px auto;padding:0 20px;background:#f5f5f5}
   h2{color:#c0725a}
   input{width:100%;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;margin-bottom:10px}
   button{background:#c0725a;color:#fff;border:none;padding:12px 24px;border-radius:6px;font-size:15px;cursor:pointer;width:100%}
@@ -18,24 +18,25 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:bold}
   .badge-ok{background:#d4edda;color:#155724}
   .badge-warn{background:#fff3cd;color:#856404}
+  .badge-err{background:#f8d7da;color:#721c24}
   .result-box{border-left:4px solid #4caf50;background:#d4edda;padding:10px 14px;border-radius:4px;margin-top:8px;font-size:14px}
-  summary{cursor:pointer;font-size:13px;color:#888;margin-top:8px}
+  summary{cursor:pointer;font-size:13px;color:#888;margin-top:8px;display:block}
 </style>
 </head>
 <body>
 <h2>🛵 Teste Cálculo de Frete</h2>
 <p style="font-size:13px;color:#666">
-  Loja: Rua Visconde de Taunay 278 — <b>-16.7286406, -43.8582139</b><br>
-  FATOR_ROTA: <b>1.80</b>
+  Loja: <b>-16.7286406, -43.8582139</b> &nbsp;|&nbsp; FATOR_ROTA: <b>1.80</b>
 </p>
 <label>CEP de destino</label>
 <input id="cep" type="text" placeholder="39400-423" maxlength="9"
   oninput="this.value=this.value.replace(/\D/g,'').replace(/(\d{5})(\d)/,'$1-$2')">
 <button onclick="testar()">Calcular</button>
+
 <div id="resultado" style="display:none">
   <div class="card">
     <div class="row"><span class="label">📍 CEP</span><span class="val" id="r-cep"></span></div>
-    <div class="row"><span class="label">🏘️ Endereço (BrasilAPI)</span><span class="val" id="r-bairro"></span></div>
+    <div class="row"><span class="label">🏘️ Endereço</span><span class="val" id="r-bairro"></span></div>
     <div class="row"><span class="label">🗺️ Fonte das coordenadas</span><span class="val" id="r-fonte"></span></div>
     <div class="row"><span class="label">📌 Coordenadas destino</span><span class="val" id="r-coords"></span></div>
     <div class="row"><span class="label">📏 Distância linha reta</span><span class="val" id="r-linha"></span></div>
@@ -44,10 +45,12 @@
   </div>
   <div id="r-faixa" class="result-box"></div>
   <details><summary>JSON BrasilAPI</summary><pre id="r-json-brasil"></pre></details>
-  <details id="det-nominatim" style="display:none"><summary>JSON Nominatim (fallback)</summary><pre id="r-json-nom"></pre></details>
+  <details id="det-awesome"><summary>JSON AwesomeAPI</summary><pre id="r-json-awesome"></pre></details>
+  <details id="det-nominatim"><summary>JSON Nominatim (fallback)</summary><pre id="r-json-nom"></pre></details>
 </div>
+
 <script>
-const LAT_LOJA=-16.7286406,LNG_LOJA=-43.8582139,FATOR_ROTA=1.80;
+const LAT_LOJA=-16.7286406, LNG_LOJA=-43.8582139, FATOR_ROTA=1.80;
 const TABELA=[
   {ate:2,valor:6.60},{ate:3,valor:7.80},{ate:4,valor:9.70},{ate:5,valor:10.80},
   {ate:6.5,valor:11.90},{ate:8,valor:13.10},{ate:9,valor:14.50},{ate:10,valor:16.90},
@@ -55,47 +58,81 @@ const TABELA=[
   {ate:19,valor:25.90},{ate:22,valor:28.50},{ate:50,valor:50.00},{ate:60,valor:60.00},
   {ate:70,valor:70.00},{ate:80,valor:80.00},{ate:90,valor:90.00},{ate:100,valor:100.00},
 ];
-function haversine(a,b,c,d){const R=6371,dLat=(c-a)*Math.PI/180,dLng=(d-b)*Math.PI/180,e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
+function haversine(a,b,c,d){
+  const R=6371,dLat=(c-a)*Math.PI/180,dLng=(d-b)*Math.PI/180;
+  const e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));
+}
 function taxaPorKm(k){for(const f of TABELA)if(k<=f.ate)return f.valor;return TABELA.at(-1).valor;}
 function fmt(v){return'R$ '+v.toFixed(2).replace('.',',');}
+
+function hide(id){document.getElementById(id).style.display='none';}
+function show(id){document.getElementById(id).style.display='block';}
 
 async function testar(){
   const cep=document.getElementById('cep').value.replace(/\D/g,'');
   if(cep.length<8){alert('CEP inválido');return;}
-  document.getElementById('resultado').style.display='none';
+  hide('resultado');
+  hide('det-awesome'); hide('det-nominatim');
+
   try{
-    const res=await fetch('https://brasilapi.com.br/api/cep/v2/'+cep);
-    const data=await res.json();
-    document.getElementById('r-json-brasil').textContent=JSON.stringify(data,null,2);
-    const coords=data?.location?.coordinates;
+    // 1) BrasilAPI
+    const r1=await fetch('https://brasilapi.com.br/api/cep/v2/'+cep);
+    const d1=await r1.json();
+    document.getElementById('r-json-brasil').textContent=JSON.stringify(d1,null,2);
+
     let lat,lng,fonte;
-    if(coords?.latitude&&coords?.longitude){
-      lat=parseFloat(coords.latitude);lng=parseFloat(coords.longitude);
+    const coords=d1?.location?.coordinates;
+
+    if(coords?.latitude && coords?.longitude){
+      // --- Fonte A: BrasilAPI coordenadas diretas ---
+      lat=parseFloat(coords.latitude); lng=parseFloat(coords.longitude);
       fonte='<span class="badge badge-ok">BrasilAPI ✅</span>';
-      document.getElementById('det-nominatim').style.display='none';
+
     } else {
-      fonte='<span class="badge badge-warn">Nominatim (fallback) ⚠️</span>';
-      const q=[data.street,data.neighborhood,data.city,data.state,'Brasil'].filter(Boolean).join(', ');
-      const nr=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=br',{headers:{'Accept-Language':'pt-BR','User-Agent':'DLuhFestas-Test/1.0'}});
-      const nd=await nr.json();
-      document.getElementById('r-json-nom').textContent=JSON.stringify(nd,null,2);
-      document.getElementById('det-nominatim').style.display='block';
-      if(!nd.length)throw new Error('Nominatim também não encontrou coordenadas');
-      lat=parseFloat(nd[0].lat);lng=parseFloat(nd[0].lon);
+      // 2) AwesomeAPI (tem lat/lng por CEP na maioria dos casos)
+      show('det-awesome');
+      try{
+        const r2=await fetch('https://cep.awesomeapi.com.br/json/'+cep);
+        const d2=await r2.json();
+        document.getElementById('r-json-awesome').textContent=JSON.stringify(d2,null,2);
+        if(d2?.lat && d2?.lng && parseFloat(d2.lat)!==0){
+          lat=parseFloat(d2.lat); lng=parseFloat(d2.lng);
+          fonte='<span class="badge badge-ok">AwesomeAPI ✅</span>';
+        } else { throw new Error('sem coords'); }
+      } catch(_){
+        // 3) Nominatim — busca só bairro+cidade (não a rua, evita segmento errado)
+        show('det-nominatim');
+        const neighborhood = d1.neighborhood || '';
+        const city         = d1.city || 'Montes Claros';
+        const state        = d1.state || 'MG';
+        const q = [neighborhood, city, state, 'Brasil'].filter(Boolean).join(', ');
+        const r3=await fetch(
+          'https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=br',
+          {headers:{'Accept-Language':'pt-BR','User-Agent':'DLuhFestas-Test/1.0'}}
+        );
+        const d3=await r3.json();
+        document.getElementById('r-json-nom').textContent=JSON.stringify(d3,null,2);
+        if(!d3.length) throw new Error('Nenhuma fonte conseguiu coordenadas para este CEP');
+        lat=parseFloat(d3[0].lat); lng=parseFloat(d3[0].lon);
+        fonte='<span class="badge badge-warn">Nominatim bairro ⚠️</span>';
+      }
     }
+
     const distLinha=haversine(LAT_LOJA,LNG_LOJA,lat,lng);
     const distRota=distLinha*FATOR_ROTA;
     const taxa=taxaPorKm(distRota);
     const faixa=TABELA.find(f=>distRota<=f.ate);
-    document.getElementById('r-cep').textContent=data.cep||cep;
-    document.getElementById('r-bairro').textContent=(data.street||'?')+', '+(data.neighborhood||'?')+' — '+(data.city||'?');
-    document.getElementById('r-fonte').innerHTML=fonte;
-    document.getElementById('r-coords').textContent=lat.toFixed(6)+', '+lng.toFixed(6);
-    document.getElementById('r-linha').textContent=distLinha.toFixed(3)+' km';
-    document.getElementById('r-rota').textContent=distRota.toFixed(3)+' km';
-    document.getElementById('r-taxa').textContent=fmt(taxa);
-    document.getElementById('r-faixa').innerHTML='✅ Faixa: até <b>'+faixa?.ate+' km</b> → <b>'+fmt(taxa)+'</b>';
-    document.getElementById('resultado').style.display='block';
+
+    document.getElementById('r-cep').textContent    = d1.cep||cep;
+    document.getElementById('r-bairro').textContent = (d1.street||'?')+', '+(d1.neighborhood||'?')+' — '+(d1.city||'?');
+    document.getElementById('r-fonte').innerHTML    = fonte;
+    document.getElementById('r-coords').textContent = lat.toFixed(6)+', '+lng.toFixed(6);
+    document.getElementById('r-linha').textContent  = distLinha.toFixed(3)+' km';
+    document.getElementById('r-rota').textContent   = distRota.toFixed(3)+' km';
+    document.getElementById('r-taxa').textContent   = fmt(taxa);
+    document.getElementById('r-faixa').innerHTML    = '✅ Faixa: até <b>'+faixa?.ate+' km</b> → <b>'+fmt(taxa)+'</b>';
+    show('resultado');
   }catch(e){alert('Erro: '+e.message);}
 }
 document.getElementById('cep').addEventListener('keydown',e=>{if(e.key==='Enter')testar();});
