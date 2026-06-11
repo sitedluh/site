@@ -254,6 +254,16 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .radio-group{display:flex;flex-wrap:wrap;gap:8px}
 .radio-opt{border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;cursor:pointer;font-size:13px;color:var(--text2);background:var(--surface);user-select:none;transition:all .15s}
 .radio-opt.active{border-color:var(--accent);color:var(--accent);background:var(--accent-light);font-weight:500}
+/* ── Slider de entrada ── */
+.entrada-box{background:var(--surface2,#fdf6f3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-top:4px}
+.entrada-slider{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:linear-gradient(to right,var(--accent) 0%,var(--accent) 50%,var(--border) 50%,var(--border) 100%);outline:none;cursor:pointer}
+.entrada-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.entrada-marks{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-top:4px;padding:0 2px}
+.entrada-vals{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)}
+.entrada-val-item{text-align:center}
+.entrada-val-item .lbl{font-size:11px;color:var(--text2);margin-bottom:2px}
+.entrada-val-item .val{font-size:16px;font-weight:600;color:var(--accent)}
+.entrada-val-item.resto .val{color:var(--text2);font-size:14px}
 .order-review{background:var(--surface2);border-radius:var(--radius-sm);padding:1rem}
 .order-review-item{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:var(--text2)}
 .order-review-total{display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding-top:10px;margin-top:8px;border-top:1px solid var(--border);color:var(--text)}
@@ -640,6 +650,24 @@ body.checkout-active .cat-mobile{display:none!important}
           <div class="radio-opt" data-val="Cartão de crédito" onclick="selectRadio(this,'rg-pgto')">Crédito</div>
           <div class="radio-opt" data-val="Cartão de débito" onclick="selectRadio(this,'rg-pgto')">Débito</div>
           <div class="radio-opt" data-val="Dinheiro" onclick="selectRadio(this,'rg-pgto');forcarRetirada()">Dinheiro</div>
+        </div>
+      </div>
+      <div class="form-row" id="row-entrada">
+        <label>Valor de entrada</label>
+        <div class="entrada-box">
+          <input type="range" id="f-entrada-pct" class="entrada-slider" min="50" max="100" step="5" value="50" oninput="atualizarEntrada()">
+          <div class="entrada-marks"><span>50%</span><span>75%</span><span>100%</span></div>
+          <div class="entrada-vals">
+            <div class="entrada-val-item">
+              <div class="lbl">Entrada agora (<span id="entrada-pct-label">50%</span>)</div>
+              <div class="val" id="entrada-val">R$ 0,00</div>
+            </div>
+            <div style="font-size:20px;color:var(--border)">+</div>
+            <div class="entrada-val-item resto">
+              <div class="lbl">Restante na entrega/retirada</div>
+              <div class="val" id="entrada-resto">R$ 0,00</div>
+            </div>
+          </div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="form-row">
@@ -1232,6 +1260,10 @@ function goCheckout(){
   document.getElementById('checkout-page').classList.add('active');
   document.body.classList.add('checkout-active');
   window.scrollTo(0,0);
+  // Reseta slider de entrada para 50% e recalcula
+  const sliderEl=document.getElementById('f-entrada-pct');
+  if(sliderEl)sliderEl.value=50;
+  atualizarEntrada();
   loadUserData();
   goCheckoutPushState();
   // Pré-preenche nome se logado
@@ -1260,7 +1292,23 @@ window.addEventListener('popstate',(e)=>{
     showCatalog();
   }
 });
-function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega')document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';}
+function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';}atualizarEntrada();}
+
+function atualizarEntrada(){
+  const items=Object.values(cart).filter(i=>i.qty>0);
+  const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
+  const taxaFrete=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
+  const total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperBonus+taxaFrete;
+  const slider=document.getElementById('f-entrada-pct');
+  const pct=parseInt(slider?.value||50)/100;
+  const entrada=Math.round(total*pct*100)/100;
+  const resto=Math.round((total-entrada)*100)/100;
+  // Atualiza gradiente do slider
+  if(slider){const p=(pct-0.5)/0.5*100;slider.style.background=`linear-gradient(to right,var(--accent) 0%,var(--accent) ${p}%,var(--border) ${p}%,var(--border) 100%)`;}
+  if(document.getElementById('entrada-pct-label'))document.getElementById('entrada-pct-label').textContent=Math.round(pct*100)+'%';
+  if(document.getElementById('entrada-val'))document.getElementById('entrada-val').textContent=fmtBRL(entrada);
+  if(document.getElementById('entrada-resto'))document.getElementById('entrada-resto').textContent=fmtBRL(Math.max(0,resto));
+}
 function getRadio(groupId){const a=document.querySelector('#'+groupId+' .radio-opt.active');return a?a.dataset.val:'';}
 // Carrega os horários disponíveis (slots fixos de 15 em 15 min, 08:00–22:00) para a data
 // escolhida, consultando o Worker, que verifica a capacidade já comprometida em "Calendário Base"
@@ -1431,6 +1479,9 @@ async function _doFinalizar(){
   const bairro=document.getElementById('f-bairro')?.value.trim()||'';
   const endereco=entrega==='Entrega em endereço'?[rua,num,bairro,cep].filter(Boolean).join(', '):'';
   const pagamento=getRadio('rg-pgto'),data=document.getElementById('f-data').value,obs=document.getElementById('f-obs').value.trim(),topperBonus=Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length*20,taxaFrete=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0),total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperBonus+taxaFrete;
+  const entradaPct=parseInt(document.getElementById('f-entrada-pct')?.value||50)/100;
+  const entradaVal=Math.round(total*entradaPct*100)/100;
+  const restoVal=Math.round((total-entradaVal)*100)/100;
   let msg=`🛍️ *NOVO PEDIDO — D'Luh Festas*\n\n👤 *Cliente:* ${nome}\n📱 *WhatsApp:* ${tel}\n📦 *Entrega:* ${entrega==='Entrega em endereço'?`Entrega — ${endereco}`:'Retirada no local'}\n💳 *Pagamento:* ${pagamento}\n`;
   const hora=document.getElementById('f-hora')?.value||'';
   if(data)msg+=`📅 *Data:* ${data.split('-').reverse().join('/')}${hora?' às '+hora:''}\n`;
@@ -1444,6 +1495,8 @@ async function _doFinalizar(){
   if(topperBonus>0)msg+=`\n  • Topper personalizado (${Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length}x) = ${fmtBRL(topperBonus)}`;
   if(taxaFrete>0)msg+=`\n  • Taxa de entrega = ${fmtBRL(taxaFrete)}`;
   msg+=`\n💰 *Total:* ${fmtBRL(total)}`;
+  msg+=`\n💵 *Entrada (${Math.round(entradaPct*100)}%):* ${fmtBRL(entradaVal)}`;
+  if(restoVal>0)msg+=`\n⏳ *Restante na entrega:* ${fmtBRL(restoVal)}`;
   if(obs)msg+=`\n\n📝 *Obs:* ${obs}`;
   const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
   // Já direciona a aba aberta no clique para o WhatsApp (não precisa esperar Coda/Firebase).
@@ -1458,7 +1511,7 @@ async function _doFinalizar(){
     return txt;
   }).join('\n');
   // Salva no Firebase (não bloqueia)
-  salvarPedidoFirebase({nome,tel,entrega,endereco,pagamento,data,hora:horaVal,obs,total,itensTexto});
+  salvarPedidoFirebase({nome,tel,entrega,endereco,pagamento,data,hora:horaVal,obs,total,entradaVal,restoVal,itensTexto});
   // Upload de imagens de topper para Firebase Storage (com timeout de 8s)
   for(const item of items){
     const td=topperPorProduto[item.id];
