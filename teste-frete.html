@@ -7,53 +7,61 @@
 <style>
   body{font-family:monospace;max-width:680px;margin:30px auto;padding:0 20px;background:#f5f5f5}
   h2{color:#c0725a}
-  input,select{width:100%;padding:9px;font-size:15px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;margin-bottom:8px}
-  button{background:#c0725a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin:4px 4px 4px 0}
+  input{width:100%;padding:9px;font-size:15px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;margin-bottom:8px}
+  button{background:#c0725a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer}
   .card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;margin-top:12px}
   .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px;gap:8px}
   .row:last-child{border:none}
-  .label{color:#888;white-space:nowrap}
-  .val{font-weight:bold;text-align:right}
-  pre{background:#222;color:#0f0;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;max-height:250px;overflow-y:auto}
+  .label{color:#888;white-space:nowrap}.val{font-weight:bold;text-align:right}
+  pre{background:#222;color:#0f0;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;max-height:200px;overflow-y:auto}
   .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:bold}
-  .badge-ok{background:#d4edda;color:#155724}
-  .badge-warn{background:#fff3cd;color:#856404}
-  .badge-err{background:#f8d7da;color:#721c24}
+  .badge-ok{background:#d4edda;color:#155724}.badge-warn{background:#fff3cd;color:#856404}.badge-err{background:#f8d7da;color:#721c24}
   .result-box{border-left:4px solid #4caf50;background:#d4edda;padding:10px 14px;border-radius:4px;margin-top:8px;font-size:14px}
   .result-box.err{border-color:#e53935;background:#f8d7da}
   summary{cursor:pointer;font-size:12px;color:#888;margin-top:6px;display:block}
-  h3{margin:16px 0 6px;font-size:14px;color:#555}
-  .tries{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-  .try-card{background:#fff;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:12px}
-  .try-card.best{border-color:#4caf50;background:#f0fff4}
-  .try-title{font-weight:bold;margin-bottom:6px;font-size:13px}
+  .step{background:#fff;border:1px solid #ddd;border-radius:6px;padding:10px;margin-top:8px;font-size:13px}
+  .step-title{font-weight:bold;color:#555;margin-bottom:4px}
+  .ok{color:#4caf50}.err{color:#e53935}.warn{color:#ff9800}
 </style>
 </head>
 <body>
-<h2>🛵 Teste Cálculo de Frete — Multi-fonte</h2>
-<p style="font-size:12px;color:#666">Loja: <b>-16.7286406, -43.8582139</b> | FATOR: <b>1.80</b> | Esperado Morrinhos: <b>R$9,70 (3.65km rota)</b></p>
-
+<h2>🛵 Teste Cálculo de Frete — OSRM</h2>
+<p style="font-size:12px;color:#666">
+  Loja: <b>-16.7286406, -43.8582139</b><br>
+  Esperado para Morrinhos (39400-423): <b>R$9,70 (3.65km rota Lets)</b>
+</p>
 <label>CEP de destino</label>
 <input id="cep" type="text" placeholder="39400-423" maxlength="9"
   oninput="this.value=this.value.replace(/\D/g,'').replace(/(\d{5})(\d)/,'$1-$2')">
-<button onclick="testar()">🔍 Testar todas as fontes</button>
+<button onclick="testar()">🔍 Calcular com OSRM</button>
 
-<div id="resultado" style="display:none">
-  <div class="card">
-    <div class="row"><span class="label">CEP</span><span class="val" id="r-cep"></span></div>
-    <div class="row"><span class="label">Endereço (BrasilAPI)</span><span class="val" id="r-bairro"></span></div>
+<div id="resultado" style="display:none;margin-top:12px">
+
+  <div class="step">
+    <div class="step-title">① BrasilAPI — dados do endereço</div>
+    <div id="s1"></div>
   </div>
 
-  <h3>Resultados por fonte de geocoding</h3>
-  <div class="tries" id="r-tries"></div>
+  <div class="step">
+    <div class="step-title">② OpenCage — coordenadas do destino</div>
+    <div id="s2"></div>
+  </div>
 
-  <div id="r-melhor" class="result-box" style="margin-top:10px"></div>
-  <details><summary>JSON BrasilAPI</summary><pre id="r-json-brasil"></pre></details>
+  <div class="step">
+    <div class="step-title">③ OSRM — distância real por rota</div>
+    <div id="s3"></div>
+  </div>
+
+  <div id="r-final" class="result-box" style="margin-top:10px"></div>
+
+  <details style="margin-top:8px"><summary>JSON BrasilAPI</summary><pre id="r-json-brasil"></pre></details>
+  <details style="margin-top:4px"><summary>JSON OpenCage</summary><pre id="r-json-oc"></pre></details>
+  <details style="margin-top:4px"><summary>JSON OSRM</summary><pre id="r-json-osrm"></pre></details>
 </div>
 
 <script>
 const OC_KEY='d1b604a636d74015b0975bcc0dab85d2';
-const LAT_LOJA=-16.7286406, LNG_LOJA=-43.8582139, FATOR=1.80;
+const LAT_LOJA=-16.7286406, LNG_LOJA=-43.8582139;
 const TABELA=[
   {ate:2,v:6.60},{ate:3,v:7.80},{ate:4,v:9.70},{ate:5,v:10.80},
   {ate:6.5,v:11.90},{ate:8,v:13.10},{ate:9,v:14.50},{ate:10,v:16.90},
@@ -61,101 +69,63 @@ const TABELA=[
   {ate:19,v:25.90},{ate:22,v:28.50},{ate:50,v:50.00},{ate:60,v:60.00},
   {ate:70,v:70.00},{ate:80,v:80.00},{ate:90,v:90.00},{ate:100,v:100.00},
 ];
-function hav(a,b,c,d){const R=6371,dLat=(c-a)*Math.PI/180,dLng=(d-b)*Math.PI/180,e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
 function taxa(k){for(const f of TABELA)if(k<=f.ate)return f.v;return TABELA.at(-1).v;}
-function fmt(v){return'R$'+v.toFixed(2).replace('.',',');}
-
-async function geocode(label, url, extract) {
-  try {
-    const r = await fetch(url, {headers:{'User-Agent':'DLuhFestas-Test/1.0','Accept-Language':'pt-BR'}});
-    const d = await r.json();
-    const pos = extract(d);
-    if (!pos) return {label, ok:false, raw:d, err:'sem coordenadas'};
-    const distLinha = hav(LAT_LOJA,LNG_LOJA,pos.lat,pos.lng);
-    const distRota = distLinha*FATOR;
-    return {label, ok:true, raw:d, lat:pos.lat, lng:pos.lng, distLinha, distRota, taxa:taxa(distRota)};
-  } catch(e) {
-    return {label, ok:false, err:e.message};
-  }
-}
+function fmt(v){return'R$ '+v.toFixed(2).replace('.',',');}
+function hav(a,b,c,d){const R=6371,dLat=(c-a)*Math.PI/180,dLng=(d-b)*Math.PI/180,e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
 
 async function testar(){
   const cep=document.getElementById('cep').value.replace(/\D/g,'');
   if(cep.length<8){alert('CEP inválido');return;}
-  document.getElementById('resultado').style.display='none';
-  document.getElementById('r-tries').innerHTML='<i style="color:#888;font-size:12px">Consultando fontes...</i>';
   document.getElementById('resultado').style.display='block';
+  ['s1','s2','s3','r-final'].forEach(id=>document.getElementById(id).innerHTML='<span style="color:#888">aguardando...</span>');
 
-  // BrasilAPI para dados do endereço
-  const r1=await fetch('https://brasilapi.com.br/api/cep/v2/'+cep);
-  const d1=await r1.json();
-  document.getElementById('r-json-brasil').textContent=JSON.stringify(d1,null,2);
-  document.getElementById('r-cep').textContent=d1.cep||cep;
-  document.getElementById('r-bairro').textContent=(d1.street||'?')+', '+(d1.neighborhood||'?')+' — '+(d1.city||'?');
-
-  const street=d1.street||'', bairro=d1.neighborhood||'', city=d1.city||'Montes Claros', state=d1.state||'MG';
-
-  // Tentativas paralelas
-  const fontes = await Promise.all([
-    // 1) BrasilAPI coords
-    geocode('BrasilAPI',
-      'https://brasilapi.com.br/api/cep/v2/'+cep,
-      d => { const c=d?.location?.coordinates; return c?.latitude?{lat:parseFloat(c.latitude),lng:parseFloat(c.longitude)}:null; }
-    ),
-    // 2) AwesomeAPI
-    geocode('AwesomeAPI',
-      'https://cep.awesomeapi.com.br/json/'+cep,
-      d => d?.lat&&parseFloat(d.lat)!==0?{lat:parseFloat(d.lat),lng:parseFloat(d.lng)}:null
-    ),
-    // 3) OpenCage — rua+bairro+cidade
-    geocode('OpenCage (rua)',
-      'https://api.opencagedata.com/geocode/v1/json?q='+encodeURIComponent([street,bairro,city,state,'Brasil'].filter(Boolean).join(', '))+'&countrycode=br&limit=1&key='+OC_KEY,
-      d => { const g=d?.results?.[0]?.geometry; return g?.lat?{lat:g.lat,lng:g.lng}:null; }
-    ),
-    // 4) OpenCage — só bairro+cidade (evita rua errada)
-    geocode('OpenCage (bairro)',
-      'https://api.opencagedata.com/geocode/v1/json?q='+encodeURIComponent([bairro,city,state,'Brasil'].filter(Boolean).join(', '))+'&countrycode=br&limit=1&key='+OC_KEY,
-      d => { const g=d?.results?.[0]?.geometry; return g?.lat?{lat:g.lat,lng:g.lng}:null; }
-    ),
-    // 5) OpenCage — CEP direto
-    geocode('OpenCage (CEP)',
-      'https://api.opencagedata.com/geocode/v1/json?q='+encodeURIComponent(cep.replace(/(\d{5})(\d)/,'$1-$2')+', '+city+', '+state)+'&countrycode=br&limit=1&key='+OC_KEY,
-      d => { const g=d?.results?.[0]?.geometry; return g?.lat?{lat:g.lat,lng:g.lng}:null; }
-    ),
-    // 6) Nominatim — só bairro+cidade
-    geocode('Nominatim (bairro)',
-      'https://nominatim.openstreetmap.org/search?q='+encodeURIComponent([bairro,city,state,'Brasil'].filter(Boolean).join(', '))+'&format=json&limit=1&countrycodes=br',
-      d => d?.length?{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}:null
-    ),
-  ]);
-
-  // Renderiza cards
-  const triesEl=document.getElementById('r-tries');
-  triesEl.innerHTML='';
-  let melhor=null;
-  for(const f of fontes){
-    const div=document.createElement('div');
-    if(f.ok){
-      // "melhor" = mais distante (geocoding incorreto tende a estar muito perto da loja)
-      if(!melhor||f.distLinha>melhor.distLinha) melhor=f;
-      div.className='try-card';
-      div.innerHTML=`<div class="try-title">${f.label}</div>
-        <div>📌 ${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}</div>
-        <div>📏 ${f.distLinha.toFixed(2)} km linha</div>
-        <div>🛣️ ${f.distRota.toFixed(2)} km rota</div>
-        <div>💰 <b>${fmt(f.taxa)}</b></div>`;
-    } else {
-      div.className='try-card';
-      div.innerHTML=`<div class="try-title">${f.label}</div><div class="badge badge-err">❌ ${f.err||'falhou'}</div>`;
-    }
-    triesEl.appendChild(div);
+  // ── PASSO 1: BrasilAPI ──
+  let d1, street, bairro, city, state;
+  try{
+    const r=await fetch('https://brasilapi.com.br/api/cep/v2/'+cep);
+    d1=await r.json();
+    document.getElementById('r-json-brasil').textContent=JSON.stringify(d1,null,2);
+    street=d1.street||''; bairro=d1.neighborhood||''; city=d1.city||'Montes Claros'; state=d1.state||'MG';
+    document.getElementById('s1').innerHTML=`<span class="ok">✅ ${street}, ${bairro} — ${city}/${state}</span>`;
+  }catch(e){
+    document.getElementById('s1').innerHTML=`<span class="err">❌ ${e.message}</span>`; return;
   }
 
-  // Destaca o melhor
-  if(melhor){
-    triesEl.querySelectorAll('.try-card')[fontes.indexOf(melhor)]?.classList.add('best');
-    document.getElementById('r-melhor').innerHTML=
-      `🏆 Melhor resultado: <b>${melhor.label}</b> → ${melhor.distRota.toFixed(2)} km rota → <b>${fmt(melhor.taxa)}</b>`;
+  // ── PASSO 2: OpenCage — bairro+cidade (mais confiável que rua) ──
+  let lat,lng;
+  try{
+    const q=[bairro,city,state,'Brasil'].filter(Boolean).join(', ');
+    const r=await fetch('https://api.opencagedata.com/geocode/v1/json?q='+encodeURIComponent(q)+'&countrycode=br&limit=1&key='+OC_KEY);
+    const d2=await r.json();
+    document.getElementById('r-json-oc').textContent=JSON.stringify(d2,null,2);
+    const geo=d2?.results?.[0]?.geometry;
+    if(!geo?.lat) throw new Error('OpenCage sem resultado');
+    lat=geo.lat; lng=geo.lng;
+    const distLinha=hav(LAT_LOJA,LNG_LOJA,lat,lng);
+    document.getElementById('s2').innerHTML=`<span class="ok">✅ ${lat.toFixed(5)}, ${lng.toFixed(5)} (${distLinha.toFixed(2)} km linha reta)</span>`;
+  }catch(e){
+    document.getElementById('s2').innerHTML=`<span class="err">❌ ${e.message}</span>`; return;
+  }
+
+  // ── PASSO 3: OSRM — distância real por estrada ──
+  try{
+    // OSRM usa formato: lng,lat (atenção à ordem!)
+    const url=`https://router.project-osrm.org/route/v1/driving/${LNG_LOJA},${LAT_LOJA};${lng},${lat}?overview=false`;
+    const r=await fetch(url);
+    const d3=await r.json();
+    document.getElementById('r-json-osrm').textContent=JSON.stringify(d3,null,2);
+    if(d3.code!=='Ok') throw new Error('OSRM: '+d3.code);
+    const distRota=d3.routes[0].distance/1000; // metros → km
+    const t=taxa(distRota);
+    document.getElementById('s3').innerHTML=`<span class="ok">✅ Distância por estrada: <b>${distRota.toFixed(2)} km</b></span>`;
+    document.getElementById('r-final').className='result-box';
+    document.getElementById('r-final').innerHTML=
+      `🏁 Resultado final: <b>${distRota.toFixed(2)} km</b> de rota → <b>${fmt(t)}</b>` +
+      `<br><small style="color:#555">Lets: 3.65km → R$9,70 | Diferença: ${(distRota-3.65).toFixed(2)} km</small>`;
+  }catch(e){
+    document.getElementById('s3').innerHTML=`<span class="err">❌ ${e.message}</span>`;
+    document.getElementById('r-final').className='result-box err';
+    document.getElementById('r-final').textContent='OSRM falhou — tente novamente';
   }
 }
 document.getElementById('cep').addEventListener('keydown',e=>{if(e.key==='Enter')testar();});
