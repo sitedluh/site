@@ -1723,6 +1723,15 @@ let _taxaEntregaAtual = 0;
 // Chave OpenCage (geocodificador gratuito, sem cartão — opencagedata.com)
 const OPENCAGE_API_KEY = 'd1b604a636d74015b0975bcc0dab85d2';
 
+// ── TABELA MANUAL DE CEPs ────────────────────────────────────────
+// CEPs com valores verificados no Moblets/Lets Express.
+// Tem prioridade total sobre o cálculo automático.
+// Formato: 'CEPSEMNUMERO': valorEmReais
+const CEP_PRECOS_FIXOS = {
+  '39400423': 9.70,  // Rua Capitão Enéas, Morrinhos
+};
+// ─────────────────────────────────────────────────────────────────
+
 async function geocodeHere(street, neighborhood, city, state) {
   if (!OPENCAGE_API_KEY) throw new Error('sem chave OpenCage');
   const q = [street, neighborhood, city, state, 'Brasil'].filter(Boolean).join(', ');
@@ -1764,6 +1773,16 @@ async function calcDeliveryFee() {
   if(loading) loading.style.display = 'block';
 
   try {
+    // 0) Tabela manual — prioridade total sobre APIs
+    if (CEP_PRECOS_FIXOS[cep] !== undefined) {
+      _taxaEntregaAtual = CEP_PRECOS_FIXOS[cep];
+      if(valEl) valEl.textContent = fmtBRL(_taxaEntregaAtual);
+      if(infoEl) infoEl.textContent = 'Taxa verificada';
+      if(box) box.style.display = 'block';
+      if(loading) loading.style.display = 'none';
+      return;
+    }
+
     // 1) BrasilAPI — address info + coordenadas diretas quando disponíveis
     const res  = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
     if (!res.ok) throw new Error('CEP não encontrado');
