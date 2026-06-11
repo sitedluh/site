@@ -1720,17 +1720,17 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 let _taxaEntregaAtual = 0;
 
-// Chave HERE Maps (geocodificador de qualidade) — deixar vazio usa somente fallbacks gratuitos
-const HERE_API_KEY = '';
+// Chave OpenCage (geocodificador gratuito, sem cartão — opencagedata.com)
+const OPENCAGE_API_KEY = 'd1b604a636d74015b0975bcc0dab85d2';
 
 async function geocodeHere(street, neighborhood, city, state) {
-  if (!HERE_API_KEY) throw new Error('sem chave HERE');
+  if (!OPENCAGE_API_KEY) throw new Error('sem chave OpenCage');
   const q = [street, neighborhood, city, state, 'Brasil'].filter(Boolean).join(', ');
-  const r = await fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(q)}&apikey=${HERE_API_KEY}`);
+  const r = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(q)}&countrycode=br&limit=1&key=${OPENCAGE_API_KEY}`);
   const d = await r.json();
-  const pos = d?.items?.[0]?.position;
-  if (!pos?.lat) throw new Error('HERE sem resultado');
-  return { lat: pos.lat, lng: pos.lng, confiavel: true };
+  const geo = d?.results?.[0]?.geometry;
+  if (!geo?.lat) throw new Error('OpenCage sem resultado');
+  return { lat: geo.lat, lng: geo.lng, confiavel: true };
 }
 
 async function geocodeFallback(street, neighborhood, city, state) {
