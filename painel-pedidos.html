@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍽️ Painel de Pedidos</title>
+<meta name="theme-color" content="#f97316">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0c0a; --surface: #1a1714; --surface2: #231f1b; --border: #2e2925;
+  --accent: #f97316; --accent2: #fbbf24; --accent-soft: rgba(249,115,22,0.12);
+  --green: #22c55e; --green-soft: rgba(34,197,94,0.12);
+  --blue: #60a5fa; --blue-soft: rgba(96,165,250,0.12);
+  --red: #f87171; --red-soft: rgba(248,113,113,0.12);
+  --text: #f5f0ea; --text2: #a89880; --text3: #6b5f52;
+  --r: 14px; --rs: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+/* APP LAYOUT */
+#app { display: flex; flex-direction: column; min-height: 100vh; font-size: 18px; }
+
+/* HEADER */
+.hdr {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 100;
+}
+.hdr-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.4rem; color: var(--accent); flex: 1; }
+.hdr-clock { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 700; letter-spacing: .05em; }
+.hdr-date { font-size: .9rem; color: var(--text2); }
+.btn-ic {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs);
+  color: var(--text2); cursor: pointer; padding: 9px 14px; font-size: 1rem;
+  display: flex; align-items: center; gap: 6px; transition: all .2s;
+}
+.btn-ic:hover { color: var(--text); border-color: var(--text2); }
+.sdot { width:8px; height:8px; border-radius:50%; background:var(--green); animation: pdot 2s ease-in-out infinite; }
+.sdot.off { background:var(--text3); animation:none; }
+@keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+
+/* UNLOCK AUDIO BTN */
+#unlock-btn {
+  position: fixed; bottom: 20px; right: 20px; z-index: 500;
+  background: var(--accent); color: #fff; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: .9rem; padding: 14px 20px; border-radius: 12px;
+  cursor: pointer; box-shadow: 0 4px 20px rgba(249,115,22,.5);
+  animation: pg 2s ease-in-out infinite; border: none;
+}
+@keyframes pg { 0%,100%{box-shadow:0 0 20px rgba(249,115,22,.3)} 50%{box-shadow:0 0 40px rgba(249,115,22,.6)} }
+
+/* MAIN */
+.main { display: flex; flex: 1; }
+.col-featured { width: 100%; padding: 14px; }
+.col-queue { flex: 1; padding: 14px; border-top: 1px solid var(--border); }
+@media(min-width:900px) {
+  .col-queue { width: 400px; flex-shrink: 0; border-right: 1px solid var(--border); border-top: none; }
+  .col-featured { border-top: none; }
+  .main { flex-direction: row; }
+}
+
+.slabel {
+  font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--text3); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.slabel::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* FEATURED CARD */
+.fc {
+  background: var(--surface); border: 2px solid var(--accent); border-radius: var(--r);
+  overflow: hidden; box-shadow: 0 0 40px rgba(249,115,22,.15);
+  animation: fcglow 3s ease-in-out infinite;
+}
+@keyframes fcglow { 0%,100%{box-shadow:0 0 30px rgba(249,115,22,.12)} 50%{box-shadow:0 0 50px rgba(249,115,22,.28)} }
+.fc-hdr {
+  background: linear-gradient(135deg, var(--accent), #ea580c);
+  padding: 16px 18px; display: flex; align-items: center; gap: 10px;
+}
+.fc-badge {
+  background: rgba(255,255,255,.2); border-radius:5px; padding:3px 10px;
+  font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#fff;
+}
+.fc-name { flex:1; font-family:'Syne',sans-serif; font-weight:700; font-size:1.4rem; color:#fff; }
+.fc-tipo { font-size:1rem; font-weight:600; color:rgba(255,255,255,.9); }
+.fc-body { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fc-box { background:var(--surface2); border-radius:var(--rs); padding:12px 14px; }
+.fc-box-label { font-size:.8rem; color:var(--text3); text-transform:uppercase; letter-spacing:.08em; margin-bottom:3px; }
+.fc-box-val { font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; }
+.fc-box-val.hl { color:var(--accent); font-size:1.3rem; }
+.fc-timer {
+  background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--rs);
+  padding:12px 14px; grid-column:1/-1; display:flex; align-items:center; justify-content:space-between;
+}
+.fc-timer-lbl { font-size:.9rem; color:var(--accent); font-weight:500; }
+.fc-timer-val { font-family:'Syne',sans-serif; font-weight:800; font-size:1.8rem; color:var(--accent); letter-spacing:.05em; }
+.fc-timer-val.urg { color:var(--red); animation:blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.fc-late { background:var(--red-soft); border:1px solid var(--red); border-radius:var(--rs); padding:11px 15px; margin:0 18px 12px; display:flex; align-items:center; gap:10px; animation:lpulse 1.5s ease-in-out infinite; }
+@keyframes lpulse { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 16px rgba(248,113,113,.4)} }
+.fc-late-txt { flex:1; font-size:1rem; color:var(--red); font-weight:600; }
+.fc-late-min { font-family:'Syne',sans-serif; font-weight:800; color:var(--red); font-size:1.1rem; }
+.items-toggle { display:flex; align-items:center; gap:8px; color:var(--text2); font-size:.95rem; cursor:pointer; user-select:none; padding:0 18px; margin-bottom:10px; }
+.items-toggle svg { transition:transform .2s; }
+.items-toggle.open svg { transform:rotate(180deg); }
+.items-list { display:none; padding:0 18px 6px; }
+.items-list.open { display:block; }
+.icat { font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--accent2); margin:10px 0 4px; }
+.irow { display:flex; align-items:baseline; gap:6px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.iqty { font-family:'Syne',sans-serif; font-weight:700; font-size:1.05rem; color:var(--accent); min-width:32px; }
+.iname { font-size:1rem; color:var(--text2); flex:1; }
+.fc-foot { padding:13px 18px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.fc-phone { font-size:1rem; color:var(--text2); }
+.fc-total { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; color:var(--green); }
+.btn-deliver {
+  width:calc(100% - 36px); margin:0 18px 16px;
+  background:var(--green-soft); border:1px solid var(--green); border-radius:var(--rs);
+  color:var(--green); font-family:'Syne',sans-serif; font-weight:700; font-size:1rem;
+  padding:12px 14px; cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.btn-deliver:hover { background:var(--green); color:#fff; }
+.btn-deliver.late { background:var(--red-soft); border-color:var(--red); color:var(--red); }
+.btn-deliver.late:hover { background:var(--red); color:#fff; }
+.btn-deliver:disabled { opacity:.5; cursor:default; }
+.no-fc { background:var(--surface); border:1px dashed var(--border); border-radius:var(--r); padding:30px; text-align:center; color:var(--text3); font-size:1rem; }
+
+/* QUEUE */
+.filter-bar { display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; scrollbar-width:none; }
+.filter-bar::-webkit-scrollbar { display:none; }
+.fbtn { flex-shrink:0; background:var(--surface2); border:1px solid var(--border); border-radius:20px; color:var(--text2); font-size:.85rem; font-weight:500; padding:6px 16px; cursor:pointer; transition:all .2s; }
+.fbtn.active { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+.qcard {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+  padding:14px; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; margin-bottom:10px;
+}
+.qcard::before { content:''; position:absolute; left:0;top:0;bottom:0; width:4px; background:var(--border); }
+.qcard.retirada::before { background:var(--green); }
+.qcard.entrega::before { background:var(--blue); }
+.qcard-top { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.qpos { font-family:'Syne',sans-serif; font-size:.85rem; font-weight:800; color:var(--text3); min-width:24px; }
+.qname { flex:1; font-weight:500; font-size:1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.qtime { font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; color:var(--text2); }
+.qcard-bot { display:flex; align-items:center; gap:8px; padding-left:32px; }
+.tag { display:inline-flex; align-items:center; gap:3px; border-radius:20px; padding:3px 9px; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.tag.retirada { background:var(--green-soft); color:var(--green); }
+.tag.entrega { background:var(--blue-soft); color:var(--blue); }
+.tag.urgente { background:var(--red-soft); color:var(--red); }
+.qdate { font-size:.82rem; color:var(--text3); }
+.qcd { margin-left:auto; font-size:.82rem; color:var(--text3); font-family:'Syne',sans-serif; }
+.qcd.soon { color:var(--accent); font-weight:700; }
+.qcd.urg { color:var(--red); font-weight:700; }
+.qdetails { display:none; padding-top:11px; margin-top:10px; border-top:1px solid var(--border); padding-left:32px; }
+.qdetails.open { display:block; }
+.btn-qdeliver {
+  background:var(--green-soft); border:1px solid var(--green); border-radius:var(--rs);
+  color:var(--green); font-family:'Syne',sans-serif; font-weight:700; font-size:.9rem;
+  padding:8px 14px; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:5px; margin-top:10px;
+}
+.btn-qdeliver:hover { background:var(--green); color:#fff; }
+.btn-qdeliver.late { background:var(--red-soft); border-color:var(--red); color:var(--red); }
+.btn-qdeliver.late:hover { background:var(--red); color:#fff; }
+
+/* ── MOBILE (< 600px) ── */
+@media(max-width:599px) {
+  /* Esconde elementos desktop */
+  .hdr-logo { display: none; }
+  .main { display: none !important; }
+  #unlock-btn { bottom: 80px; }
+
+  /* Header mobile minimalista */
+  .hdr { padding: 8px 12px; gap: 8px; }
+  .hdr-clock { font-size: 1rem; }
+  .hdr-date { font-size: .65rem; }
+  .btn-ic { padding: 6px 8px; font-size: .8rem; }
+  .btn-ic span { display: none; } /* esconde label "Som" */
+
+  /* Mobile list */
+  #mobile-view { display: flex; flex-direction: column; flex: 1; }
+  .m-filters {
+    display: flex; gap: 6px; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none;
+  }
+  .m-filters::-webkit-scrollbar { display: none; }
+  .m-pill {
+    flex-shrink: 0; border-radius: 20px; padding: 5px 13px;
+    font-size: .72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .05em; cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text2); transition: all .2s;
+  }
+  .m-pill.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  .m-list { flex: 1; overflow-y: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 5px; }
+
+  .m-item {
+    border-radius: 12px; padding: 11px 13px;
+    display: flex; align-items: center; gap: 10px;
+    position: relative; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface);
+    transition: all .2s;
+  }
+  .m-item.next { background: rgba(249,115,22,.08); border-color: rgba(249,115,22,.35); }
+  .m-item.delivered { opacity: .4; filter: saturate(0); }
+  .m-bar { width: 3px; position: absolute; left: 0; top: 0; bottom: 0; border-radius: 12px 0 0 12px; }
+  .m-bar.orange { background: var(--accent); }
+  .m-bar.green { background: var(--green); }
+  .m-bar.blue { background: var(--blue); }
+  .m-bar.gray { background: var(--border); }
+  .m-info { flex: 1; min-width: 0; padding-left: 4px; }
+  .m-name { font-weight: 600; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-name.next { color: var(--accent); }
+  .m-name.done { color: var(--text3); }
+  .m-sub { font-size: .68rem; color: var(--text2); margin-top: 2px; display: flex; gap: 5px; align-items: center; }
+  .m-tag { border-radius: 20px; padding: 1px 7px; font-size: .6rem; font-weight: 700; text-transform: uppercase; }
+  .m-tag.ret { background: var(--green-soft); color: var(--green); }
+  .m-tag.ent { background: var(--blue-soft); color: var(--blue); }
+  .m-right { text-align: right; flex-shrink: 0; }
+  .m-time { font-family: 'Syne', sans-serif; font-weight: 800; font-size: .88rem; color: var(--text2); }
+  .m-time.next { color: var(--accent); }
+  .m-time.done { color: var(--text3); }
+  .m-cd { font-size: .65rem; color: var(--text3); margin-top: 2px; font-family: 'Syne', sans-serif; font-weight: 700; }
+  .m-cd.urg { color: var(--red); }
+  .m-cd.soon { color: var(--accent); }
+  .m-cd.ok { color: var(--text3); }
+  .m-badge {
+    position: absolute; top: 6px; right: 8px;
+    background: var(--accent); color: #fff;
+    font-size: .52rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .08em; border-radius: 4px; padding: 2px 5px;
+  }
+
+  /* Modal de detalhes mobile */
+  #m-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    z-index: 400; align-items: flex-end;
+  }
+  #m-modal-overlay.open { display: flex; }
+  #m-modal {
+    background: var(--surface); border-radius: 20px 20px 0 0;
+    width: 100%; max-height: 85vh; overflow-y: auto;
+    padding: 0 0 24px; border-top: 2px solid var(--accent);
+    animation: slideUp .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .m-modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 16px; }
+  .m-modal-hdr { padding: 0 16px 12px; border-bottom: 1px solid var(--border); }
+  .m-modal-name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; }
+  .m-modal-sub { font-size: .8rem; color: var(--text2); margin-top: 3px; }
+  .m-modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .m-modal-row { display: flex; justify-content: space-between; }
+  .m-modal-label { font-size: .72rem; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; }
+  .m-modal-val { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem; }
+  .m-modal-val.hl { color: var(--accent); }
+  .m-modal-val.green { color: var(--green); }
+  .m-modal-items { background: var(--surface2); border-radius: var(--rs); padding: 10px 12px; }
+  .m-modal-btn {
+    margin: 0 16px; padding: 12px; border-radius: var(--rs);
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: .9rem;
+    cursor: pointer; text-align: center; border: none; transition: all .2s;
+  }
+  .m-modal-btn.deliver { background: var(--green-soft); border: 1px solid var(--green); color: var(--green); }
+  .m-modal-btn.deliver:hover { background: var(--green); color: #fff; }
+  .m-modal-btn.deliver.late { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+  .m-modal-btn.print { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); margin-top: 8px; }
+  .m-modal-timer {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: var(--rs); padding: 10px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .m-modal-timer-lbl { font-size: .75rem; color: var(--accent); }
+  .m-modal-timer-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--accent); }
+  .m-modal-timer-val.urg { color: var(--red); animation: blink 1s step-end infinite; }
+  .m-rlabel { text-align: center; padding: 8px; font-size: .68rem; color: var(--text3); }
+}
+
+/* Desktop: hide mobile view */
+@media(min-width:600px) {
+  #mobile-view { display: none !important; }
+  #m-modal-overlay { display: none !important; }
+}
+.btn-print {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs);
+  color: var(--text2); font-family: 'Syne', sans-serif; font-weight: 700; font-size: .9rem;
+  padding: 9px 14px; cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-print:hover { border-color: var(--text); color: var(--text); }
+
+/* Recibo oculto na tela, visível só na impressão */
+#print-area {
+  display: none;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  width: 72mm;
+  padding: 4mm;
+  color: #000;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+#print-area .p-logo {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  margin-bottom: 2mm;
+}
+
+#print-area .p-sub {
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 3mm;
+}
+
+#print-area .p-div {
+  border-top: 2px solid #000;
+  margin: 2mm 0;
+}
+
+#print-area .p-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: bold;
+  margin: 1.5mm 0;
+}
+
+#print-area .p-label { font-weight: 900; }
+#print-area .p-section { font-weight: 900; margin-top: 2mm; font-size: 14px; text-decoration: underline; }
+#print-area .p-item { margin-left: 2mm; font-size: 13px; font-weight: bold; }
+#print-area .p-total { font-size: 17px; font-weight: 900; text-align: right; margin-top: 2mm; }
+#print-area .p-footer { text-align: center; font-size: 12px; font-weight: bold; margin-top: 3mm; }
+
+/* Na hora de imprimir, esconde tudo menos o recibo */
+@media print {
+  body > * { display: none !important; }
+  #print-area { display: block !important; width: 72mm; margin: 0; padding: 2mm; }
+  @page { margin: 0; size: 80mm auto; }
+}
+.dq-opt {
+  padding: 8px 10px; border-radius: var(--rs); cursor: pointer;
+  font-size: .88rem; color: var(--text2); transition: all .15s;
+}
+.dq-opt:hover { background: var(--surface2); color: var(--text); }
+.dq-opt.active { color: var(--accent); font-weight: 600; }
+.cal-day {
+  padding: 5px 2px; border-radius: 6px; cursor: pointer;
+  font-size: .78rem; color: var(--text2); transition: all .15s; text-align:center;
+}
+.cal-day:hover { background: var(--surface2); color: var(--text); }
+.cal-day.today { color: var(--accent); font-weight: 700; }
+.cal-day.selected { background: var(--accent) !important; color: #fff !important; font-weight: 700; }
+.cal-day.has-orders { color: var(--text); }
+.cal-day.has-orders::after {
+  content:'•'; display:block; color:var(--accent2); font-size:.6rem; line-height:0; margin-top:2px;
+}
+.cal-day.other-month { color: var(--text3); }
+.cal-header { color: var(--text3); font-size:.72rem; font-weight:700; padding:3px 0; text-align:center; }
+.toast-wrap { position:fixed; top:0; left:0; right:0; z-index:999; pointer-events:none; }
+.toast {
+  background:linear-gradient(135deg,#f97316,#ea580c); color:#fff;
+  padding:14px 18px; display:flex; align-items:center; gap:9px;
+  transform:translateY(-100%); transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+  pointer-events:all; box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.toast.show { transform:translateY(0); }
+.toast-body { flex:1; }
+.toast-title { font-family:'Syne',sans-serif; font-weight:700; font-size:.95rem; }
+.toast-sub { font-size:.78rem; opacity:.9; }
+.toast-close { background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer; padding:0 3px; }
+
+.rlabel { text-align:center; padding:7px; font-size:.7rem; color:var(--text3); }
+.empty { text-align:center; padding:40px 20px; color:var(--text3); }
+.empty-icon { font-size:2.2rem; margin-bottom:10px; }
+::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-logo">🍽️ Pedidos</div>
+    <div style="flex:1"></div>
+    <div style="text-align:right">
+      <div class="hdr-clock" id="clock">--:--</div>
+      <div class="hdr-date" id="date-txt"></div>
+    </div>
+    <button class="btn-ic" id="sound-btn" onclick="toggleSound()">
+      <div class="sdot" id="sdot"></div>
+      <span id="slabel">Som</span>
+    </button>
+    <div style="position:relative" id="date-picker-wrap">
+      <button class="btn-ic" id="date-filter-btn" onclick="toggleDatePicker()">📅 <span id="date-filter-label">Hoje</span></button>
+      <div id="date-picker" style="display:none;position:absolute;right:0;top:110%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);z-index:300;width:300px;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden">
+        <!-- Opções rápidas -->
+        <div style="padding:8px;border-bottom:1px solid var(--border)">
+          <div class="dq-opt" onclick="setDateFilter('hoje')">📅 Hoje</div>
+          <div class="dq-opt" onclick="setDateFilter('amanha')">⏭️ Amanhã</div>
+          <div class="dq-opt" onclick="setDateFilter('semana')">📆 Próximos 7 dias</div>
+          <div class="dq-opt" onclick="setDateFilter('mes')">🗓️ Este mês</div>
+          <div class="dq-opt" onclick="setDateFilter('todos')">📋 Todos os pedidos</div>
+          <div class="dq-opt" onclick="setDateFilter('passados')">⏮️ Pedidos passados</div>
+        </div>
+        <!-- Calendário -->
+        <div style="padding:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <button onclick="calNav(-1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1.1rem;padding:4px 8px">‹</button>
+            <span id="cal-title" style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem"></span>
+            <button onclick="calNav(1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1.1rem;padding:4px 8px">›</button>
+          </div>
+          <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:.78rem"></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-ic" id="tts-btn" onclick="testarVoz()" title="Testar voz">🗣️</button>
+    <button class="btn-ic" onclick="printAllOrders()" title="Imprimir todos">🖨️ Tudo</button>
+    <button class="btn-ic" onclick="fetchOrders()" title="Atualizar">⟳</button>
+  </header>
+
+  <button id="unlock-btn" onclick="unlockAudio()">🔊 Toque para ativar o som</button>
+
+  <div class="main">
+    <!-- QUEUE (esquerda, menor) -->
+    <div class="col-queue">
+      <div class="slabel">Fila do dia</div>
+      <div class="filter-bar">
+        <button class="fbtn active" onclick="setFilter('todos',this)">Todos</button>
+        <button class="fbtn" onclick="setFilter('retirada',this)">🛍️ Retirada</button>
+        <button class="fbtn" onclick="setFilter('entrega',this)">🛵 Entrega</button>
+        <button class="fbtn" onclick="setFilter('urgente',this)">🔥 Urgente</button>
+      </div>
+      <div id="queue"></div>
+      <div class="rlabel" id="rlabel">—</div>
+    </div>
+
+    <!-- FEATURED (direita, área boa da tela) -->
+    <div class="col-featured">
+      <div class="slabel">▶ Próximo</div>
+      <div id="featured"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ÁREA DE IMPRESSÃO (invisível na tela) -->
+<div id="print-area"></div>
+
+<!-- MOBILE VIEW -->
+<div id="mobile-view">
+  <div class="m-filters">
+    <button class="m-pill active" onclick="setMFilter('todos',this)">Todos</button>
+    <button class="m-pill" onclick="setMFilter('retirada',this)">🛍️ Retirada</button>
+    <button class="m-pill" onclick="setMFilter('entrega',this)">🛵 Entrega</button>
+    <button class="m-pill" onclick="setMFilter('urgente',this)">🔥 Urgente</button>
+  </div>
+  <div class="m-list" id="m-list"></div>
+  <div class="m-rlabel" id="m-rlabel">—</div>
+  <button onclick="printAllOrders()" style="position:fixed;bottom:24px;right:16px;z-index:200;background:var(--accent);color:#fff;border:none;border-radius:50%;width:56px;height:56px;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 12px rgba(249,115,22,.4);display:none" id="m-print-all-btn">🖨️</button>
+</div>
+
+<!-- MOBILE MODAL -->
+<div id="m-modal-overlay" onclick="closeMModal(event)">
+  <div id="m-modal">
+    <div class="m-modal-handle"></div>
+    <div id="m-modal-content"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-wrap">
+  <div class="toast" id="toast">
+    <div style="font-size:1.3rem">🔔</div>
+    <div class="toast-body">
+      <div class="toast-title" id="toast-title"></div>
+      <div class="toast-sub" id="toast-sub"></div>
+    </div>
+    <button class="toast-close" onclick="hideToast()">×</button>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+const CFG = {
+  token: 'c2df9327-a40c-4716-9f59-c40620d691ef',
+  docId: 'Wq8ktEEI3N',
+  tableId: 'Pedidos Base',
+  cols: {
+    nome: 'c-qNsNbVHKNI',
+    data: 'c-0y6_X-_T7g',
+    hora: 'c-bL3KECWBkd',
+    tipo: 'c-NWtelSDmAE',
+    pedido: 'c-txX8tge0sr',
+    telefone: 'c-WhdvD5qzPB',
+    valor: 'c-lTihbeP5Cj',
+    status: 'c-SpdhR0ZMGd',
+    statusValor: 'Entregue'
+  },
+  alertHours: 1
+};
+
+// ── STATE ───────────────────────────────────────────────
+let orders = [];
+let allOrders = []; // todos os pedidos sem filtro de data
+let filter = 'todos';
+let soundOn = true;
+let alerted = new Set();
+let audioCtx = null;
+let audioUnlocked = false;
+let selectedDate = 'hoje'; // 'hoje', 'todos', 'YYYY-MM-DD'
+
+// ── CLOCK ───────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('date-txt').textContent =
+    now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ── AUDIO ───────────────────────────────────────────────
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function unlockAudio() {
+  getCtx();
+  audioUnlocked = true;
+  document.getElementById('unlock-btn').style.display = 'none';
+  playBell(1).then(() => speak('Som ativado!'));
+}
+
+async function playBell(intensity) {
+  const ctx = getCtx();
+  const ring = (delay, freq, gain) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    o2.type = 'sine'; o2.frequency.value = freq * 2.76;
+    g.gain.setValueAtTime(0, ctx.currentTime + delay);
+    g.gain.linearRampToValueAtTime(gain, ctx.currentTime + delay + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 2.5);
+    g2.gain.setValueAtTime(0, ctx.currentTime + delay);
+    g2.gain.linearRampToValueAtTime(gain * 0.3, ctx.currentTime + delay + 0.01);
+    g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 1.5);
+    o.connect(g); g.connect(ctx.destination);
+    o2.connect(g2); g2.connect(ctx.destination);
+    o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + 2.5);
+    o2.start(ctx.currentTime + delay); o2.stop(ctx.currentTime + delay + 1.5);
+  };
+  const rings = intensity >= 3 ? 4 : intensity === 2 ? 3 : 2;
+  const freq = intensity >= 3 ? 880 : intensity === 2 ? 740 : 660;
+  for (let i = 0; i < rings; i++) ring(i * 0.55, freq, 0.6);
+  return new Promise(r => setTimeout(r, rings * 550 + 500));
+}
+
+let speakQueue = Promise.resolve();
+
+function speak(text) {
+  if (!soundOn) return;
+  speakQueue = speakQueue.then(() => new Promise(resolve => {
+    try {
+      if (!window.speechSynthesis) { resolve(); return; }
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'pt-BR';
+      u.rate = 0.88;
+      u.volume = 1;
+      u.onend = resolve;
+      u.onerror = resolve;
+      setTimeout(resolve, 8000); // watchdog
+
+      const trySpeak = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const pt = voices.find(v => v.lang === 'pt-BR')
+                || voices.find(v => v.lang.startsWith('pt'))
+                || voices[0];
+        if (pt) u.voice = pt;
+        window.speechSynthesis.speak(u);
+      };
+
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) trySpeak();
+      else { window.speechSynthesis.onvoiceschanged = () => trySpeak(); }
+    } catch(e) { resolve(); }
+  }));
+}
+
+function testarVoz() {
+  playBell(1).then(() => speak('Teste de voz. Painel de pedidos funcionando!'));
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  document.getElementById('sdot').className = 'sdot' + (soundOn ? '' : ' off');
+  document.getElementById('slabel').textContent = soundOn ? 'Som' : 'Mudo';
+  if (soundOn) playBell(1).then(() => speak('Som ativado!'));
+}
+
+// ── TOAST ───────────────────────────────────────────────
+let toastTimer = null;
+function showToast(title, sub) {
+  document.getElementById('toast-title').textContent = title;
+  document.getElementById('toast-sub').textContent = sub || '';
+  document.getElementById('toast').classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 6000);
+}
+function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+// ── ALERTS ──────────────────────────────────────────────
+const STAGES = [60, 30, 15, 5, 0];
+
+async function alertNewOrder(order) {
+  const isEntrega = order.tipo.toLowerCase().includes('entrega');
+  const tipo = isEntrega ? 'entrega' : 'retirada';
+
+  showToast(
+    `🆕 Novo pedido — ${fmtDate(order.datetime)} ${fmtTime(order.datetime)}`,
+    `${order.nome} · ${isEntrega ? '🛵 Entrega' : '🛍️ Retirada'}`
+  );
+
+  if (soundOn) {
+    await playBell(2);
+    speak(`Novo pedido recebido! ${order.nome}, ${tipo} para ${fmtTimeSpeak(order.datetime)}.`);
+  }
+}
+
+function fmtTimeSpeak(dt) {
+  if (!dt) return '';
+  return new Date(dt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    .replace(':', ' horas e ') + ' minutos';
+}
+
+async function triggerAlert(order, mins, type) {
+  const isEntrega = order.tipo.toLowerCase().includes('entrega');
+  const tipo = isEntrega ? 'entrega' : 'retirada';
+  let bell, title, speech;
+
+  if (type === 'late') {
+    bell = 3; title = `⚠️ ATRASADO ${mins}min — ${order.nome}`;
+    speech = `Atenção! O pedido de ${order.nome} está atrasado ${mins} minutos.`;
+  } else if (mins === 0) {
+    bell = 3; title = `🔔 AGORA — ${order.nome}`;
+    speech = `Hora do pedido! ${order.nome}, ${tipo} agora!`;
+  } else if (mins <= 5) {
+    bell = 3; title = `🔥 ${mins} min — ${order.nome}`;
+    speech = `Urgente! ${mins} minutos para o pedido de ${order.nome}.`;
+  } else if (mins <= 15) {
+    bell = 2; title = `⏰ ${mins} min — ${order.nome}`;
+    speech = `Atenção! ${mins} minutos para o pedido de ${order.nome} para ${tipo}.`;
+  } else {
+    bell = 1; title = `🔔 ${mins} min — ${order.nome}`;
+    speech = `Lembrete. ${mins} minutos para o pedido de ${order.nome} para ${tipo}.`;
+  }
+
+  showToast(title, fmtTime(order.datetime) + ' · ' + (isEntrega ? '🛵 Entrega' : '🛍️ Retirada'));
+  if (soundOn) { await playBell(bell); speak(speech); }
+  renderAll();
+}
+
+function checkAlerts() {
+  const now = new Date();
+  orders.forEach(o => {
+    if (o.entregue) return;
+    const diffMin = Math.round((o.datetime - now) / 60000);
+    STAGES.forEach(s => {
+      const key = `${o.id}_s${s}`;
+      if (diffMin <= s && diffMin > s - 1.5 && !alerted.has(key)) {
+        alerted.add(key); triggerAlert(o, s, 'pre');
+      }
+    });
+    if (diffMin < 0) {
+      const lk = `${o.id}_late${Math.floor(Math.abs(diffMin) / 5)}`;
+      if (!alerted.has(lk)) { alerted.add(lk); triggerAlert(o, Math.abs(diffMin), 'late'); }
+    }
+  });
+}
+setInterval(checkAlerts, 30000);
+
+// ── CODA ────────────────────────────────────────────────
+async function fetchOrders() {
+  document.getElementById('rlabel').textContent = '⟳ Atualizando...';
+  try {
+    let allItems = [];
+    let pageToken = null;
+
+    do {
+      const url = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows?limit=500${pageToken ? '&pageToken=' + pageToken : ''}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${CFG.token}` } });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        document.getElementById('rlabel').textContent = `❌ ${e.message || res.status}`;
+        return;
+      }
+      const data = await res.json();
+      allItems = allItems.concat(data.items || []);
+      pageToken = data.nextPageToken || null;
+    } while (pageToken);
+
+    const newAllOrders = parseRows(allItems);
+
+    // Detecta pedidos novos (que não existiam antes)
+    if (allOrders.length > 0) {
+      const existingIds = new Set(allOrders.map(o => o.id));
+      const novos = newAllOrders.filter(o => !existingIds.has(o.id));
+      novos.forEach(o => alertNewOrder(o));
+    }
+
+    allOrders = newAllOrders;
+    applyDateFilter();
+    checkAlerts();
+    document.getElementById('rlabel').textContent =
+      '✓ Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } catch(e) {
+    document.getElementById('rlabel').textContent = '❌ Sem conexão';
+  }
+}
+
+function parseRows(rows) {
+  const c = CFG.cols;
+  return rows
+    .filter(row => !row.parent) // ignora linhas filho (subpáginas)
+    .map((row, i) => {
+    const v = row.values || {};
+    let dt = null;
+
+    try {
+      const rawData = v[c.data];
+      const rawHora = v[c.hora];
+
+      if (rawData) {
+        const s = String(rawData).trim();
+        let dateOnly = null;
+
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+          dateOnly = new Date(s.split('T')[0] + 'T00:00:00');
+        } else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+          const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (m) dateOnly = new Date(+m[3], +m[2]-1, +m[1]);
+        } else {
+          dateOnly = new Date(s);
+        }
+
+        if (dateOnly && !isNaN(dateOnly)) {
+          if (rawHora) {
+            const hm = String(rawHora).trim().match(/(\d{1,2}):(\d{2})/);
+            if (hm) dateOnly.setHours(+hm[1], +hm[2], 0, 0);
+          }
+          dt = dateOnly;
+        }
+      }
+    } catch(e) { /* ignora silenciosamente */ }
+
+    // Sem data válida — pula sem travar
+    if (!dt || isNaN(dt)) return null;
+
+    return {
+      id: row.id, // sempre usa o ID único do Coda
+      nome: v[c.nome] || '(sem nome)',
+      telefone: v[c.telefone] || '',
+      tipo: v[c.tipo] || 'Retirada',
+      datetime: dt,
+      pedido: v[c.pedido] || '',
+      valor: v[c.valor] || '',
+      entregue: String(v[c.status] || '').toLowerCase() === String(c.statusValor).toLowerCase()
+    };
+  }).filter(Boolean).sort((a,b) => a.datetime - b.datetime);
+}
+
+async function markDelivered(id) {
+  const btn = document.getElementById('db-' + id);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando...'; }
+  const o = orders.find(x => x.id === id);
+  if (o) o.entregue = true;
+  try {
+    const url = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows/${id}`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${CFG.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row: { cells: [{ column: 'c-SpdhR0ZMGd', value: CFG.cols.statusValor }] } })
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      showToast('❌ Erro ao salvar', e.message || '');
+      if (o) o.entregue = false;
+      if (btn) { btn.disabled = false; btn.textContent = '✓ Marcar como Entregue'; }
+      return;
+    }
+    showToast('✅ Entregue! Enviando cobrança...', o ? o.nome : '');
+    speak('Pedido marcado como entregue!');
+    // Dispara cobrança do restante via worker (não bloqueia o render)
+    if (o) {
+      const totalNum = parseFloat(String(o.valor || '0').replace(/[^\d,.]/g,'').replace(',','.')) || 0;
+      fetch('https://coda-proxy.sitedluh.workers.dev/entrega-confirmada', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedidoId: id,
+          cliente: o.nome,
+          telefone: o.telefone,
+          total: totalNum,
+        })
+      }).then(r => r.json()).then(d => {
+        if (d.ok) showToast('💳 Link de pagamento enviado!', 'Verifique o Telegram');
+        else showToast('⚠️ Cobrança não gerada', d.error || '');
+      }).catch(() => showToast('⚠️ Worker indisponível', 'Verifique o Telegram manualmente'));
+    }
+  } catch(e) {
+    showToast('❌ Erro de conexão', e.message);
+    if (o) o.entregue = false;
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Marcar como Entregue'; }
+    return;
+  }
+  renderAll();
+}
+
+// ── RENDER ──────────────────────────────────────────────
+// ── DATE PICKER ─────────────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+function toggleDatePicker() {
+  const dp = document.getElementById('date-picker');
+  const isOpen = dp.style.display !== 'none';
+  dp.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderCal();
+}
+
+// Close when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('date-picker-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('date-picker').style.display = 'none';
+  }
+});
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCal();
+}
+
+function renderCal() {
+  const dias = ['D','S','T','Q','Q','S','S'];
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  document.getElementById('cal-title').textContent = `${meses[calMonth]} ${calYear}`;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+
+  // Dates that have orders
+  const orderDates = new Set(allOrders.map(o => {
+    const d = new Date(o.datetime);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }));
+
+  let html = dias.map(d => `<div class="cal-header">${d}</div>`).join('');
+
+  // Prev month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    html += `<div class="cal-day other-month">${daysInPrev - i}</div>`;
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(calYear, calMonth, d);
+    const dateKey = `${calYear}-${calMonth}-${d}`;
+    const isToday = date.getTime() === today.getTime();
+    const hasOrders = orderDates.has(dateKey);
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSelected = selectedDate === dateStr;
+
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    if (hasOrders) cls += ' has-orders';
+    if (isSelected) cls += ' selected';
+
+    html += `<div class="${cls}" onclick="selectCalDate('${dateStr}')">${d}</div>`;
+  }
+
+  document.getElementById('cal-grid').innerHTML = html;
+
+  // Highlight active quick option
+  document.querySelectorAll('.dq-opt').forEach(el => el.classList.remove('active'));
+  const quickMap = { hoje:'Hoje', amanha:'Amanhã', semana:'Próximos 7 dias', mes:'Este mês', todos:'Todos os pedidos', passados:'Pedidos passados' };
+  document.querySelectorAll('.dq-opt').forEach(el => {
+    if (Object.values(quickMap).some(v => el.textContent.includes(v.split(' ')[1] || v))) {
+      // skip complex match
+    }
+  });
+}
+
+function selectCalDate(dateStr) {
+  selectedDate = dateStr;
+  const d = new Date(dateStr + 'T00:00:00');
+  document.getElementById('date-filter-label').textContent =
+    d.toLocaleDateString('pt-BR', {weekday:'short', day:'2-digit', month:'2-digit'});
+  document.getElementById('date-picker').style.display = 'none';
+  applyDateFilter();
+}
+
+function applyDateFilter() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const in7 = new Date(today); in7.setDate(in7.getDate()+7);
+  const endMonth = new Date(today.getFullYear(), today.getMonth()+1, 0);
+
+  if (selectedDate === 'hoje') {
+    orders = allOrders.filter(o => { const d=new Date(o.datetime); d.setHours(0,0,0,0); return d.getTime()===today.getTime(); });
+  } else if (selectedDate === 'amanha') {
+    orders = allOrders.filter(o => { const d=new Date(o.datetime); d.setHours(0,0,0,0); return d.getTime()===tomorrow.getTime(); });
+  } else if (selectedDate === 'semana') {
+    orders = allOrders.filter(o => { const d=new Date(o.datetime); return d>=today && d<=in7; });
+  } else if (selectedDate === 'mes') {
+    orders = allOrders.filter(o => { const d=new Date(o.datetime); return d>=today && d<=endMonth; });
+  } else if (selectedDate === 'todos') {
+    orders = [...allOrders];
+  } else if (selectedDate === 'passados') {
+    orders = allOrders.filter(o => new Date(o.datetime) < today).reverse();
+  } else {
+    const sel = new Date(selectedDate + 'T00:00:00');
+    orders = allOrders.filter(o => { const d=new Date(o.datetime); d.setHours(0,0,0,0); return d.getTime()===sel.getTime(); });
+  }
+  renderAll();
+}
+
+function setDateFilter(val) {
+  selectedDate = val;
+  const labels = { hoje:'Hoje', amanha:'Amanhã', semana:'Próx. 7 dias', mes:'Este mês', todos:'Todos', passados:'Passados' };
+  document.getElementById('date-filter-label').textContent = labels[val] || val;
+  document.getElementById('date-picker').style.display = 'none';
+  applyDateFilter();
+}
+
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function renderAll() {
+  const now = new Date();
+  const upcoming = orders.filter(o => !o.entregue && o.datetime >= now);
+  const lateUndel = orders.filter(o => !o.entregue && o.datetime < now).sort((a,b) => b.datetime - a.datetime);
+  const featured = upcoming[0] || lateUndel[0] || null;
+  renderFeatured(featured, now);
+  const filtered = orders.filter(o => {
+    if (filter === 'retirada') return o.tipo.toLowerCase().includes('retirada');
+    if (filter === 'entrega') return o.tipo.toLowerCase().includes('entrega');
+    if (filter === 'urgente') { const m = (o.datetime - now) / 60000; return m >= 0 && m <= 60; }
+    return true;
+  });
+  // Entregues vão para o fim
+  filtered.sort((a, b) => {
+    if (a.entregue && !b.entregue) return 1;
+    if (!a.entregue && b.entregue) return -1;
+    return a.datetime - b.datetime;
+  });
+  renderQueue(filtered.filter(o => !featured || o.id !== featured.id), featured, now);
+  renderMobile(); // atualiza versão mobile também
+}
+
+function renderFeatured(order, now) {
+  const el = document.getElementById('featured');
+  if (!order) { el.innerHTML = '<div class="no-fc">Nenhum pedido para hoje ainda 🎉</div>'; return; }
+  const mins = Math.round((order.datetime - now) / 60000);
+  const isLate = mins < 0;
+  const isEntrega = order.tipo.toLowerCase().includes('entrega');
+  const timerTxt = isLate ? `ATRASADO ${Math.abs(mins)}min`
+    : mins === 0 ? 'AGORA!'
+    : mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}min`
+    : `${mins} min`;
+  const timerCls = (isLate || mins <= 15) ? 'fc-timer-val urg' : 'fc-timer-val';
+  const items = parseItems(order.pedido);
+  el.innerHTML = `
+    <div class="fc">
+      <div class="fc-hdr">
+        <span class="fc-badge">PRÓXIMO</span>
+        <span class="fc-name">${esc(order.nome)}</span>
+        <span class="fc-tipo">${isEntrega?'🛵 Entrega':'🛍️ Retirada'}</span>
+      </div>
+      ${isLate && !order.entregue ? `<div class="fc-late"><span style="font-size:1.2rem">⚠️</span><span class="fc-late-txt">Pedido atrasado! Marque como entregue.</span><span class="fc-late-min">${Math.abs(mins)}min</span></div>` : ''}
+      <div class="fc-body">
+        <div class="fc-box"><div class="fc-box-label">Horário</div><div class="fc-box-val hl">${fmtTime(order.datetime)}</div></div>
+        <div class="fc-box"><div class="fc-box-label">Data</div><div class="fc-box-val">${fmtDate(order.datetime)}</div></div>
+        <div class="fc-box"><div class="fc-box-label">Valor</div><div class="fc-box-val">${esc(String(order.valor||'—'))}</div></div>
+        <div class="fc-timer">
+          <div class="fc-timer-lbl">${isLate?'⚠️ Atrasado':'⏳ Tempo restante'}</div>
+          <div class="${timerCls}" id="ftimer">${timerTxt}</div>
+        </div>
+      </div>
+      <div class="items-toggle" onclick="this.classList.toggle('open');document.getElementById('fitems').classList.toggle('open')">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,5 7,10 12,5"/></svg>
+        Ver itens do pedido
+      </div>
+      <div class="items-list" id="fitems">${items}</div>
+      <div class="fc-foot">
+        <div class="fc-phone">📞 ${esc(order.telefone||'—')}</div>
+        <div class="fc-total">${esc(String(order.valor||''))}</div>
+      </div>
+      ${!order.entregue
+        ? `<button class="btn-deliver${isLate?' late':''}" id="db-${order.id}" onclick="markDelivered('${order.id}')">✓ Marcar como ${isEntrega?'Entregue':'Retirado'}</button>`
+        : `<div style="text-align:center;color:var(--green);font-size:.82rem;padding:10px 0">✅ Concluído</div>`}
+      <button class="btn-print" style="margin:0 18px 16px;width:calc(100% - 36px);justify-content:center" onclick="printOrder('${order.id}')">🖨️ Imprimir Nota</button>
+    </div>`;
+  startFeaturedTimer(order);
+}
+
+function startFeaturedTimer(order) {
+  if (window._fti) clearInterval(window._fti);
+  window._fti = setInterval(() => {
+    const el = document.getElementById('ftimer');
+    if (!el) { clearInterval(window._fti); return; }
+    const now = new Date();
+    const mins = Math.round((order.datetime - now) / 60000);
+    const isLate = mins < 0;
+    el.className = (isLate || mins <= 15) ? 'fc-timer-val urg' : 'fc-timer-val';
+    el.textContent = isLate ? `ATRASADO ${Math.abs(mins)}min`
+      : mins === 0 ? 'AGORA!'
+      : mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}min`
+      : `${mins} min`;
+  }, 15000);
+}
+
+function renderQueue(list, featured, now) {
+  const el = document.getElementById('queue');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>Sem mais pedidos na fila.</div>';
+    return;
+  }
+  el.innerHTML = list.map((o, i) => {
+    const mins = Math.round((o.datetime - now) / 60000);
+    const isLate = mins < 0;
+    const isEntrega = o.tipo.toLowerCase().includes('entrega');
+    const tc = isEntrega ? 'entrega' : 'retirada';
+    const isUrg = mins >= 0 && mins <= 60;
+    let cd = '', cdcls = '';
+    if (o.entregue) { cd = '✅ Entregue'; }
+    else if (isLate) { cd = `ATRASADO ${Math.abs(mins)}min`; cdcls = 'urg'; }
+    else if (mins === 0) { cd = 'AGORA'; cdcls = 'urg'; }
+    else if (mins >= 60) { cd = `${Math.floor(mins/60)}h${mins%60?` ${mins%60}min`:''}`; cdcls = ''; }
+    else { cd = `${mins}min`; cdcls = isUrg ? 'urg' : 'soon'; }
+    const items = parseItems(o.pedido);
+    return `
+      <div class="qcard ${tc}" style="${o.entregue?'opacity:.4;filter:saturate(0)':''}" onclick="this.querySelector('.qdetails').classList.toggle('open')">
+        <div class="qcard-top">
+          <span class="qpos">#${i+1}</span>
+          <span class="qname">${esc(o.nome)}</span>
+          <span class="qtime">${fmtTime(o.datetime)}</span>
+        </div>
+        <div class="qcard-bot">
+          <span class="tag ${tc}">${isEntrega?'🛵 Entrega':'🛍️ Retirada'}</span>
+          ${isLate&&!o.entregue?'<span class="tag urgente">⚠️ Atrasado</span>':isUrg&&!o.entregue?'<span class="tag urgente">🔥 Urgente</span>':''}
+          <span class="qdate">${fmtDate(o.datetime)}</span>
+          <span class="qcd ${cdcls}">${cd}</span>
+        </div>
+        <div class="qdetails">
+          ${items}
+          ${o.telefone?`<div style="margin-top:7px;font-size:.78rem;color:var(--text3)">📞 ${esc(o.telefone)}</div>`:''}
+          ${o.valor?`<div style="font-size:.82rem;color:var(--green);font-weight:700;margin-top:3px">${esc(String(o.valor))}</div>`:''}
+          ${!o.entregue?`<button class="btn-qdeliver${isLate?' late':''}" id="db-${o.id}" onclick="event.stopPropagation();markDelivered('${o.id}')">✓ Marcar como ${isEntrega?'Entregue':'Retirado'}</button>`
+          :'<div style="color:var(--green);font-size:.75rem;padding:5px 0">✅ Concluído</div>'}
+          <button class="btn-print" style="margin-top:8px" onclick="event.stopPropagation();printOrder('${o.id}')">🖨️ Imprimir</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── HELPERS ─────────────────────────────────────────────
+function fmtTime(dt) { return dt ? new Date(dt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—'; }
+function fmtDate(dt) { return dt ? new Date(dt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—'; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function parseItems(txt) {
+  if (!txt) return '<div style="color:var(--text3);font-size:.78rem">Sem detalhes</div>';
+  return String(txt).split('\n').map(l => {
+    l = l.trim(); if (!l) return '';
+    if (/^[^0-9].+:$/.test(l)) return `<div class="icat">${esc(l.replace(':',''))}</div>`;
+    const m = l.match(/^(\d+)\s+(.+)/);
+    if (m) return `<div class="irow"><span class="iqty">${m[1]}</span><span class="iname">${esc(m[2])}</span></div>`;
+    return `<div class="irow"><span class="iname" style="font-size:.75rem;font-style:italic;color:var(--text3)">${esc(l)}</span></div>`;
+  }).join('');
+}
+
+// ── PRINT ───────────────────────────────────────────────
+function printOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+
+  if (!confirm(`Imprimir nota de ${o.nome}?`)) return;
+
+  const isEntrega = o.tipo.toLowerCase().includes('entrega');
+  const tipoLabel = isEntrega ? '🛵 ENTREGA' : '🛍️ RETIRADA';
+  const itemsHtml = buildPrintItems(o.pedido);
+
+  document.getElementById('print-area').innerHTML = `
+    <div class="p-logo">D'Luh Festas 🍰</div>
+    <div class="p-sub">Salgados & Doces para festas</div>
+    <div class="p-div"></div>
+
+    <div class="p-row"><span class="p-label">Cliente:</span><span>${esc(o.nome)}</span></div>
+    <div class="p-row"><span class="p-label">Fone:</span><span>${esc(o.telefone||'—')}</span></div>
+    <div class="p-row"><span class="p-label">Tipo:</span><span>${tipoLabel}</span></div>
+    <div class="p-row"><span class="p-label">Data/Hora:</span><span>${fmtDate(o.datetime)} ${fmtTime(o.datetime)}</span></div>
+
+    <div class="p-div"></div>
+    <div class="p-section">PEDIDO:</div>
+    ${itemsHtml}
+    <div class="p-div"></div>
+
+    <div class="p-total">Total: ${esc(String(o.valor||'—'))}</div>
+    <div class="p-div"></div>
+    <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
+  `;
+
+  setTimeout(() => window.print(), 100);
+}
+
+function buildPrintItems(txt) {
+  if (!txt) return '<div class="p-item">—</div>';
+  return String(txt).split('\n').map(l => {
+    l = l.trim(); if (!l) return '';
+    if (/^[^0-9].+:$/.test(l)) return `<div class="p-section">${esc(l)}</div>`;
+    return `<div class="p-item">${esc(l)}</div>`;
+  }).join('');
+}
+
+// ── MOBILE RENDER ───────────────────────────────────────
+let mFilter = 'todos';
+
+function setMFilter(f, btn) {
+  mFilter = f;
+  document.querySelectorAll('.m-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMobile();
+}
+
+function renderMobile() {
+  const now = new Date();
+  const upcoming = orders.filter(o => !o.entregue && o.datetime >= now);
+  const lateUndel = orders.filter(o => !o.entregue && o.datetime < now).sort((a,b) => b.datetime - a.datetime);
+  const featured = upcoming[0] || lateUndel[0] || null;
+
+  const filtered = orders.filter(o => {
+    if (mFilter === 'retirada') return o.tipo.toLowerCase().includes('retirada');
+    if (mFilter === 'entrega') return o.tipo.toLowerCase().includes('entrega');
+    if (mFilter === 'urgente') { const m = (o.datetime - now) / 60000; return m >= 0 && m <= 60; }
+    return true;
+  });
+
+  const el = document.getElementById('m-list');
+  if (!filtered.length) { el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text3)">✅ Sem pedidos</div>'; return; }
+
+  el.innerHTML = filtered.map((o, i) => {
+    const mins = Math.round((o.datetime - now) / 60000);
+    const isLate = mins < 0;
+    const isEntrega = o.tipo.toLowerCase().includes('entrega');
+    const tipoLabel = isEntrega ? 'Entrega' : 'Retirada';
+    const tc = isEntrega ? 'ent' : 'ret';
+    let cd = '', cdcls = '';
+    if (o.entregue) { cd = '✅ Entregue'; }
+    else if (isLate) { cd = `ATRASADO ${Math.abs(mins)}min`; cdcls = 'urg'; }
+    else if (mins === 0) { cd = 'AGORA'; cdcls = 'urg'; }
+    else if (mins >= 60) { cd = `${Math.floor(mins/60)}h${mins%60?` ${mins%60}min`:''}`; }
+    else { cd = `${mins}min`; cdcls = (isLate || mins <= 15) ? 'urg' : 'soon'; }
+    const isNext = o.id === featured?.id;
+
+    return `
+      <div class="m-item${isNext ? ' next' : ''}${o.entregue ? ' delivered' : ''}" onclick="openMModal('${o.id}')">
+        <div class="m-bar ${isEntrega ? 'blue' : tc === 'ret' ? 'green' : 'orange'}"></div>
+        <div class="m-info">
+          <div class="m-name${isNext ? ' next' : o.entregue ? ' done' : ''}">${esc(o.nome)}</div>
+          <div class="m-sub">
+            <span class="m-tag ${tc}">${tipoLabel}</span>
+            ${fmtDate(o.datetime)}
+          </div>
+        </div>
+        <div class="m-right">
+          <div class="m-time${isNext ? ' next' : o.entregue ? ' done' : ''}">${fmtTime(o.datetime)}</div>
+          <div class="m-cd ${cdcls}">${cd}</div>
+        </div>
+        ${isNext ? '<div class="m-badge">próximo</div>' : ''}
+      </div>`;
+  }).join('');
+
+  document.getElementById('m-rlabel').textContent = `✓ ${filtered.length} pedido${filtered.length !== 1 ? 's' : ''}`;
+  
+  // Mostra botão de imprimir todos
+  const printBtn = document.getElementById('m-print-all-btn');
+  const pendentes = orders.filter(o => !o.entregue);
+  if (window.innerWidth < 600 && pendentes.length > 0) {
+    printBtn.style.display = 'block';
+  } else {
+    printBtn.style.display = 'none';
+  }
+}
+
+function openMModal(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  const isEntrega = o.tipo.toLowerCase().includes('entrega');
+  const tipoLabel = isEntrega ? '🛵 Entrega' : '🛍️ Retirada';
+  const items = parseItems(o.pedido);
+  const now = new Date();
+  const mins = Math.round((o.datetime - now) / 60000);
+  const isLate = mins < 0;
+  let timerTxt = isLate ? `ATRASADO ${Math.abs(mins)}min`
+    : mins === 0 ? 'AGORA!'
+    : mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}min`
+    : `${mins} min`;
+
+  document.getElementById('m-modal-content').innerHTML = `
+    <div class="m-modal-hdr">
+      <div class="m-modal-name">${esc(o.nome)}</div>
+      <div class="m-modal-sub">${tipoLabel} · ${fmtDate(o.datetime)}</div>
+    </div>
+    <div class="m-modal-body">
+      <div class="m-modal-row">
+        <div><div class="m-modal-label">Horário</div><div class="m-modal-val hl">${fmtTime(o.datetime)}</div></div>
+        <div><div class="m-modal-label">Telefone</div><div class="m-modal-val">${esc(o.telefone || '—')}</div></div>
+      </div>
+      <div class="m-modal-timer">
+        <span class="m-modal-timer-lbl">${isLate ? '⚠️ Atrasado' : '⏳ Tempo'}</span>
+        <span class="m-modal-timer-val${(isLate || mins <= 15) ? ' urg' : ''}">${timerTxt}</span>
+      </div>
+      <div class="m-modal-items">${items}</div>
+      <div class="m-modal-row">
+        <div><div class="m-modal-label">Total</div><div class="m-modal-val green">${esc(String(o.valor || '—'))}</div></div>
+      </div>
+      ${!o.entregue
+        ? `<button class="m-modal-btn deliver${isLate ? ' late' : ''}" id="db-${o.id}" onclick="markDelivered('${o.id}')">✓ Marcar como ${isEntrega ? 'Entregue' : 'Retirado'}</button>`
+        : `<div style="text-align:center;color:var(--green);font-size:.82rem;padding:10px 0">✅ Concluído</div>`}
+      <button class="m-modal-btn print" onclick="event.stopPropagation();printOrder('${o.id}')">🖨️ Imprimir</button>
+    </div>
+  `;
+  document.getElementById('m-modal-overlay').classList.add('open');
+}
+
+function closeMModal(e) {
+  if (e.target === document.getElementById('m-modal-overlay')) {
+    document.getElementById('m-modal-overlay').classList.remove('open');
+  }
+}
+
+// ── PRINT ALL ORDERS ─────────────────────────────────────
+function printAllOrders() {
+  const pendentes = orders.filter(o => !o.entregue);
+  if (!pendentes.length) { alert('Nenhum pedido para imprimir'); return; }
+  if (!confirm(`Imprimir ${pendentes.length} pedido${pendentes.length !== 1 ? 's' : ''} do dia?`)) return;
+
+  let html = '';
+  pendentes.forEach((o, i) => {
+    const isEntrega = o.tipo.toLowerCase().includes('entrega');
+    const tipoLabel = isEntrega ? '🛵 ENTREGA' : '🛍️ RETIRADA';
+    const itemsHtml = buildPrintItems(o.pedido);
+
+    html += `
+      <div style="page-break-after:always;page-break-inside:avoid;margin-bottom:10mm">
+        <div class="p-logo">D'Luh Festas 🍰</div>
+        <div class="p-sub">Salgados & Doces para festas</div>
+        <div class="p-div"></div>
+        <div class="p-row"><span class="p-label">Cliente:</span><span>${esc(o.nome)}</span></div>
+        <div class="p-row"><span class="p-label">Fone:</span><span>${esc(o.telefone||'—')}</span></div>
+        <div class="p-row"><span class="p-label">Tipo:</span><span>${tipoLabel}</span></div>
+        <div class="p-row"><span class="p-label">Data/Hora:</span><span>${fmtDate(o.datetime)} ${fmtTime(o.datetime)}</span></div>
+        <div class="p-div"></div>
+        <div class="p-section">PEDIDO:</div>
+        ${itemsHtml}
+        <div class="p-div"></div>
+        <div class="p-total">Total: ${esc(String(o.valor||'—'))}</div>
+        <div class="p-div"></div>
+        <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
+      </div>
+    `;
+  });
+
+  document.getElementById('print-area').innerHTML = html;
+  setTimeout(() => window.print(), 100);
+}
+
+// ── BOOT ────────────────────────────────────────────────
+fetchOrders();
+setInterval(fetchOrders, 2 * 60 * 1000);
+setInterval(renderAll, 30000);
+
+// Unlock audio on first interaction
+['click','keydown','touchstart'].forEach(ev =>
+  document.addEventListener(ev, function h() {
+    if (!audioUnlocked) unlockAudio();
+    document.removeEventListener(ev, h);
+  }, { once: true })
+);
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

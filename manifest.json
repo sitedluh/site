@@ -1,0 +1,17 @@
+{
+  "name": "Painel de Pedidos",
+  "short_name": "Pedidos",
+  "description": "Painel de pedidos com alertas e integração Coda",
+  "start_url": "./painel-pedidos.html",
+  "display": "standalone",
+  "background_color": "#0e0c0a",
+  "theme_color": "#f97316",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='24' fill='%23f97316'/><text y='130' x='30' font-size='120'>🍽️</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
