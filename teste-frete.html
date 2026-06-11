@@ -9,123 +9,148 @@
   h2{color:#c0725a}
   input{width:100%;padding:9px;font-size:15px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;margin-bottom:8px}
   button{background:#c0725a;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer}
-  .card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;margin-top:12px}
-  .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px;gap:8px}
-  .row:last-child{border:none}
-  .label{color:#888;white-space:nowrap}.val{font-weight:bold;text-align:right}
-  pre{background:#222;color:#0f0;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;max-height:200px;overflow-y:auto}
-  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:bold}
-  .badge-ok{background:#d4edda;color:#155724}.badge-warn{background:#fff3cd;color:#856404}.badge-err{background:#f8d7da;color:#721c24}
-  .result-box{border-left:4px solid #4caf50;background:#d4edda;padding:10px 14px;border-radius:4px;margin-top:8px;font-size:14px}
-  .result-box.err{border-color:#e53935;background:#f8d7da}
-  summary{cursor:pointer;font-size:12px;color:#888;margin-top:6px;display:block}
   .step{background:#fff;border:1px solid #ddd;border-radius:6px;padding:10px;margin-top:8px;font-size:13px}
   .step-title{font-weight:bold;color:#555;margin-bottom:4px}
   .ok{color:#4caf50}.err{color:#e53935}.warn{color:#ff9800}
+  .result-box{border-left:4px solid #4caf50;background:#d4edda;padding:10px 14px;border-radius:4px;margin-top:8px;font-size:14px}
+  .result-box.err{border-color:#e53935;background:#f8d7da}
+  pre{background:#222;color:#0f0;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;max-height:200px;overflow-y:auto}
+  summary{cursor:pointer;font-size:12px;color:#888;margin-top:6px;display:block}
 </style>
 </head>
 <body>
-<h2>🛵 Teste Cálculo de Frete — OSRM</h2>
+<h2>🛵 Teste Cálculo de Frete</h2>
 <p style="font-size:12px;color:#666">
-  Loja: <b>-16.7286406, -43.8582139</b><br>
-  Esperado para Morrinhos (39400-423): <b>R$9,70 (3.65km rota Lets)</b>
+  Fluxo: BrasilAPI → <b>tabela por bairro (Lets Express)</b> → fallback OSRM<br>
+  Teste: Morrinhos (39400-423) → esperado <b>R$9,70</b>
 </p>
 <label>CEP de destino</label>
 <input id="cep" type="text" placeholder="39400-423" maxlength="9"
   oninput="this.value=this.value.replace(/\D/g,'').replace(/(\d{5})(\d)/,'$1-$2')">
-<button onclick="testar()">🔍 Calcular com OSRM</button>
+<button onclick="testar()">🔍 Calcular</button>
 
 <div id="resultado" style="display:none;margin-top:12px">
-
-  <div class="step">
-    <div class="step-title">① BrasilAPI — dados do endereço</div>
-    <div id="s1"></div>
-  </div>
-
-  <div class="step">
-    <div class="step-title">② OpenCage — coordenadas do destino</div>
-    <div id="s2"></div>
-  </div>
-
-  <div class="step">
-    <div class="step-title">③ OSRM — distância real por rota</div>
-    <div id="s3"></div>
-  </div>
-
+  <div class="step"><div class="step-title">① BrasilAPI — endereço</div><div id="s1"></div></div>
+  <div class="step"><div class="step-title">② Tabela de bairros (Lets Express)</div><div id="s2"></div></div>
+  <div class="step" id="step-fallback" style="display:none"><div class="step-title">③ Fallback — OSRM (bairro não encontrado)</div><div id="s3"></div></div>
   <div id="r-final" class="result-box" style="margin-top:10px"></div>
-
   <details style="margin-top:8px"><summary>JSON BrasilAPI</summary><pre id="r-json-brasil"></pre></details>
-  <details style="margin-top:4px"><summary>JSON OpenCage</summary><pre id="r-json-oc"></pre></details>
-  <details style="margin-top:4px"><summary>JSON OSRM</summary><pre id="r-json-osrm"></pre></details>
 </div>
 
 <script>
-const OC_KEY='d1b604a636d74015b0975bcc0dab85d2';
-const LAT_LOJA=-16.7286406, LNG_LOJA=-43.8582139;
-const TABELA=[
+const LAT_LOJA = -16.7286406, LNG_LOJA = -43.8582139;
+const OC_KEY = 'd1b604a636d74015b0975bcc0dab85d2';
+const TABELA = [
   {ate:2,v:6.60},{ate:3,v:7.80},{ate:4,v:9.70},{ate:5,v:10.80},
   {ate:6.5,v:11.90},{ate:8,v:13.10},{ate:9,v:14.50},{ate:10,v:16.90},
   {ate:11,v:18.50},{ate:13,v:19.90},{ate:15,v:21.00},{ate:17,v:22.70},
-  {ate:19,v:25.90},{ate:22,v:28.50},{ate:50,v:50.00},{ate:60,v:60.00},
-  {ate:70,v:70.00},{ate:80,v:80.00},{ate:90,v:90.00},{ate:100,v:100.00},
+  {ate:19,v:25.90},{ate:22,v:28.50},{ate:50,v:50.00},
 ];
 function taxa(k){for(const f of TABELA)if(k<=f.ate)return f.v;return TABELA.at(-1).v;}
 function fmt(v){return'R$ '+v.toFixed(2).replace('.',',');}
 function hav(a,b,c,d){const R=6371,dLat=(c-a)*Math.PI/180,dLng=(d-b)*Math.PI/180,e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
 
+// ── TABELA DE PREÇOS POR BAIRRO (Lets Express) ──
+const BAIRRO_PRECOS = {
+  'Acácias': 13.10, 'Alcides Rabelo': 13.10, 'Alice Maia': 13.10,
+  'Alterosas': 7.80, 'Alto da Boa Vista': 7.80, 'Alto Floresta': 14.50,
+  'Alto São João': 11.90, 'Amazonas': 13.10, 'Antônio Pimenta': 6.60,
+  'Augusta Mota': 14.50, 'Barcelona Park': 13.10, 'Barreiro': 9.70,
+  'Bela Vista': 13.10, 'Belvedere': 11.90, 'Camilo Prates': 10.80,
+  'Cândida Câmara': 10.80, 'Canelas': 9.70, 'Carmelo': 11.90,
+  'Centro': 10.80, 'Cidade Industrial': 19.90, 'Cidade Nova': 7.80,
+  'Cidade Santa Maria': 9.70, 'Cintra': 9.70, 'Clarindo Lopes': 7.80,
+  'Colorado': 9.70, 'Conjunto Cristo Rei': 6.60, 'Conjunto Havaí': 7.80,
+  'Conjunto Joaquim Costa': 7.80, 'Delfino Magalhães': 9.70,
+  'Dona Gregória': 7.80, 'Duque de Caxias': 9.70, 'Edgar Pereira': 13.10,
+  'Eldorado': 16.90, 'Esplanada': 11.90, 'Funcionários': 9.70,
+  'Guarujá': 13.10, 'Ibituruna': 13.10, 'Inconfidentes': 9.70,
+  'Independência': 13.10, 'Interlagos': 11.90, 'Ipiranga': 16.90,
+  'Jaraguá': 18.50, 'Jardim Alvorada': 7.80, 'Jardim Brasil': 13.10,
+  'Jardim Liberdade': 13.10, 'Jardim Olímpico': 10.80,
+  'Jardim São Luiz': 10.80, 'João Botelho': 7.80,
+  'José Carlos Vale de Lima': 6.60, 'Juscelino Kubitschek': 9.70,
+  'Lourdes': 10.80, 'Major Prates': 10.80, 'Maracanã': 7.80,
+  'Melo': 11.90, 'Monte Alegre': 9.70, 'Morada da Serra': 11.90,
+  'Morada do Parque': 11.90, 'Morada do Sol': 10.80, 'Morrinhos': 9.70,
+  'Nossa Senhora Aparecida': 13.10, 'Nossa Senhora das Graças': 7.80,
+  'Nossa Senhora de Fátima': 7.80, 'Nova América': 19.90,
+  'Nova Morada': 14.50, 'Nova Suíça': 13.10, 'Novo Delfino': 10.80,
+  'Panorama': 13.10, 'Planalto': 13.10, 'Regina Peres': 9.70,
+  'Renascença': 13.10, 'Sagrada Família': 9.70, 'Santa Cecília': 13.10,
+  'Santa Eugênia': 14.50, 'Santa Lúcia': 9.70, 'Santa Rita': 7.80,
+  'Santo Amaro': 10.80, 'Santo Antônio': 7.80, 'Santos Dumont': 10.80,
+  'São Geraldo': 16.90, 'São João': 11.90, 'São Judas Tadeu': 6.60,
+  'São Lucas': 11.90, 'São Mateus': 13.10, 'Tancredo Neves': 13.10,
+  'Todos os Santos': 11.90, 'Universitário': 16.90, 'Vargem Grande': 9.70,
+  'Vera Cruz': 11.90, 'Vila Anália': 10.80, 'Vila Atlântida': 13.10,
+  'Vila Brasília': 11.90, 'Vila Campos': 7.80, 'Vila Castelo Branco': 16.90,
+  'Vila Guilhermina': 9.70, 'Vila Maria Cândida': 6.60,
+  'Vila Mauricéia': 11.90, 'Vila Oliveira': 13.10, 'Vila Real': 13.10,
+  'Vila Regina': 11.90, 'Vila Santa Cruz': 11.90, 'Vila Sion': 7.80,
+  'Vila Sumaré': 6.60, 'Vila Telma': 6.60, 'Vila Tiradentes': 10.80,
+  'Village do Lago': 19.90,
+};
+function normBairro(s){return(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().replace(/\s+/g,' ');}
+const BAIRRO_NORM = Object.fromEntries(Object.entries(BAIRRO_PRECOS).map(([k,v])=>[normBairro(k),v]));
+
 async function testar(){
-  const cep=document.getElementById('cep').value.replace(/\D/g,'');
+  const cep = document.getElementById('cep').value.replace(/\D/g,'');
   if(cep.length<8){alert('CEP inválido');return;}
   document.getElementById('resultado').style.display='block';
+  document.getElementById('step-fallback').style.display='none';
   ['s1','s2','s3','r-final'].forEach(id=>document.getElementById(id).innerHTML='<span style="color:#888">aguardando...</span>');
 
   // ── PASSO 1: BrasilAPI ──
-  let d1, street, bairro, city, state;
+  let bairro, city, state, lat, lng;
   try{
-    const r=await fetch('https://brasilapi.com.br/api/cep/v2/'+cep);
-    d1=await r.json();
-    document.getElementById('r-json-brasil').textContent=JSON.stringify(d1,null,2);
-    street=d1.street||''; bairro=d1.neighborhood||''; city=d1.city||'Montes Claros'; state=d1.state||'MG';
-    document.getElementById('s1').innerHTML=`<span class="ok">✅ ${street}, ${bairro} — ${city}/${state}</span>`;
+    const r = await fetch('https://brasilapi.com.br/api/cep/v2/'+cep);
+    const d = await r.json();
+    document.getElementById('r-json-brasil').textContent=JSON.stringify(d,null,2);
+    bairro=d.neighborhood||''; city=d.city||''; state=d.state||'';
+    document.getElementById('s1').innerHTML=`<span class="ok">✅ ${d.street||''}, <b>${bairro}</b> — ${city}/${state}</span>`;
   }catch(e){
-    document.getElementById('s1').innerHTML=`<span class="err">❌ ${e.message}</span>`; return;
+    document.getElementById('s1').innerHTML=`<span class="err">❌ ${e.message}</span>`;
+    document.getElementById('r-final').className='result-box err';
+    document.getElementById('r-final').textContent='CEP não encontrado';
+    return;
   }
 
-  // ── PASSO 2: OpenCage — bairro+cidade (mais confiável que rua) ──
-  let lat,lng;
+  // ── PASSO 2: Tabela de bairros ──
+  const precoBairro = BAIRRO_NORM[normBairro(bairro)];
+  if(precoBairro !== undefined){
+    document.getElementById('s2').innerHTML=`<span class="ok">✅ Bairro "<b>${bairro}</b>" encontrado na tabela → <b>${fmt(precoBairro)}</b></span>`;
+    document.getElementById('r-final').className='result-box';
+    document.getElementById('r-final').innerHTML=`🏁 <b>${fmt(precoBairro)}</b> — via tabela Lets Express (bairro: ${bairro})`;
+    return;
+  }
+
+  document.getElementById('s2').innerHTML=`<span class="warn">⚠️ Bairro "<b>${bairro||'(vazio)'}</b>" não está na tabela — usando fallback OSRM</span>`;
+  document.getElementById('step-fallback').style.display='block';
+
+  // ── PASSO 3: Fallback OpenCage + OSRM ──
   try{
+    // OpenCage por bairro+cidade
     const q=[bairro,city,state,'Brasil'].filter(Boolean).join(', ');
-    const r=await fetch('https://api.opencagedata.com/geocode/v1/json?q='+encodeURIComponent(q)+'&countrycode=br&limit=1&key='+OC_KEY);
-    const d2=await r.json();
-    document.getElementById('r-json-oc').textContent=JSON.stringify(d2,null,2);
+    const r2=await fetch('https://api.opencagedata.com/geocode/v1/json?q='+encodeURIComponent(q)+'&countrycode=br&limit=1&key='+OC_KEY);
+    const d2=await r2.json();
     const geo=d2?.results?.[0]?.geometry;
     if(!geo?.lat) throw new Error('OpenCage sem resultado');
     lat=geo.lat; lng=geo.lng;
-    const distLinha=hav(LAT_LOJA,LNG_LOJA,lat,lng);
-    document.getElementById('s2').innerHTML=`<span class="ok">✅ ${lat.toFixed(5)}, ${lng.toFixed(5)} (${distLinha.toFixed(2)} km linha reta)</span>`;
-  }catch(e){
-    document.getElementById('s2').innerHTML=`<span class="err">❌ ${e.message}</span>`; return;
-  }
 
-  // ── PASSO 3: OSRM — distância real por estrada ──
-  try{
-    // OSRM usa formato: lng,lat (atenção à ordem!)
-    const url=`https://router.project-osrm.org/route/v1/driving/${LNG_LOJA},${LAT_LOJA};${lng},${lat}?overview=false`;
-    const r=await fetch(url);
-    const d3=await r.json();
-    document.getElementById('r-json-osrm').textContent=JSON.stringify(d3,null,2);
+    // OSRM
+    const r3=await fetch(`https://router.project-osrm.org/route/v1/driving/${LNG_LOJA},${LAT_LOJA};${lng},${lat}?overview=false`);
+    const d3=await r3.json();
     if(d3.code!=='Ok') throw new Error('OSRM: '+d3.code);
-    const distRota=d3.routes[0].distance/1000; // metros → km
+    const distRota=d3.routes[0].distance/1000;
     const t=taxa(distRota);
-    document.getElementById('s3').innerHTML=`<span class="ok">✅ Distância por estrada: <b>${distRota.toFixed(2)} km</b></span>`;
+    document.getElementById('s3').innerHTML=`<span class="ok">✅ ${lat.toFixed(5)}, ${lng.toFixed(5)} → ${distRota.toFixed(2)} km de rota</span>`;
     document.getElementById('r-final').className='result-box';
-    document.getElementById('r-final').innerHTML=
-      `🏁 Resultado final: <b>${distRota.toFixed(2)} km</b> de rota → <b>${fmt(t)}</b>` +
-      `<br><small style="color:#555">Lets: 3.65km → R$9,70 | Diferença: ${(distRota-3.65).toFixed(2)} km</small>`;
+    document.getElementById('r-final').innerHTML=`🏁 <b>${fmt(t)}</b> — fallback OSRM (${distRota.toFixed(2)} km) <span style="color:#856404;font-size:12px">⚠️ pode diferir do Lets</span>`;
   }catch(e){
     document.getElementById('s3').innerHTML=`<span class="err">❌ ${e.message}</span>`;
     document.getElementById('r-final').className='result-box err';
-    document.getElementById('r-final').textContent='OSRM falhou — tente novamente';
+    document.getElementById('r-final').textContent='Não foi possível calcular — taxa a combinar';
   }
 }
 document.getElementById('cep').addEventListener('keydown',e=>{if(e.key==='Enter')testar();});
