@@ -1724,12 +1724,64 @@ let _taxaEntregaAtual = 0;
 const OPENCAGE_API_KEY = 'd1b604a636d74015b0975bcc0dab85d2';
 
 // ── TABELA MANUAL DE CEPs ────────────────────────────────────────
-// CEPs com valores verificados no Moblets/Lets Express.
-// Tem prioridade total sobre o cálculo automático.
-// Formato: 'CEPSEMNUMERO': valorEmReais
-const CEP_PRECOS_FIXOS = {
-  '39400423': 9.70,  // Rua Capitão Enéas, Morrinhos
+// CEPs com valores verificados manualmente. Prioridade MÁXIMA.
+const CEP_PRECOS_FIXOS = {};
+// ─────────────────────────────────────────────────────────────────
+
+// ── TABELA DE PREÇOS POR BAIRRO ──────────────────────────────────
+// Gerado automaticamente via API Lets Express / Moblets em junho/2025.
+// Chave: nome do bairro conforme retornado pela BrasilAPI (normalizado).
+const BAIRRO_PRECOS = {
+  'Acácias': 13.10, 'Alcides Rabelo': 13.10, 'Alice Maia': 13.10,
+  'Alterosas': 7.80, 'Alto da Boa Vista': 7.80, 'Alto Floresta': 14.50,
+  'Alto São João': 11.90, 'Amazonas': 13.10, 'Antônio Pimenta': 6.60,
+  'Augusta Mota': 14.50, 'Barcelona Park': 13.10, 'Barreiro': 9.70,
+  'Bela Vista': 13.10, 'Belvedere': 11.90, 'Camilo Prates': 10.80,
+  'Cândida Câmara': 10.80, 'Canelas': 9.70, 'Carmelo': 11.90,
+  'Centro': 10.80, 'Cidade Industrial': 19.90, 'Cidade Nova': 7.80,
+  'Cidade Santa Maria': 9.70, 'Cintra': 9.70, 'Clarindo Lopes': 7.80,
+  'Colorado': 9.70, 'Conjunto Cristo Rei': 6.60, 'Conjunto Havaí': 7.80,
+  'Conjunto Joaquim Costa': 7.80, 'Delfino Magalhães': 9.70,
+  'Dona Gregória': 7.80, 'Duque de Caxias': 9.70, 'Edgar Pereira': 13.10,
+  'Eldorado': 16.90, 'Esplanada': 11.90, 'Funcionários': 9.70,
+  'Guarujá': 13.10, 'Ibituruna': 13.10, 'Inconfidentes': 9.70,
+  'Independência': 13.10, 'Interlagos': 11.90, 'Ipiranga': 16.90,
+  'Jaraguá': 18.50, 'Jardim Alvorada': 7.80, 'Jardim Brasil': 13.10,
+  'Jardim Liberdade': 13.10, 'Jardim Olímpico': 10.80,
+  'Jardim São Luiz': 10.80, 'João Botelho': 7.80,
+  'José Carlos Vale de Lima': 6.60, 'Juscelino Kubitschek': 9.70,
+  'Lourdes': 10.80, 'Major Prates': 10.80, 'Maracanã': 7.80,
+  'Melo': 11.90, 'Monte Alegre': 9.70, 'Morada da Serra': 11.90,
+  'Morada do Parque': 11.90, 'Morada do Sol': 10.80, 'Morrinhos': 9.70,
+  'Nossa Senhora Aparecida': 13.10, 'Nossa Senhora das Graças': 7.80,
+  'Nossa Senhora de Fátima': 7.80, 'Nova América': 19.90,
+  'Nova Morada': 14.50, 'Nova Suíça': 13.10, 'Novo Delfino': 10.80,
+  'Panorama': 13.10, 'Planalto': 13.10, 'Regina Peres': 9.70,
+  'Renascença': 13.10, 'Sagrada Família': 9.70, 'Santa Cecília': 13.10,
+  'Santa Eugênia': 14.50, 'Santa Lúcia': 9.70, 'Santa Rita': 7.80,
+  'Santo Amaro': 10.80, 'Santo Antônio': 7.80, 'Santos Dumont': 10.80,
+  'São Geraldo': 16.90, 'São João': 11.90, 'São Judas Tadeu': 6.60,
+  'São Lucas': 11.90, 'São Mateus': 13.10, 'Tancredo Neves': 13.10,
+  'Todos os Santos': 11.90, 'Universitário': 16.90, 'Vargem Grande': 9.70,
+  'Vera Cruz': 11.90, 'Vila Anália': 10.80, 'Vila Atlântida': 13.10,
+  'Vila Brasília': 11.90, 'Vila Campos': 7.80, 'Vila Castelo Branco': 16.90,
+  'Vila Guilhermina': 9.70, 'Vila Maria Cândida': 6.60,
+  'Vila Mauricéia': 11.90, 'Vila Oliveira': 13.10, 'Vila Real': 13.10,
+  'Vila Regina': 11.90, 'Vila Santa Cruz': 11.90, 'Vila Sion': 7.80,
+  'Vila Sumaré': 6.60, 'Vila Telma': 6.60, 'Vila Tiradentes': 10.80,
+  'Village do Lago': 19.90,
 };
+
+// Normaliza nome de bairro para comparação (sem acento, lowercase, trim)
+function normalizarBairro(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+// Mapa normalizado para lookup rápido
+const _BAIRRO_NORM = Object.fromEntries(
+  Object.entries(BAIRRO_PRECOS).map(([k, v]) => [normalizarBairro(k), v])
+);
 // ─────────────────────────────────────────────────────────────────
 
 async function geocodeHere(street, neighborhood, city, state) {
@@ -1787,6 +1839,17 @@ async function calcDeliveryFee() {
     const res  = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
     if (!res.ok) throw new Error('CEP não encontrado');
     const data = await res.json();
+
+    // 1b) Tabela por bairro — usa Google Maps da Lets Express (mais preciso)
+    const precoBairro = _BAIRRO_NORM[normalizarBairro(data.neighborhood)];
+    if (precoBairro !== undefined) {
+      _taxaEntregaAtual = precoBairro;
+      if(valEl) valEl.textContent = fmtBRL(_taxaEntregaAtual);
+      if(infoEl) infoEl.textContent = `${data.neighborhood || 'Bairro'} — taxa verificada`;
+      if(box) box.style.display = 'block';
+      if(loading) loading.style.display = 'none';
+      return;
+    }
 
     let lat, lng, confiavel = false;
     const coords = data?.location?.coordinates;
