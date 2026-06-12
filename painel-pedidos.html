@@ -795,9 +795,9 @@ async function markDelivered(id) {
       if (btn) { btn.disabled = false; btn.textContent = '✓ Marcar como Entregue'; }
       return;
     }
-    showToast('✅ Entregue! Enviando cobrança...', o ? o.nome : '');
+    showToast('✅ Entregue! Gerando cobrança...', o ? o.nome : '');
     speak('Pedido marcado como entregue!');
-    // Dispara cobrança do restante via worker (não bloqueia o render)
+    // Gera link InfinitePay e abre WhatsApp com a mensagem
     if (o) {
       const totalNum = parseFloat(String(o.valor || '0').replace(/[^\d,.]/g,'').replace(',','.')) || 0;
       fetch('https://coda-proxy.sitedluh.workers.dev/entrega-confirmada', {
@@ -810,9 +810,15 @@ async function markDelivered(id) {
           total: totalNum,
         })
       }).then(r => r.json()).then(d => {
-        if (d.ok) showToast('💳 Link de pagamento enviado!', 'Verifique o Telegram');
-        else showToast('⚠️ Cobrança não gerada', d.error || '');
-      }).catch(() => showToast('⚠️ Worker indisponível', 'Verifique o Telegram manualmente'));
+        if (d.ok && d.waUrl) {
+          showToast('💳 Abrindo WhatsApp...', o.nome);
+          window.open(d.waUrl, '_blank');
+        } else if (d.ok && d.link) {
+          showToast('💳 Link gerado!', d.link);
+        } else {
+          showToast('⚠️ Cobrança não gerada', d.error || '');
+        }
+      }).catch(() => showToast('⚠️ Worker indisponível', 'Tente novamente'));
     }
   } catch(e) {
     showToast('❌ Erro de conexão', e.message);
