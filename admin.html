@@ -175,12 +175,24 @@ async function carregarPedidos(){
   }
 }
 
+// Lista global de produtos únicos para o datalist
+let _produtosList = [];
+
 function renderPedidos(pedidos){
   const main=document.getElementById('main');
   if(!pedidos.length){
     main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação.</div>';
     return;
   }
+  // Extrai produtos únicos de todos os pedidos carregados
+  const nomes=new Set();
+  pedidos.forEach(p=>(p.itens||[]).forEach(i=>{if(i.produto&&!i.produto.startsWith('🛵'))nomes.add(i.produto);}));
+  _produtosList=Array.from(nomes).sort();
+  // Injeta datalist global
+  let dl=document.getElementById('produtos-datalist');
+  if(!dl){dl=document.createElement('datalist');dl.id='produtos-datalist';document.body.appendChild(dl);}
+  dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
+
   main.innerHTML=pedidos.map(p=>cardPedido(p)).join('');
   pedidos.forEach(p=>recalcCard(p.idPedido));
 }
@@ -194,7 +206,7 @@ function cardPedido(p){
   const rows=(p.itens||[]).map((i,idx)=>`
     <tr data-idx="${idx}" style="border-top:1px solid var(--border)">
       <td style="padding:7px 0">
-        <input class="inp-nome" value="${esc(i.produto)}" style="${IS}width:100%">
+        <input class="inp-nome" value="${esc(i.produto)}" list="produtos-datalist" style="${IS}width:100%">
         ${i.recheios?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(i.recheios)}</div>`:''}
         ${i.topoInfo?`<div style="font-size:11px;color:var(--text3);margin-top:2px">🎨 ${esc(i.topoInfo.replace(/\n/g,' · '))}</div>`:''}
       </td>
@@ -292,7 +304,7 @@ function addItem(id){
   tr.setAttribute('data-idx',idx);
   tr.style.borderTop='1px solid var(--border)';
   tr.innerHTML=`
-    <td style="padding:7px 0"><input class="inp-nome" value="Produto" style="${IS}width:100%"></td>
+    <td style="padding:7px 0"><input class="inp-nome" value="" placeholder="Selecione o produto" list="produtos-datalist" style="${IS}width:100%"></td>
     <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center"></td>
     <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="0.00" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center"></td>
     <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">R$ 0,00</td>
