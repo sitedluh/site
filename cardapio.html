@@ -1539,6 +1539,8 @@ async function _doFinalizar(){
         { column: 'Data Desejada', value: data },
         { column: 'Hora', value: horaVal },
         { column: 'Observações', value: obs },
+        { column: 'Entrada',     value: entradaVal },
+        { column: 'Restante',    value: restoVal },
       ]}]})
     });
     const paiData = await paiRes.json();
@@ -1565,28 +1567,45 @@ async function _doFinalizar(){
           { column: 'Recheios',     value: recheiosTxt },
           { column: 'Cliente',      value: nome },
           { column: 'WhatsApp',     value: tel },
+          { column: 'Entrega',      value: entrega },
+          { column: 'Pagamento',    value: pagamento },
+          { column: 'Entrada',      value: entradaVal },
+          { column: 'Restante',     value: restoVal },
           { column: 'Data Desejada', value: data },
           { column: 'Hora',         value: horaVal },
           { column: 'Observações',  value: obsItem },
           { column: 'Topo Info',    value: topperTxt },
         ]};
       });
-      const subRes = await fetch(`${CONFIG.WORKER_URL}/orcamentos`, {
+      // Adiciona subrow da taxa de entrega (para o worker incluir no total do Telegram)
+      if (taxaFrete > 0) {
+        subrows.push({ cells: [
+          { column: 'Pedido',    value: [paiId] },
+          { column: 'Produto',   value: '🛵 Taxa de Entrega' },
+          { column: 'Quantidade', value: 1 },
+          { column: 'Valor Unit', value: taxaFrete },
+          { column: 'Cliente',   value: nome },
+          { column: 'WhatsApp',  value: tel },
+          { column: 'Entrega',   value: entrega },
+          { column: 'Pagamento', value: pagamento },
+          { column: 'Data Desejada', value: data },
+          { column: 'Hora',      value: horaVal },
+        ]});
+      }
+      // keepalive: fetch continua mesmo após navegação (resolve WA no celular)
+      fetch(`${CONFIG.WORKER_URL}/orcamentos`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ rows: subrows })
-      });
-      const subData = await subRes.json();
-      if (!subRes.ok) throw new Error(`Erro subrows: ${JSON.stringify(subData)}`);
+        body: JSON.stringify({ rows: subrows }),
+        keepalive: true
+      }).catch(() => {});
     }
     document.getElementById('coda-note').textContent='✅ Pedido registrado em Orçamentos!';
   }catch(e){
     console.error('Erro Coda:',e);
     document.getElementById('coda-note').textContent=`⚠️ Erro: ${e.message}`;
   }
-  // Garante que o WhatsApp abra mesmo se a aba inicial não pôde ser aberta/redirecionada
-  // (ex.: pop-up bloqueado pelo navegador do tablet) — navega a aba atual como alternativa.
-  // Navegação direta (location.href) não é bloqueada por bloqueadores de pop-up.
+  // Abre WhatsApp imediatamente após salvar o PAI (subrows vão em background com keepalive)
   if(!waWindow||waWindow.closed){
     window.location.href=waUrl;
   }
