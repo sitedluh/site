@@ -1539,8 +1539,6 @@ async function _doFinalizar(){
         { column: 'Data Desejada', value: data },
         { column: 'Hora', value: horaVal },
         { column: 'Observações', value: obs },
-        { column: 'Entrada',     value: entradaVal },
-        { column: 'Restante',    value: restoVal },
       ]}]})
     });
     const paiData = await paiRes.json();
@@ -1584,7 +1582,7 @@ async function _doFinalizar(){
     document.getElementById('coda-note').textContent='✅ Pedido registrado em Orçamentos!';
   }catch(e){
     console.error('Erro Coda:',e);
-    document.getElementById('coda-note').textContent='⚠️ Não foi possível registrar automaticamente.';
+    document.getElementById('coda-note').textContent=`⚠️ Erro: ${e.message}`;
   }
   // Garante que o WhatsApp abra mesmo se a aba inicial não pôde ser aberta/redirecionada
   // (ex.: pop-up bloqueado pelo navegador do tablet) — navega a aba atual como alternativa.
