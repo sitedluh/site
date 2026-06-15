@@ -161,35 +161,30 @@ function showToast(msg){
 
 // ── ESTOQUE ─────────────────────────────────────────────────────────────────
 
+// Catálogo completo de produtos
+let _produtosList = [];
+let _produtosMap  = {};
+
+// Carrega produtos + pedidos em paralelo; renderiza só depois que ambos chegarem
 async function carregarPedidos(){
   const btn=document.getElementById('btn-refresh');
   btn.classList.add('loading');btn.disabled=true;
   try{
-    const res=await fetch(`${WORKER}/pedidos-pendentes`);
-    const data=await res.json();
-    renderPedidos(data.pedidos||[]);
+    const [prodData,pedData]=await Promise.all([
+      fetch(`${WORKER}/produtos`).then(r=>r.json()).catch(()=>({produtos:[]})),
+      fetch(`${WORKER}/pedidos-pendentes`).then(r=>r.json()).catch(()=>({pedidos:[]}))
+    ]);
+    const lista=prodData.produtos||[];
+    _produtosList=lista.map(p=>p.nome);
+    _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
+    const dl=document.getElementById('produtos-datalist');
+    if(dl)dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
+    renderPedidos(pedData.pedidos||[]);
   }catch(e){
     document.getElementById('main').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar pedidos.<br><small>${e.message}</small></div>`;
   }finally{
     btn.classList.remove('loading');btn.disabled=false;
   }
-}
-
-// Catálogo completo de produtos (carregado do worker)
-let _produtosList = []; // nomes únicos ordenados
-let _produtosMap  = {}; // nome → último preço unitário
-
-async function carregarProdutos(){
-  try{
-    const res=await fetch(`${WORKER}/produtos`);
-    const data=await res.json();
-    const lista=data.produtos||[];
-    _produtosList=lista.map(p=>p.nome);
-    _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
-    // Atualiza datalist se já existe
-    const dl=document.getElementById('produtos-datalist');
-    if(dl)dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
-  }catch(e){console.warn('Falha ao carregar produtos:',e);}
 }
 
 function renderPedidos(pedidos){
@@ -202,16 +197,50 @@ function renderPedidos(pedidos){
   pedidos.forEach(p=>recalcCard(p.idPedido));
 }
 
+// Monta <select> de produto com todos os itens do catálogo
+function buildProdutoSelect(id,selectedNome){
+  const inList=_produtosList.includes(selectedNome);
+  const extraOpt=selectedNome&&!inList?`<option value="${esc(selectedNome)}" selected>${esc(selectedNome)}</option>`:'';
+  const opts=_produtosList.map(n=>`<option value="${esc(n)}"${n===selectedNome?' selected':''}>${esc(n)}</option>`).join('');
+  return `<select class="inp-nome" onchange="trocaProduto(this,'${id}')" style="${IS}width:100%">
+    <option value="">— escolha o produto —</option>
+    ${extraOpt}${opts}
+    <option value="__outro__">✏️ Outro produto...</option>
+  </select>`;
+}
+
+function trocaProduto(sel,id){
+  const val=sel.value;
+  if(!val)return;
+  if(val==='__outro__'){
+    // Troca select por campo de texto livre
+    const td=sel.closest('td');
+    td.innerHTML=`<input class="inp-nome" value="" placeholder="Nome do produto" list="produtos-datalist" style="${IS}width:100%">`;
+    td.querySelector('.inp-nome').focus();
+    return;
+  }
+  // Preenche preço unitário do produto selecionado
+  const preco=(_produtosMap[val]||0).toFixed(2);
+  const row=sel.closest('tr');
+  const unitInput=row.querySelector('.inp-unit');
+  if(unitInput)unitInput.value=preco;
+  recalcCard(id);
+}
+
 const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
 
 function cardPedido(p){
   const id=p.idPedido;
   const total=p.total||p.itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
 
-  const rows=(p.itens||[]).map((i,idx)=>`
+  // Taxa de entrega sempre por último
+  const sortedItens=[...(p.itens||[])].sort((a,b)=>
+    (a.produto.startsWith('🛵')?1:0)-(b.produto.startsWith('🛵')?1:0));
+
+  const rows=sortedItens.map((i,idx)=>`
     <tr data-idx="${idx}" style="border-top:1px solid var(--border)">
       <td style="padding:7px 0">
-        <input class="inp-nome" value="${esc(i.produto)}" list="produtos-datalist" style="${IS}width:100%">
+        ${buildProdutoSelect(id,i.produto)}
         ${i.recheios?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(i.recheios)}</div>`:''}
         ${i.topoInfo?`<div style="font-size:11px;color:var(--text3);margin-top:2px">🎨 ${esc(i.topoInfo.replace(/\n/g,' · '))}</div>`:''}
       </td>
@@ -308,35 +337,13 @@ function addItem(id){
   const tr=document.createElement('tr');
   tr.setAttribute('data-idx',idx);
   tr.style.borderTop='1px solid var(--border)';
-  // Monta opções do select com produtos conhecidos
-  const optsProd=_produtosList.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   tr.innerHTML=`
-    <td style="padding:7px 0" colspan="3">
-      <select onchange="selecionarProduto(this,'${id}',${idx})" style="${IS}width:100%;color:var(--text2)">
-        <option value="">— escolha o produto —</option>
-        ${optsProd}
-        <option value="__outro__">✏️ Outro produto...</option>
-      </select>
-    </td>
-    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">—</td>
+    <td style="padding:7px 0">${buildProdutoSelect(id,'')}</td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center"></td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="0.00" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center"></td>
+    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">R$ 0,00</td>
     <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0">×</button></td>`;
   tbody.appendChild(tr);
-}
-
-function selecionarProduto(sel,id,idx){
-  const val=sel.value;
-  if(!val)return;
-  const tr=sel.closest('tr');
-  const nome=val==='__outro__'?'':val;
-  const preco=(_produtosMap[nome]||0).toFixed(2);
-  tr.innerHTML=`
-    <td style="padding:7px 0"><input class="inp-nome" value="${esc(nome)}" list="produtos-datalist" placeholder="Nome do produto" style="${IS}width:100%"></td>
-    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center"></td>
-    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="${preco}" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center"></td>
-    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">${fmtBRL(parseFloat(preco)||0)}</td>
-    <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0">×</button></td>`;
-  if(val==='__outro__')tr.querySelector('.inp-nome').focus();
-  recalcCard(id);
 }
 
 // datalist para autocomplete nos inputs existentes
@@ -344,9 +351,7 @@ function selecionarProduto(sel,id,idx){
   const dl=document.createElement('datalist');dl.id='produtos-datalist';document.body.appendChild(dl);
 })();
 
-// Carrega pedidos e catálogo em paralelo
 carregarPedidos();
-carregarProdutos();
 
 function notificarCliente(id){
   const card=document.getElementById(`card-${CSS.escape(id)}`);
@@ -430,6 +435,11 @@ function switchTab(tab){
   }
 }
 
+// Mapeamento Pedido Status (tabela Pedidos) → Status do admin
+const PEDIDO_STATUS_MAP = {
+  'Entregue':    'Entregue — Esperando restante',
+};
+
 async function carregarStatus(){
   const el=document.getElementById('status-list');
   if(!el.querySelector('.status-card'))
@@ -439,9 +449,25 @@ async function carregarStatus(){
     const data=await res.json();
     const pedidos=data.pedidos||[];
     if(!pedidos.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido encontrado.</div>';return;}
+
+    // Auto-atualiza status baseado em Pedido Status da tabela Pedidos
+    for(const p of pedidos){
+      const ps=p.pedidoStatus||'';
+      const novoStatus=PEDIDO_STATUS_MAP[ps];
+      if(novoStatus && p.status!==novoStatus && p.rowId){
+        p.status=novoStatus; // atualiza localmente para renderizar certo
+        fetch(`${WORKER}/atualizar-status`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({rowId:p.rowId,status:novoStatus})
+        }).catch(()=>{});
+      }
+    }
+
     el.innerHTML=pedidos.map(p=>{
       const status=p.status||'Aguardando confirmação';
       const cls=STATUS_CLS[status]||'aguardando';
+      const ps=p.pedidoStatus||'';
       const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
       const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
       const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
@@ -450,7 +476,10 @@ async function carregarStatus(){
           <div class="sc-nome">${esc(p.cliente||'—')}</div>
           <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
           <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
-          <span class="sc-badge ${cls}">${status}</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            <span class="sc-badge ${cls}">${status}</span>
+            ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
+          </div>
         </div>
         <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
       </div>`;
