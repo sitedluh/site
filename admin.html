@@ -151,11 +151,15 @@ const WORKER = 'https://coda-proxy.sitedluh.workers.dev';
 
 function fmtBRL(v){return'R$ '+Number(v||0).toFixed(2).replace('.',',');}
 function fmtData(d){if(!d)return'—';const p=d.split('-');return p.length===3?p.reverse().join('/'):d;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function enc(s){return encodeURIComponent(s||'');}
 
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2800);
 }
+
+// ── ESTOQUE ─────────────────────────────────────────────────────────────────
 
 async function carregarPedidos(){
   const btn=document.getElementById('btn-refresh');
@@ -174,71 +178,182 @@ async function carregarPedidos(){
 function renderPedidos(pedidos){
   const main=document.getElementById('main');
   if(!pedidos.length){
-    main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação de estoque.</div>';
+    main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação.</div>';
     return;
   }
   main.innerHTML=pedidos.map(p=>cardPedido(p)).join('');
+  pedidos.forEach(p=>recalcCard(p.idPedido));
 }
 
+const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
+
 function cardPedido(p){
+  const id=p.idPedido;
   const total=p.total||p.itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
-  const itensHtml=p.itens.map(i=>{
-    const subs=[];
-    if(i.recheios)subs.push(i.recheios);
-    const topper=i.topoInfo?`<div class="item-topper">🎨 Topper: ${i.topoInfo.replace(/\n/g,' · ')}</div>`:'';
-    return`<div class="item-row">
-      <div class="item-info">
-        <div class="item-nome">${esc(i.produto)}</div>
-        ${subs.length?`<div class="item-sub">${esc(subs.join(' | '))}</div>`:''}
-        ${topper}
-      </div>
-      <div class="item-valor">${fmtBRL(i.valorItem)}</div>
-    </div>`;
-  }).join('');
 
-  const confirmarUrl=`${WORKER}/confirmar-estoque?pedidoId=${enc(p.idPedido)}&total=${enc(total)}&telefone=${enc(p.telefone)}&cliente=${enc(p.cliente)}`;
+  const rows=(p.itens||[]).map((i,idx)=>`
+    <tr data-idx="${idx}" style="border-top:1px solid var(--border)">
+      <td style="padding:7px 0">
+        <input class="inp-nome" value="${esc(i.produto)}" style="${IS}width:100%">
+        ${i.recheios?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(i.recheios)}</div>`:''}
+        ${i.topoInfo?`<div style="font-size:11px;color:var(--text3);margin-top:2px">🎨 ${esc(i.topoInfo.replace(/\n/g,' · '))}</div>`:''}
+      </td>
+      <td style="padding:7px 4px;text-align:center">
+        <input class="inp-qty" type="number" value="${i.quantidade||1}" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center">
+      </td>
+      <td style="padding:7px 4px;text-align:center">
+        <input class="inp-unit" type="number" value="${Number(i.valorUnit||0).toFixed(2)}" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center">
+      </td>
+      <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600;white-space:nowrap">${fmtBRL(i.valorItem)}</td>
+      <td style="padding:7px 0 7px 8px">
+        <button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0" title="Remover">×</button>
+      </td>
+    </tr>`).join('');
 
-  return`<div class="card" id="card-${esc(p.idPedido)}">
+  return`<div class="card" id="card-${esc(id)}" data-id="${esc(id)}" data-cliente="${esc(p.cliente)}" data-telefone="${esc(p.telefone)}">
     <div class="card-header">
       <div>
-        <div class="card-id">Pedido #${esc(p.idPedido)}</div>
         <div class="card-nome">${esc(p.cliente)}</div>
         <div class="card-meta">📱 ${esc(p.telefone)} · ${esc(p.entrega||'—')} · ${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</div>
+        ${p.pagamento?`<div class="card-meta" style="margin-top:2px">💳 ${esc(p.pagamento)}</div>`:''}
+        ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
       </div>
-      <span class="badge">Verificando estoque</span>
+      <span class="badge">Verificar estoque</span>
     </div>
     <div class="card-body">
-      <div class="info-grid">
-        <div class="info-item"><label>Pagamento</label><span>${esc(p.pagamento||'—')}</span></div>
-        <div class="info-item"><label>Entrega</label><span>${esc(p.entrega||'—')}</span></div>
-        ${p.endereco?`<div class="info-item" style="grid-column:1/-1"><label>Endereço</label><span>${esc(p.endereco)}</span></div>`:''}
-        ${p.obs?`<div class="info-item" style="grid-column:1/-1"><label>Observações</label><span>${esc(p.obs)}</span></div>`:''}
+      <div class="itens-titulo" style="margin-bottom:6px">Itens &mdash; <span style="font-weight:400;font-size:11px;color:var(--text3)">edite se precisar trocar produto</span></div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px">
+            <th style="text-align:left;padding-bottom:4px;font-weight:600">Produto</th>
+            <th style="text-align:center;padding-bottom:4px;font-weight:600;width:60px">Qtd</th>
+            <th style="text-align:center;padding-bottom:4px;font-weight:600;width:80px">Unit</th>
+            <th style="text-align:right;padding-bottom:4px;font-weight:600;width:90px">Subtotal</th>
+            <th style="width:30px"></th>
+          </tr>
+        </thead>
+        <tbody id="itens-body-${esc(id)}">${rows}</tbody>
+      </table>
+      <button onclick="addItem('${esc(id)}')" style="background:none;border:1px dashed var(--border);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--text3);cursor:pointer;width:100%;margin-top:8px;font-family:inherit">+ Adicionar item</button>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:12px">
+        <div style="display:flex;align-items:center;gap:5px">
+          <label style="font-size:12px;color:var(--text3);font-weight:600">Entrada</label>
+          <input id="pct-${esc(id)}" type="number" value="50" min="1" max="100" step="1" oninput="recalcCard('${esc(id)}')" style="width:50px;border:1.5px solid var(--accent);border-radius:6px;padding:4px 5px;font-size:13px;font-weight:600;color:var(--accent);text-align:center;font-family:inherit">
+          <span style="font-size:12px;color:var(--text3)">%</span>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text2)">
+          <span>Total: <b id="total-${esc(id)}">${fmtBRL(total)}</b></span>
+          <span>Entrada: <b id="entrada-${esc(id)}">${fmtBRL(Math.round(total*.5*100)/100)}</b></span>
+          <span>Restante: <b id="restante-${esc(id)}">${fmtBRL(Math.round(total*.5*100)/100)}</b></span>
+        </div>
       </div>
-      <div class="itens-titulo">Itens do pedido</div>
-      ${itensHtml}
     </div>
     <div class="card-footer">
-      <div class="total-txt"><span class="total-label">Total:</span>${fmtBRL(total)}</div>
-      <button class="btn-confirmar" onclick="confirmarEstoque('${esc(p.idPedido)}','${confirmarUrl}')">
+      <button onclick="notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
+        📱 Avisar cliente
+      </button>
+      <button class="btn-confirmar" onclick="confirmarEstoque('${esc(id)}')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Confirmar estoque &amp; enviar link
+        Confirmar e cobrar
       </button>
     </div>
   </div>`;
 }
 
-function confirmarEstoque(idPedido, url){
-  const btn=document.querySelector(`#card-${CSS.escape(idPedido)} .btn-confirmar`);
-  if(btn){btn.disabled=true;btn.textContent='Abrindo…';}
-  window.open(url,'_blank');
-  showToast('Link de pagamento gerado! WhatsApp abrirá em instantes.');
-  setTimeout(()=>{if(btn){btn.disabled=false;btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Confirmar estoque &amp; enviar link';}},4000);
+function recalcCard(id){
+  const tbody=document.getElementById(`itens-body-${id}`);
+  if(!tbody)return;
+  let total=0;
+  tbody.querySelectorAll('tr[data-idx]').forEach(row=>{
+    const qty=parseFloat(row.querySelector('.inp-qty')?.value)||0;
+    const unit=parseFloat(row.querySelector('.inp-unit')?.value)||0;
+    const sub=Math.round(qty*unit*100)/100;
+    total+=sub;
+    const td=row.querySelector('.td-sub');
+    if(td)td.textContent=fmtBRL(sub);
+  });
+  const pct=parseInt(document.getElementById(`pct-${id}`)?.value)||50;
+  const entrada=Math.round(total*pct/100*100)/100;
+  const restante=Math.round((total-entrada)*100)/100;
+  const elT=document.getElementById(`total-${id}`);
+  const elE=document.getElementById(`entrada-${id}`);
+  const elR=document.getElementById(`restante-${id}`);
+  if(elT)elT.textContent=fmtBRL(total);
+  if(elE)elE.textContent=fmtBRL(entrada);
+  if(elR)elR.textContent=fmtBRL(restante);
 }
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function enc(s){return encodeURIComponent(s||'');}
+function addItem(id){
+  const tbody=document.getElementById(`itens-body-${id}`);
+  if(!tbody)return;
+  const idx=tbody.querySelectorAll('tr').length;
+  const tr=document.createElement('tr');
+  tr.setAttribute('data-idx',idx);
+  tr.style.borderTop='1px solid var(--border)';
+  tr.innerHTML=`
+    <td style="padding:7px 0"><input class="inp-nome" value="Produto" style="${IS}width:100%"></td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center"></td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="0.00" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center"></td>
+    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">R$ 0,00</td>
+    <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0">×</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function notificarCliente(id){
+  const card=document.getElementById(`card-${CSS.escape(id)}`);
+  if(!card)return;
+  const cliente=card.dataset.cliente||'';
+  const telefone=card.dataset.telefone||'';
+  const tbody=document.getElementById(`itens-body-${id}`);
+  let itensMsg='';
+  let total=0;
+  if(tbody){
+    tbody.querySelectorAll('tr[data-idx]').forEach(row=>{
+      const nome=row.querySelector('.inp-nome')?.value||'';
+      const qty=parseFloat(row.querySelector('.inp-qty')?.value)||0;
+      const unit=parseFloat(row.querySelector('.inp-unit')?.value)||0;
+      const sub=Math.round(qty*unit*100)/100;
+      total+=sub;
+      if(nome)itensMsg+=`\n• ${qty}x ${nome} = ${fmtBRL(sub)}`;
+    });
+  }
+  const pct=parseInt(document.getElementById(`pct-${id}`)?.value)||50;
+  const entrada=Math.round(total*pct/100*100)/100;
+  const restante=Math.round((total-entrada)*100)/100;
+  const msg=`Olá ${cliente}! 🎂\n\nAtualizamos seu pedido conforme estoque disponível:${itensMsg}\n\n💰 Total: ${fmtBRL(total)}\n💵 Entrada (${pct}%): ${fmtBRL(entrada)}${restante>0?`\n⏳ Restante na entrega: ${fmtBRL(restante)}`:''}\n\nPode confirmar este pedido atualizado? 🩷`;
+  const fone=String(telefone).replace(/\D/g,'');
+  window.open(`https://wa.me/55${fone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function confirmarEstoque(id){
+  const card=document.getElementById(`card-${CSS.escape(id)}`);
+  if(!card)return;
+  const btn=card.querySelector('.btn-confirmar');
+  if(btn){btn.disabled=true;btn.textContent='Processando…';}
+  const telefone=card.dataset.telefone||'';
+  const cliente=card.dataset.cliente||'';
+  const tbody=document.getElementById(`itens-body-${id}`);
+  let total=0;
+  if(tbody){
+    tbody.querySelectorAll('tr[data-idx]').forEach(row=>{
+      const qty=parseFloat(row.querySelector('.inp-qty')?.value)||0;
+      const unit=parseFloat(row.querySelector('.inp-unit')?.value)||0;
+      total+=Math.round(qty*unit*100)/100;
+    });
+  }
+  const pct=parseInt(document.getElementById(`pct-${id}`)?.value)||50;
+  const entrada=Math.round(total*pct/100*100)/100;
+  const url=`${WORKER}/confirmar-estoque?pedidoId=${enc(id)}&total=${enc(total)}&telefone=${enc(telefone)}&cliente=${enc(cliente)}&entrada=${enc(entrada)}`;
+  window.open(url,'_blank');
+  showToast('Abrindo WhatsApp com link de pagamento…');
+  const ICON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  setTimeout(()=>{if(btn){btn.disabled=false;btn.innerHTML=ICON+' Confirmar e cobrar';}},6000);
+}
 
 carregarPedidos();
+
+// ── STATUS ───────────────────────────────────────────────────────────────────
 
 const STATUS_OPTS = [
   'Aguardando confirmação',
@@ -247,66 +362,73 @@ const STATUS_OPTS = [
   'Entregue — Esperando restante',
   'Finalizado',
 ];
-const STATUS_CLS  = {
-  'Aguardando confirmação':         'aguardando',
+const STATUS_CLS = {
+  'Aguardando confirmação':          'aguardando',
   'Confirmado — Esperando pagamento':'confirmado',
-  'Pago — Em produção':             'preparo',
-  'Entregue — Esperando restante':  'saiu',
-  'Finalizado':                     'entregue',
+  'Pago — Em produção':              'preparo',
+  'Entregue — Esperando restante':   'saiu',
+  'Finalizado':                      'entregue',
 };
+
+let _statusTimer=null;
 
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['estoque','status'][i]===tab));
-  document.getElementById('tab-estoque').classList.toggle('active', tab==='estoque');
-  document.getElementById('tab-status').classList.toggle('active', tab==='status');
-  if(tab==='status') carregarStatus();
-}
-
-async function carregarStatus(){
-  const el = document.getElementById('status-list');
-  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Carregando...</div>';
-  try {
-    const res = await fetch(`${WORKER}/pedidos-pendentes?todos=1`);
-    const data = await res.json();
-    const pedidos = data.pedidos || [];
-    if(!pedidos.length){ el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido encontrado.</div>'; return; }
-    el.innerHTML = pedidos.map(p => {
-      const status = p.status || 'Aguardando confirmação';
-      const cls = STATUS_CLS[status] || 'aguardando';
-      const opts = STATUS_OPTS.map(s => `<option value="${s}" ${s===status?'selected':''}>${s}</option>`).join('');
-      const itensResumo = (p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
-      return `<div class="status-card">
-        <div class="sc-info">
-          <div class="sc-nome">${esc(p.cliente||'—')}</div>
-          <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
-          <div class="sc-itens">${esc(itensResumo)}</div>
-          <span class="sc-badge ${cls}">${status}</span>
-        </div>
-        <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}', this)">
-          ${opts}
-        </select>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    el.innerHTML = `<div class="empty">⚠️ Erro: ${e.message}</div>`;
+  document.getElementById('tab-estoque').classList.toggle('active',tab==='estoque');
+  document.getElementById('tab-status').classList.toggle('active',tab==='status');
+  if(tab==='status'){
+    carregarStatus();
+    if(!_statusTimer)_statusTimer=setInterval(carregarStatus,30000);
+  }else{
+    if(_statusTimer){clearInterval(_statusTimer);_statusTimer=null;}
   }
 }
 
-async function atualizarStatus(rowId, sel){
-  const novoStatus = sel.value;
-  sel.disabled = true;
-  try {
-    await fetch(`${WORKER}/atualizar-status`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ rowId, status: novoStatus })
+async function carregarStatus(){
+  const el=document.getElementById('status-list');
+  if(!el.querySelector('.status-card'))
+    el.innerHTML='<div class="loading-state"><div class="spinner"></div>Carregando...</div>';
+  try{
+    const res=await fetch(`${WORKER}/pedidos-pendentes?todos=1`);
+    const data=await res.json();
+    const pedidos=data.pedidos||[];
+    if(!pedidos.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido encontrado.</div>';return;}
+    el.innerHTML=pedidos.map(p=>{
+      const status=p.status||'Aguardando confirmação';
+      const cls=STATUS_CLS[status]||'aguardando';
+      const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+      const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
+      const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+      return`<div class="status-card">
+        <div class="sc-info">
+          <div class="sc-nome">${esc(p.cliente||'—')}</div>
+          <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
+          <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
+          <span class="sc-badge ${cls}">${status}</span>
+        </div>
+        <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML=`<div class="empty">⚠️ Erro: ${e.message}</div>`;
+  }
+}
+
+async function atualizarStatus(rowId,sel){
+  const novoStatus=sel.value;
+  sel.disabled=true;
+  try{
+    await fetch(`${WORKER}/atualizar-status`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rowId,status:novoStatus})
     });
-    const badge = sel.closest('.status-card').querySelector('.sc-badge');
-    if(badge){ badge.textContent=novoStatus; badge.className='sc-badge '+(STATUS_CLS[novoStatus]||'aguardando'); }
+    const badge=sel.closest('.status-card').querySelector('.sc-badge');
+    if(badge){badge.textContent=novoStatus;badge.className='sc-badge '+(STATUS_CLS[novoStatus]||'aguardando');}
     showToast('Status atualizado: '+novoStatus);
-  } catch(e) {
+  }catch(e){
     showToast('Erro ao atualizar: '+e.message);
-  } finally { sel.disabled = false; }
+  }finally{sel.disabled=false;}
 }
 
 </script>
