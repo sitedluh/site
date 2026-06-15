@@ -175,9 +175,22 @@ async function carregarPedidos(){
   }
 }
 
-// Catálogo de produtos extraído dos pedidos carregados
-let _produtosList = []; // nomes únicos
-let _produtosMap  = {}; // nome → último preço unitário visto
+// Catálogo completo de produtos (carregado do worker)
+let _produtosList = []; // nomes únicos ordenados
+let _produtosMap  = {}; // nome → último preço unitário
+
+async function carregarProdutos(){
+  try{
+    const res=await fetch(`${WORKER}/produtos`);
+    const data=await res.json();
+    const lista=data.produtos||[];
+    _produtosList=lista.map(p=>p.nome);
+    _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
+    // Atualiza datalist se já existe
+    const dl=document.getElementById('produtos-datalist');
+    if(dl)dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
+  }catch(e){console.warn('Falha ao carregar produtos:',e);}
+}
 
 function renderPedidos(pedidos){
   const main=document.getElementById('main');
@@ -185,18 +198,6 @@ function renderPedidos(pedidos){
     main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação.</div>';
     return;
   }
-  // Extrai produtos e preços dos pedidos carregados
-  const nomesSet=new Set();
-  const precos={};
-  pedidos.forEach(p=>(p.itens||[]).forEach(i=>{
-    if(i.produto&&!i.produto.startsWith('🛵')){
-      nomesSet.add(i.produto);
-      if(i.valorUnit>0) precos[i.produto]=i.valorUnit;
-    }
-  }));
-  _produtosList=Array.from(nomesSet).sort();
-  _produtosMap=precos;
-
   main.innerHTML=pedidos.map(p=>cardPedido(p)).join('');
   pedidos.forEach(p=>recalcCard(p.idPedido));
 }
@@ -338,10 +339,14 @@ function selecionarProduto(sel,id,idx){
   recalcCard(id);
 }
 
-// datalist para fallback de autocomplete nos inputs existentes
+// datalist para autocomplete nos inputs existentes
 (function(){
   const dl=document.createElement('datalist');dl.id='produtos-datalist';document.body.appendChild(dl);
 })();
+
+// Carrega pedidos e catálogo em paralelo
+carregarPedidos();
+carregarProdutos();
 
 function notificarCliente(id){
   const card=document.getElementById(`card-${CSS.escape(id)}`);
@@ -393,8 +398,6 @@ function confirmarEstoque(id){
   const ICON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
   setTimeout(()=>{if(btn){btn.disabled=false;btn.innerHTML=ICON+' Confirmar e cobrar';}},6000);
 }
-
-carregarPedidos();
 
 // ── STATUS ───────────────────────────────────────────────────────────────────
 
