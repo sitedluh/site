@@ -221,8 +221,10 @@ function trocaProduto(sel,id){
   }
   // Preenche preço unitário do produto selecionado
   const preco=(_produtosMap[val]||0).toFixed(2);
+  console.log('[trocaProduto]',val,'→',preco,'| map keys:',Object.keys(_produtosMap).slice(0,3));
   const row=sel.closest('tr');
   const unitInput=row.querySelector('.inp-unit');
+  console.log('[trocaProduto] unitInput encontrado:',!!unitInput);
   if(unitInput)unitInput.value=preco;
   recalcCard(id);
 }
