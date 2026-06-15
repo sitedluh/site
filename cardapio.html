@@ -1453,171 +1453,122 @@ async function finalizar(){
   return;
 }
 async function _doFinalizar(){
-  // Proteção contra envio duplicado (clique duplo / reenvio)
+  // Proteção contra envio duplicado
   if(_enviandoPedido)return;
   const items=Object.values(cart).filter(i=>i.qty>0);if(!items.length)return;
   _enviandoPedido=true;
   const btnEnviar=document.querySelector('.btn-wpp');
   const btnHtmlOriginal=btnEnviar?btnEnviar.innerHTML:'';
-  if(btnEnviar){
-    btnEnviar.disabled=true;
-    btnEnviar.classList.add('btn-sending');
-    btnEnviar.innerHTML='⏳ Enviando pedido...';
-  }
-  // Abre a aba do WhatsApp já aqui, em resposta direta ao clique (gesto síncrono do usuário).
-  // Se deixarmos para abrir só depois dos `await` do Coda/Firebase, navegadores móveis/tablets
-  // costumam bloquear o pop-up por não reconhecerem mais a ação como originada do usuário.
-  // Navegamos essa aba para a URL final do WhatsApp assim que a mensagem estiver pronta.
-  let waWindow=null;
-  try{ waWindow=window.open('about:blank','_blank'); }catch(e){ waWindow=null; }
+  if(btnEnviar){btnEnviar.disabled=true;btnEnviar.classList.add('btn-sending');btnEnviar.innerHTML='⏳ Enviando pedido...';}
   try{
-  saveUserData();
-  const nome=document.getElementById('f-nome').value.trim(),tel=document.getElementById('f-tel').value.trim(),entrega=getRadio('rg-entrega');
-  const cep=document.getElementById('f-cep')?.value.trim()||'';
-  const rua=document.getElementById('f-rua')?.value.trim()||'';
-  const num=document.getElementById('f-num')?.value.trim()||'';
-  const bairro=document.getElementById('f-bairro')?.value.trim()||'';
-  const endereco=entrega==='Entrega em endereço'?[rua,num,bairro,cep].filter(Boolean).join(', '):'';
-  const pagamento=getRadio('rg-pgto'),data=document.getElementById('f-data').value,obs=document.getElementById('f-obs').value.trim(),topperBonus=Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length*20,taxaFrete=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0),total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperBonus+taxaFrete;
-  const entradaPct=parseInt(document.getElementById('f-entrada-pct')?.value||50)/100;
-  const entradaVal=Math.round(total*entradaPct*100)/100;
-  const restoVal=Math.round((total-entradaVal)*100)/100;
-  let msg=`🛍️ *NOVO PEDIDO — D'Luh Festas*\n\n👤 *Cliente:* ${nome}\n📱 *WhatsApp:* ${tel}\n📦 *Entrega:* ${entrega==='Entrega em endereço'?`Entrega — ${endereco}`:'Retirada no local'}\n💳 *Pagamento:* ${pagamento}\n`;
-  const hora=document.getElementById('f-hora')?.value||'';
-  if(data)msg+=`📅 *Data:* ${data.split('-').reverse().join('/')}${hora?' às '+hora:''}\n`;
-  msg+=`\n📋 *Itens:*\n`;
-  items.forEach(i=>{
-    msg+=`  • ${i.nome} — ${i.qty*i.qtdMin} unid. = ${fmtBRL(i.valor*i.qty)}\n`;
-    if(isBolo(i.tipo)&&i.recheios){
-      i.recheios.forEach((r,idx)=>{msg+=`    Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}\n`;});
-    }
-  });
-  if(topperBonus>0)msg+=`\n  • Topper personalizado (${Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length}x) = ${fmtBRL(topperBonus)}`;
-  if(taxaFrete>0)msg+=`\n  • Taxa de entrega = ${fmtBRL(taxaFrete)}`;
-  msg+=`\n💰 *Total:* ${fmtBRL(total)}`;
-  msg+=`\n💵 *Entrada (${Math.round(entradaPct*100)}%):* ${fmtBRL(entradaVal)}`;
-  if(restoVal>0)msg+=`\n⏳ *Restante na entrega:* ${fmtBRL(restoVal)}`;
-  if(obs)msg+=`\n\n📝 *Obs:* ${obs}`;
-  const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
-  // Já direciona a aba aberta no clique para o WhatsApp (não precisa esperar Coda/Firebase).
-  // Assim o WhatsApp abre imediatamente — em apps nativos (mobile) ou WhatsApp Web (desktop) — via wa.me.
-  if(waWindow&&!waWindow.closed){
-    try{ waWindow.location.href=waUrl; }catch(e){ waWindow=null; }
-  }
-  const horaVal=document.getElementById('f-hora')?.value||'';
-  const itensTexto=items.map(i=>{
-    let txt=`${i.nome} · ${i.qty*i.qtdMin} unid. = R$ ${(i.valor*i.qty).toFixed(2)}`;
-    if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{txt+=`\n  Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}`;});
-    return txt;
-  }).join('\n');
-  // Salva no Firebase (não bloqueia)
-  salvarPedidoFirebase({nome,tel,entrega,endereco,pagamento,data,hora:horaVal,obs,total,entradaVal,restoVal,itensTexto});
-  // Upload de imagens de topper para Firebase Storage (com timeout de 8s)
-  for(const item of items){
-    const td=topperPorProduto[item.id];
-    if(td?.quero&&td.refFile&&window._fbUploadTopper){
-      try{
-        const _uploadP=window._fbUploadTopper(item.id,td.refFile);
-        const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000));
-        td.refUrl=await Promise.race([_uploadP,_timeout]);
-      }catch(e){console.warn('Topper upload fail:',e);td.refUrl='';}
-    }
-  }
-  // Envia para o Coda ANTES de abrir o WhatsApp
-  try{
-    // 1. Cria a row PAI no Orçamentos
-    const paiRes = await fetch(`${CONFIG.WORKER_URL}/orcamentos`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ rows: [{ cells: [
-        { column: 'Cliente', value: nome },
-        { column: 'WhatsApp', value: tel },
-        { column: 'Total', value: total },
-        { column: 'Entrega', value: entrega },
-        { column: 'Endereço', value: endereco },
-        { column: 'Pagamento', value: pagamento },
-        { column: 'Data Desejada', value: data },
-        { column: 'Hora', value: horaVal },
-        { column: 'Observações', value: obs },
-        { column: 'Entrada',     value: entradaVal },
-        { column: 'Restante',    value: restoVal },
-      ]}]})
-    });
-    const paiData = await paiRes.json();
-    if (!paiRes.ok) throw new Error(`Coda PAI: ${JSON.stringify(paiData)}`);
-    const paiId = paiData.addedRowIds?.[0];
+    saveUserData();
+    const nome=document.getElementById('f-nome').value.trim(),tel=document.getElementById('f-tel').value.trim(),entrega=getRadio('rg-entrega');
+    const cep=document.getElementById('f-cep')?.value.trim()||'';
+    const rua=document.getElementById('f-rua')?.value.trim()||'';
+    const num=document.getElementById('f-num')?.value.trim()||'';
+    const bairro=document.getElementById('f-bairro')?.value.trim()||'';
+    const endereco=entrega==='Entrega em endereço'?[rua,num,bairro,cep].filter(Boolean).join(', '):'';
+    const pagamento=getRadio('rg-pgto'),data=document.getElementById('f-data').value,obs=document.getElementById('f-obs').value.trim();
+    const topperBonus=Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length*20;
+    const taxaFrete=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0);
+    const total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperBonus+taxaFrete;
+    const entradaPct=parseInt(document.getElementById('f-entrada-pct')?.value||50)/100;
+    const entradaVal=Math.round(total*entradaPct*100)/100;
+    const restoVal=Math.round((total-entradaVal)*100)/100;
+    const horaVal=document.getElementById('f-hora')?.value||'';
 
-    // 2. Cria uma subrow por item linkada ao pai
-    if (paiId) {
-      const subrows = items.map(i => {
-        const recheiosTxt = (isBolo(i.tipo) && i.recheios)
-          ? i.recheios.map((r,idx) => `Bolo ${idx+1}: ${Array.isArray(r)?r.join(' + '):r||'sem recheio'}`).join(' | ')
-          : '';
-        const td = topperPorProduto[i.id];
-        const topperTxt = (isBolo(i.tipo) && td?.quero)
-          ? `Tema: ${td.tema}${td.detalhes?'\nDetalhes: '+td.detalhes:''}${td.refUrl?'\nReferência: '+td.refUrl:''}`
-          : '';
-        const obsItem = topperTxt ? (obs?obs+'\n\n':'')+'TOPPER:\n'+topperTxt : obs;
-        return { cells: [
-          { column: 'Pedido',       value: [paiId] },
-          { column: 'Produto',      value: i.nome },
-          { column: 'Row ID Produto', value: i.id },
-          { column: 'Quantidade',   value: i.qty * i.qtdMin },
-          { column: 'Valor Unit',   value: i.valorUnit },
-          { column: 'Recheios',     value: recheiosTxt },
-          { column: 'Cliente',      value: nome },
-          { column: 'WhatsApp',     value: tel },
-          { column: 'Entrega',      value: entrega },
-          { column: 'Pagamento',    value: pagamento },
-          { column: 'Entrada',      value: entradaVal },
-          { column: 'Restante',     value: restoVal },
-          { column: 'Data Desejada', value: data },
-          { column: 'Hora',         value: horaVal },
-          { column: 'Observações',  value: obsItem },
-          { column: 'Topo Info',    value: topperTxt },
-        ]};
-      });
-      // Adiciona subrow da taxa de entrega (para o worker incluir no total do Telegram)
-      if (taxaFrete > 0) {
-        subrows.push({ cells: [
-          { column: 'Pedido',    value: [paiId] },
-          { column: 'Produto',   value: '🛵 Taxa de Entrega' },
-          { column: 'Quantidade', value: 1 },
-          { column: 'Valor Unit', value: taxaFrete },
-          { column: 'Cliente',   value: nome },
-          { column: 'WhatsApp',  value: tel },
-          { column: 'Entrega',   value: entrega },
-          { column: 'Pagamento', value: pagamento },
-          { column: 'Data Desejada', value: data },
-          { column: 'Hora',      value: horaVal },
-        ]});
+    // Monta mensagem WhatsApp
+    let msg=`🛍️ *NOVO PEDIDO — D'Luh Festas*\n\n👤 *Cliente:* ${nome}\n📱 *WhatsApp:* ${tel}\n📦 *Entrega:* ${entrega==='Entrega em endereço'?`Entrega — ${endereco}`:'Retirada no local'}\n💳 *Pagamento:* ${pagamento}\n`;
+    if(data)msg+=`📅 *Data:* ${data.split('-').reverse().join('/')}${horaVal?' às '+horaVal:''}\n`;
+    msg+=`\n📋 *Itens:*\n`;
+    items.forEach(i=>{
+      msg+=`  • ${i.nome} — ${i.qty*i.qtdMin} unid. = ${fmtBRL(i.valor*i.qty)}\n`;
+      if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{msg+=`    Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}\n`;});
+    });
+    if(topperBonus>0)msg+=`\n  • Topper personalizado (${Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length}x) = ${fmtBRL(topperBonus)}`;
+    if(taxaFrete>0)msg+=`\n  • Taxa de entrega = ${fmtBRL(taxaFrete)}`;
+    msg+=`\n💰 *Total:* ${fmtBRL(total)}`;
+    msg+=`\n💵 *Entrada (${Math.round(entradaPct*100)}%):* ${fmtBRL(entradaVal)}`;
+    if(restoVal>0)msg+=`\n⏳ *Restante na entrega:* ${fmtBRL(restoVal)}`;
+    if(obs)msg+=`\n\n📝 *Obs:* ${obs}`;
+    const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
+
+    // ── ABRE WHATSAPP AGORA — antes de qualquer await ──
+    // Desktop: nova aba; celular: window.open retorna null (bloqueado) → navega a aba atual.
+    // Ambos ainda estão no contexto direto do gesto do usuário (sem await antes),
+    // o que é obrigatório no iOS Safari para que window.open / location.href funcionem.
+    let waDesktopOpened=false;
+    try{ const w=window.open(waUrl,'_blank'); waDesktopOpened=!!(w&&!w.closed); }catch(_){}
+    if(!waDesktopOpened){ window.location.href=waUrl; }
+
+    // ── MONTA DADOS PARA O CODA (síncrono, sem await) ──
+    const paiCells=[
+      {column:'Cliente',value:nome},
+      {column:'WhatsApp',value:tel},
+      {column:'Total',value:total},
+      {column:'Entrega',value:entrega},
+      {column:'Endereço',value:endereco},
+      {column:'Pagamento',value:pagamento},
+      {column:'Data Desejada',value:data},
+      {column:'Hora',value:horaVal},
+      {column:'Observações',value:obs},
+      {column:'Entrada',value:entradaVal},
+      {column:'Restante',value:restoVal},
+    ];
+    const subrowInputs=items.map(i=>{
+      const recheiosTxt=(isBolo(i.tipo)&&i.recheios)?i.recheios.map((r,idx)=>`Bolo ${idx+1}: ${Array.isArray(r)?r.join(' + '):r||'sem recheio'}`).join(' | '):'';
+      const td=topperPorProduto[i.id];
+      const topperTxt=(isBolo(i.tipo)&&td?.quero)?`Tema: ${td.tema}${td.detalhes?'\nDetalhes: '+td.detalhes:''}${td.refUrl?'\nReferência: '+td.refUrl:''}` :'';
+      const obsItem=topperTxt?(obs?obs+'\n\n':'')+'TOPPER:\n'+topperTxt:obs;
+      return [
+        {column:'Produto',value:i.nome},
+        {column:'Row ID Produto',value:i.id},
+        {column:'Quantidade',value:i.qty*i.qtdMin},
+        {column:'Valor Unit',value:i.valorUnit},
+        {column:'Recheios',value:recheiosTxt},
+        {column:'Cliente',value:nome},
+        {column:'WhatsApp',value:tel},
+        {column:'Entrega',value:entrega},
+        {column:'Pagamento',value:pagamento},
+        {column:'Entrada',value:entradaVal},
+        {column:'Restante',value:restoVal},
+        {column:'Data Desejada',value:data},
+        {column:'Hora',value:horaVal},
+        {column:'Observações',value:obsItem},
+        {column:'Topo Info',value:topperTxt},
+      ];
+    });
+
+    // ── DISPARA /novo-pedido COM keepalive (não bloqueia, sobrevive à navegação) ──
+    fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pai:paiCells,subrows:subrowInputs,taxaFrete}),
+      keepalive:true
+    }).then(r=>r.json()).then(d=>{
+      if(d&&d.ok){try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}}
+    }).catch(()=>{});
+
+    // Firebase (fire-and-forget)
+    const itensTexto=items.map(i=>{
+      let txt=`${i.nome} · ${i.qty*i.qtdMin} unid. = R$ ${(i.valor*i.qty).toFixed(2)}`;
+      if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{txt+=`\n  Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}`;});
+      return txt;
+    }).join('\n');
+    salvarPedidoFirebase({nome,tel,entrega,endereco,pagamento,data,hora:horaVal,obs,total,entradaVal,restoVal,itensTexto});
+
+    // Topper uploads (fire-and-forget — no celular a página pode já estar navegando)
+    for(const item of items){
+      const td=topperPorProduto[item.id];
+      if(td?.quero&&td.refFile&&window._fbUploadTopper){
+        window._fbUploadTopper(item.id,td.refFile).catch(()=>{});
       }
-      // keepalive: fetch continua mesmo após navegação (resolve WA no celular)
-      fetch(`${CONFIG.WORKER_URL}/orcamentos`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ rows: subrows }),
-        keepalive: true
-      }).catch(() => {});
     }
-    document.getElementById('coda-note').textContent='✅ Pedido registrado em Orçamentos!';
-  }catch(e){
-    console.error('Erro Coda:',e);
-    document.getElementById('coda-note').textContent=`⚠️ Erro: ${e.message}`;
-  }
-  // Abre WhatsApp imediatamente após salvar o PAI (subrows vão em background com keepalive)
-  if(!waWindow||waWindow.closed){
-    window.location.href=waUrl;
-  }
-  clearCart();topperPorProduto={};
+
+    clearCart();topperPorProduto={};
   }finally{
-    // Libera o botão para um próximo pedido (carrinho já foi limpo)
     _enviandoPedido=false;
-    if(btnEnviar){
-      btnEnviar.disabled=false;
-      btnEnviar.classList.remove('btn-sending');
-      btnEnviar.innerHTML=btnHtmlOriginal;
-    }
+    if(btnEnviar){btnEnviar.disabled=false;btnEnviar.classList.remove('btn-sending');btnEnviar.innerHTML=btnHtmlOriginal;}
   }
 }
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
