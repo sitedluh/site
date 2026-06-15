@@ -1292,7 +1292,7 @@ window.addEventListener('popstate',(e)=>{
     showCatalog();
   }
 });
-function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';}atualizarEntrada();}
+function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';saveUserData();}atualizarEntrada();}
 
 function atualizarEntrada(){
   const items=Object.values(cart).filter(i=>i.qty>0);
@@ -1675,6 +1675,7 @@ function saveUserData(){
       rua: document.getElementById('f-rua')?.value||'',
       num: document.getElementById('f-num')?.value||'',
       bairro: document.getElementById('f-bairro')?.value||'',
+      entrega: getRadio('rg-entrega')||'',
     };
     localStorage.setItem(USER_KEY, JSON.stringify(data));
   }catch(e){}
@@ -1691,6 +1692,12 @@ function loadUserData(){
     set('f-rua',data.rua);
     set('f-num',data.num);
     set('f-bairro',data.bairro);
+    // Restaura radio de entrega e recalcula taxa se necessário
+    if(data.entrega){
+      const opt=document.querySelector(`#rg-entrega .radio-opt[data-val="${data.entrega}"]`);
+      if(opt) selectRadio(opt,'rg-entrega');
+      if(data.entrega==='Entrega em endereço' && data.cep) setTimeout(()=>calcDeliveryFee(),200);
+    }
   }catch(e){}
 }
 
