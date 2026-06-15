@@ -1544,6 +1544,7 @@ async function _doFinalizar(){
       ]}]})
     });
     const paiData = await paiRes.json();
+    if (!paiRes.ok) throw new Error(`Coda PAI: ${JSON.stringify(paiData)}`);
     const paiId = paiData.addedRowIds?.[0];
 
     // 2. Cria uma subrow por item linkada ao pai
