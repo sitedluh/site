@@ -1292,7 +1292,7 @@ window.addEventListener('popstate',(e)=>{
     showCatalog();
   }
 });
-function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';saveUserData();}atualizarEntrada();}
+function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';saveUserData();if(el.dataset.val==='Entrega em endereço'&&document.getElementById('f-cep')?.value)calcDeliveryFee();}atualizarEntrada();}
 
 function atualizarEntrada(){
   const items=Object.values(cart).filter(i=>i.qty>0);
