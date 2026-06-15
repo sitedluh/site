@@ -240,8 +240,20 @@ function enc(s){return encodeURIComponent(s||'');}
 
 carregarPedidos();
 
-const STATUS_OPTS = ['Aguardando confirmação','Confirmado','Em preparo','Saiu para entrega','Pronto para retirada','Entregue','Cancelado'];
-const STATUS_CLS  = {'Aguardando confirmação':'aguardando','Confirmado':'confirmado','Em preparo':'preparo','Saiu para entrega':'saiu','Pronto para retirada':'pronto','Entregue':'entregue','Cancelado':'cancelado'};
+const STATUS_OPTS = [
+  'Aguardando confirmação',
+  'Confirmado — Esperando pagamento',
+  'Pago — Em produção',
+  'Entregue — Esperando restante',
+  'Finalizado',
+];
+const STATUS_CLS  = {
+  'Aguardando confirmação':         'aguardando',
+  'Confirmado — Esperando pagamento':'confirmado',
+  'Pago — Em produção':             'preparo',
+  'Entregue — Esperando restante':  'saiu',
+  'Finalizado':                     'entregue',
+};
 
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['estoque','status'][i]===tab));
@@ -254,21 +266,23 @@ async function carregarStatus(){
   const el = document.getElementById('status-list');
   el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Carregando...</div>';
   try {
-    const pedidos = await window._adminGetPedidos();
+    const res = await fetch(`${WORKER}/pedidos-pendentes?todos=1`);
+    const data = await res.json();
+    const pedidos = data.pedidos || [];
     if(!pedidos.length){ el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido encontrado.</div>'; return; }
     el.innerHTML = pedidos.map(p => {
-      const dt = p.criadoEm?.toDate ? p.criadoEm.toDate().toLocaleString('pt-BR') : '—';
       const status = p.status || 'Aguardando confirmação';
       const cls = STATUS_CLS[status] || 'aguardando';
       const opts = STATUS_OPTS.map(s => `<option value="${s}" ${s===status?'selected':''}>${s}</option>`).join('');
+      const itensResumo = (p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
       return `<div class="status-card">
         <div class="sc-info">
-          <div class="sc-nome">${esc(p.nome||'—')}</div>
-          <div class="sc-meta">📱 ${esc(p.tel||'—')} · ${esc(p.entrega||'Retirada')} · ${dt}</div>
-          <div class="sc-itens">${esc((p.itensTexto||'').split('\n').slice(0,2).join(' | '))}</div>
+          <div class="sc-nome">${esc(p.cliente||'—')}</div>
+          <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
+          <div class="sc-itens">${esc(itensResumo)}</div>
           <span class="sc-badge ${cls}">${status}</span>
         </div>
-        <select class="status-select" onchange="atualizarStatus('${p.id}', this)">
+        <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}', this)">
           ${opts}
         </select>
       </div>`;
@@ -278,17 +292,20 @@ async function carregarStatus(){
   }
 }
 
-async function atualizarStatus(id, sel){
+async function atualizarStatus(rowId, sel){
   const novoStatus = sel.value;
   sel.disabled = true;
   try {
-    await window._adminUpdateStatus(id, novoStatus);
+    await fetch(`${WORKER}/atualizar-status`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ rowId, status: novoStatus })
+    });
     const badge = sel.closest('.status-card').querySelector('.sc-badge');
     if(badge){ badge.textContent=novoStatus; badge.className='sc-badge '+(STATUS_CLS[novoStatus]||'aguardando'); }
     showToast('Status atualizado: '+novoStatus);
   } catch(e) {
     showToast('Erro ao atualizar: '+e.message);
-    sel.value = sel.querySelector('[selected]')?.value || '';
   } finally { sel.disabled = false; }
 }
 
