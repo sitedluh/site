@@ -471,6 +471,8 @@ async function carregarStatus(){
       const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
       const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
       const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+      const restante=Math.round((total-(p.valorPago||0))*100)/100;
+      const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
       return`<div class="status-card">
         <div class="sc-info">
           <div class="sc-nome">${esc(p.cliente||'—')}</div>
@@ -480,6 +482,7 @@ async function carregarStatus(){
             <span class="sc-badge ${cls}">${status}</span>
             ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
           </div>
+          ${podeRestante?`<button onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')" style="margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
         </div>
         <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
       </div>`;
@@ -487,6 +490,12 @@ async function carregarStatus(){
   }catch(e){
     el.innerHTML=`<div class="empty">⚠️ Erro: ${e.message}</div>`;
   }
+}
+
+function cobrarRestante(pedidoId,telefone,cliente){
+  const url=`${WORKER}/cobrar-restante?pedidoId=${enc(pedidoId)}&telefone=${enc(telefone)}&cliente=${enc(cliente)}`;
+  window.open(url,'_blank');
+  showToast('Abrindo WhatsApp com link do restante…');
 }
 
 async function atualizarStatus(rowId,sel){
