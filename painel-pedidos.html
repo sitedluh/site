@@ -706,7 +706,27 @@ async function fetchOrders() {
       pageToken = data.nextPageToken || null;
     } while (pageToken);
 
-    const newAllOrders = parseRows(allItems);
+    // Busca o valor a cobrar pelo NOME da coluna ("Valor Total"), não pelo ID.
+    // O ID c-lTihbeP5Cj usado acima pode apontar para outra coluna (ex.: valor unitário/parcial),
+    // então buscamos os mesmos registros com useColumnNames=true só para pegar "Valor Total" certo.
+    const valorTotalMap = {};
+    try {
+      let vItems = [];
+      let vToken = null;
+      do {
+        const vUrl = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows?limit=500&valueFormat=simpleWithArrays&useColumnNames=true${vToken ? '&pageToken=' + vToken : ''}`;
+        const vRes = await fetch(vUrl, { headers: { Authorization: `Bearer ${CFG.token}` } });
+        if (!vRes.ok) break;
+        const vData = await vRes.json();
+        vItems = vItems.concat(vData.items || []);
+        vToken = vData.nextPageToken || null;
+      } while (vToken);
+      vItems.forEach(row => {
+        valorTotalMap[row.id] = row.values ? row.values['Valor Total'] : undefined;
+      });
+    } catch(e) { /* se falhar, parseRows cai no fallback pelo ID antigo */ }
+
+    const newAllOrders = parseRows(allItems, valorTotalMap);
 
     // Detecta pedidos novos (que não existiam antes)
     if (allOrders.length > 0) {
@@ -725,8 +745,9 @@ async function fetchOrders() {
   }
 }
 
-function parseRows(rows) {
+function parseRows(rows, valorTotalMap) {
   const c = CFG.cols;
+  valorTotalMap = valorTotalMap || {};
   return rows
     .filter(row => !row.parent) // ignora linhas filho (subpáginas)
     .map((row, i) => {
@@ -770,7 +791,11 @@ function parseRows(rows) {
       tipo: v[c.tipo] || 'Retirada',
       datetime: dt,
       pedido: v[c.pedido] || '',
-      valor: v[c.valor] || '',
+      // "Valor Total" (pelo nome da coluna) é a fonte correta para cobrança.
+      // Fallback para o valor antigo (por ID) só se a busca por nome não retornar nada.
+      valor: (valorTotalMap[row.id] !== undefined && valorTotalMap[row.id] !== null && valorTotalMap[row.id] !== '')
+        ? valorTotalMap[row.id]
+        : (v[c.valor] || ''),
       entregue: String(v[c.status] || '').toLowerCase() === String(c.statusValor).toLowerCase()
     };
   }).filter(Boolean).sort((a,b) => a.datetime - b.datetime);
@@ -1002,7 +1027,7 @@ function renderFeatured(order, now) {
       <div class="fc-body">
         <div class="fc-box"><div class="fc-box-label">Horário</div><div class="fc-box-val hl">${fmtTime(order.datetime)}</div></div>
         <div class="fc-box"><div class="fc-box-label">Data</div><div class="fc-box-val">${fmtDate(order.datetime)}</div></div>
-        <div class="fc-box"><div class="fc-box-label">Valor</div><div class="fc-box-val">${esc(String(order.valor||'—'))}</div></div>
+        <div class="fc-box"><div class="fc-box-label">Valor</div><div class="fc-box-val">${esc(fmtMoney(order.valor))}</div></div>
         <div class="fc-timer">
           <div class="fc-timer-lbl">${isLate?'⚠️ Atrasado':'⏳ Tempo restante'}</div>
           <div class="${timerCls}" id="ftimer">${timerTxt}</div>
@@ -1015,7 +1040,7 @@ function renderFeatured(order, now) {
       <div class="items-list" id="fitems">${items}</div>
       <div class="fc-foot">
         <div class="fc-phone">📞 ${esc(order.telefone||'—')}</div>
-        <div class="fc-total">${esc(String(order.valor||''))}</div>
+        <div class="fc-total">${esc(fmtMoney(order.valor))}</div>
       </div>
       ${!order.entregue
         ? `<button class="btn-deliver${isLate?' late':''}" id="db-${order.id}" onclick="markDelivered('${order.id}')">✓ Marcar como ${isEntrega?'Entregue':'Retirado'}</button>`
@@ -1076,7 +1101,7 @@ function renderQueue(list, featured, now) {
         <div class="qdetails">
           ${items}
           ${o.telefone?`<div style="margin-top:7px;font-size:.78rem;color:var(--text3)">📞 ${esc(o.telefone)}</div>`:''}
-          ${o.valor?`<div style="font-size:.82rem;color:var(--green);font-weight:700;margin-top:3px">${esc(String(o.valor))}</div>`:''}
+          ${o.valor?`<div style="font-size:.82rem;color:var(--green);font-weight:700;margin-top:3px">${esc(fmtMoney(o.valor))}</div>`:''}
           ${!o.entregue?`<button class="btn-qdeliver${isLate?' late':''}" id="db-${o.id}" onclick="event.stopPropagation();markDelivered('${o.id}')">✓ Marcar como ${isEntrega?'Entregue':'Retirado'}</button>`
           :'<div style="color:var(--green);font-size:.75rem;padding:5px 0">✅ Concluído</div>'}
           <button class="btn-print" style="margin-top:8px" onclick="event.stopPropagation();printOrder('${o.id}')">🖨️ Imprimir</button>
@@ -1089,6 +1114,16 @@ function renderQueue(list, featured, now) {
 function fmtTime(dt) { return dt ? new Date(dt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—'; }
 function fmtDate(dt) { return dt ? new Date(dt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—'; }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtMoney(v) {
+  if (v === undefined || v === null || v === '') return '—';
+  if (typeof v === 'number') {
+    return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const s = String(v).trim();
+  if (/r\$|,/i.test(s)) return s; // já formatado (ex.: vindo do fallback antigo)
+  const n = parseFloat(s.replace(',', '.'));
+  return isNaN(n) ? s : 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 function parseItems(txt) {
   if (!txt) return '<div style="color:var(--text3);font-size:.78rem">Sem detalhes</div>';
@@ -1127,7 +1162,7 @@ function printOrder(id) {
     ${itemsHtml}
     <div class="p-div"></div>
 
-    <div class="p-total">Total: ${esc(String(o.valor||'—'))}</div>
+    <div class="p-total">Total: ${esc(fmtMoney(o.valor))}</div>
     <div class="p-div"></div>
     <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
   `;
@@ -1244,7 +1279,7 @@ function openMModal(id) {
       </div>
       <div class="m-modal-items">${items}</div>
       <div class="m-modal-row">
-        <div><div class="m-modal-label">Total</div><div class="m-modal-val green">${esc(String(o.valor || '—'))}</div></div>
+        <div><div class="m-modal-label">Total</div><div class="m-modal-val green">${esc(fmtMoney(o.valor))}</div></div>
       </div>
       ${!o.entregue
         ? `<button class="m-modal-btn deliver${isLate ? ' late' : ''}" id="db-${o.id}" onclick="markDelivered('${o.id}')">✓ Marcar como ${isEntrega ? 'Entregue' : 'Retirado'}</button>`
@@ -1286,7 +1321,7 @@ function printAllOrders() {
         <div class="p-section">PEDIDO:</div>
         ${itemsHtml}
         <div class="p-div"></div>
-        <div class="p-total">Total: ${esc(String(o.valor||'—'))}</div>
+        <div class="p-total">Total: ${esc(fmtMoney(o.valor))}</div>
         <div class="p-div"></div>
         <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
       </div>
