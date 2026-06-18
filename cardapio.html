@@ -232,6 +232,21 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .confirm-phone-no{background:none;color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .confirm-phone-no:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ── Pedido loading overlay ── */
+.pedido-loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:none;align-items:center;justify-content:center;padding:20px}
+.pedido-loading-overlay.open{display:flex}
+.pedido-loading-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:340px;padding:32px 24px;text-align:center}
+.pl-spinner{width:42px;height:42px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:0 auto 18px;animation:pl-spin .8s linear infinite}
+@keyframes pl-spin{to{transform:rotate(360deg)}}
+.pl-icon{font-size:38px;margin-bottom:14px}
+.pl-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:500;color:var(--text);margin-bottom:6px}
+.pl-sub{font-size:13px;color:var(--text2);line-height:1.4}
+.pl-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.pl-retry{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:13px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+.pl-retry:hover{background:var(--accent-dark)}
+.pl-skip{background:none;color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer}
+.pl-skip:hover{border-color:var(--accent);color:var(--accent)}
+
 
 /* ══════════════════════════════════════
    CHECKOUT
@@ -1452,6 +1467,9 @@ async function finalizar(){
   showConfirmPhone();
   return;
 }
+let _pedidoPendente=null; // dados do pedido aguardando confirmação no Coda (usado por retry/skip)
+let _confirmandoPedido=false;
+
 async function _doFinalizar(){
   // Proteção contra envio duplicado
   if(_enviandoPedido)return;
@@ -1460,6 +1478,9 @@ async function _doFinalizar(){
   const btnEnviar=document.querySelector('.btn-wpp');
   const btnHtmlOriginal=btnEnviar?btnEnviar.innerHTML:'';
   if(btnEnviar){btnEnviar.disabled=true;btnEnviar.classList.add('btn-sending');btnEnviar.innerHTML='⏳ Enviando pedido...';}
+  // Tela de carregamento aparece já no clique — só sai dela quando o pedido
+  // tiver percorrido todo o caminho necessário (Coda) e então vai para o WhatsApp.
+  abrirPedidoLoading();
   try{
     saveUserData();
     const nome=document.getElementById('f-nome').value.trim(),tel=document.getElementById('f-tel').value.trim(),entrega=getRadio('rg-entrega');
@@ -1492,14 +1513,6 @@ async function _doFinalizar(){
     if(restoVal>0)msg+=`\n⏳ *Restante na entrega:* ${fmtBRL(restoVal)}`;
     if(obs)msg+=`\n\n📝 *Obs:* ${obs}`;
     const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
-
-    // ── ABRE WHATSAPP AGORA — antes de qualquer await ──
-    // Desktop: nova aba; celular: window.open retorna null (bloqueado) → navega a aba atual.
-    // Ambos ainda estão no contexto direto do gesto do usuário (sem await antes),
-    // o que é obrigatório no iOS Safari para que window.open / location.href funcionem.
-    let waDesktopOpened=false;
-    try{ const w=window.open(waUrl,'_blank'); waDesktopOpened=!!(w&&!w.closed); }catch(_){}
-    if(!waDesktopOpened){ window.location.href=waUrl; }
 
     // ── MONTA DADOS PARA O CODA (síncrono, sem await) ──
     const paiCells=[
@@ -1539,38 +1552,117 @@ async function _doFinalizar(){
       ];
     });
 
-    // ── DISPARA /novo-pedido COM keepalive (não bloqueia, sobrevive à navegação) ──
-    fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({pai:paiCells,subrows:subrowInputs,taxaFrete}),
-      keepalive:true
-    }).then(r=>r.json()).then(d=>{
-      if(d&&d.ok){try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}}
-    }).catch(()=>{});
-
-    // Firebase (fire-and-forget)
     const itensTexto=items.map(i=>{
       let txt=`${i.nome} · ${i.qty*i.qtdMin} unid. = R$ ${(i.valor*i.qty).toFixed(2)}`;
       if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{txt+=`\n  Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}`;});
       return txt;
     }).join('\n');
-    salvarPedidoFirebase({nome,tel,entrega,endereco,pagamento,data,hora:horaVal,obs,total,entradaVal,restoVal,itensTexto});
 
-    // Topper uploads (fire-and-forget — no celular a página pode já estar navegando)
-    for(const item of items){
+    // Guarda os dados montados — usados pela confirmação (e por retry/skip se algo falhar)
+    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items};
+
+    // Só passa para o WhatsApp depois que o pedido for registrado no Coda
+    await _confirmarESeguirWhats();
+  }catch(e){
+    console.warn('Erro ao preparar pedido:',e);
+    setPedidoLoadingState('error');
+  }finally{
+    _enviandoPedido=false;
+    if(btnEnviar){btnEnviar.disabled=false;btnEnviar.classList.remove('btn-sending');btnEnviar.innerHTML=btnHtmlOriginal;}
+  }
+}
+
+// Envia o pedido para o Coda (worker /novo-pedido) e só então segue para o WhatsApp.
+// Pode ser chamada de novo pelo botão "Tentar novamente" no overlay de erro.
+async function _confirmarESeguirWhats(){
+  const p=_pedidoPendente;
+  if(!p||_confirmandoPedido)return;
+  _confirmandoPedido=true;
+  setPedidoLoadingState('loading');
+  try{
+    const ctrl=new AbortController();
+    const timeoutId=setTimeout(()=>ctrl.abort(),15000);
+    let res,d;
+    try{
+      res=await fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({pai:p.paiCells,subrows:p.subrowInputs,taxaFrete:p.taxaFrete}),
+        signal:ctrl.signal
+      });
+    }finally{ clearTimeout(timeoutId); }
+    d=await res.json().catch(()=>({}));
+    if(!res.ok||!d||d.ok===false) throw new Error((d&&d.error)?d.error:'Falha ao registrar pedido no Coda');
+
+    try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}
+
+    // Extras não-críticos: não atrasam a ida ao WhatsApp, só disparam depois que o essencial confirmou
+    salvarPedidoFirebase({nome:p.nome,tel:p.tel,entrega:p.entrega,endereco:p.endereco,pagamento:p.pagamento,data:p.data,hora:p.horaVal,obs:p.obs,total:p.total,entradaVal:p.entradaVal,restoVal:p.restoVal,itensTexto:p.itensTexto});
+    for(const item of p.items){
       const td=topperPorProduto[item.id];
       if(td?.quero&&td.refFile&&window._fbUploadTopper){
         window._fbUploadTopper(item.id,td.refFile).catch(()=>{});
       }
     }
 
+    setPedidoLoadingState('success');
     clearCart();topperPorProduto={};
+    _pedidoPendente=null;
+    setTimeout(()=>irParaWhatsapp(p.waUrl),700);
+  }catch(e){
+    console.warn('Erro ao confirmar pedido no Coda:',e);
+    setPedidoLoadingState('error');
   }finally{
-    _enviandoPedido=false;
-    if(btnEnviar){btnEnviar.disabled=false;btnEnviar.classList.remove('btn-sending');btnEnviar.innerHTML=btnHtmlOriginal;}
+    _confirmandoPedido=false;
   }
 }
+
+function irParaWhatsapp(waUrl){
+  fecharPedidoLoading();
+  let opened=false;
+  try{ const w=window.open(waUrl,'_blank'); opened=!!(w&&!w.closed); }catch(_){}
+  if(!opened){ window.location.href=waUrl; }
+}
+
+function _retryEnvioPedido(){ _confirmarESeguirWhats(); }
+function _skipParaWhatsapp(){
+  if(!_pedidoPendente)return;
+  const waUrl=_pedidoPendente.waUrl;
+  clearCart();topperPorProduto={};
+  _pedidoPendente=null;
+  irParaWhatsapp(waUrl);
+}
+
+// ── Overlay de carregamento do pedido ──
+function abrirPedidoLoading(){
+  document.getElementById('pedido-loading-overlay').classList.add('open');
+  setPedidoLoadingState('loading');
+}
+function fecharPedidoLoading(){
+  document.getElementById('pedido-loading-overlay').classList.remove('open');
+}
+function setPedidoLoadingState(state){
+  const spinner=document.getElementById('pl-spinner');
+  const icon=document.getElementById('pl-icon');
+  const title=document.getElementById('pl-title');
+  const sub=document.getElementById('pl-sub');
+  const actions=document.getElementById('pl-actions');
+  if(!spinner||!icon||!title||!sub||!actions)return;
+  if(state==='loading'){
+    spinner.style.display='block';icon.style.display='none';actions.style.display='none';
+    title.textContent='Confirmando seu pedido...';
+    sub.textContent='Aguarde um instante, não feche nem saia desta página';
+  }else if(state==='success'){
+    spinner.style.display='none';icon.style.display='block';icon.textContent='✅';actions.style.display='none';
+    title.textContent='Pedido confirmado!';
+    sub.textContent='Abrindo o WhatsApp...';
+  }else if(state==='error'){
+    spinner.style.display='none';icon.style.display='block';icon.textContent='⚠️';actions.style.display='flex';
+    title.textContent='Não foi possível confirmar';
+    sub.textContent='Seu pedido pode não ter sido registrado. Tente novamente ou continue para o WhatsApp.';
+  }
+}
+
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
 
 // SWIPE — desliza lista atual para o lado, nova aparece
@@ -2388,6 +2480,20 @@ document.addEventListener('DOMContentLoaded', () => { loadTicker(); });
     <div class="confirm-phone-actions">
       <button class="confirm-phone-yes" onclick="confirmPhoneAndSend()">✅ Sim, está correto</button>
       <button class="confirm-phone-no" onclick="closeConfirmPhone()">✏️ Corrigir número</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pedido loading overlay -->
+<div class="pedido-loading-overlay" id="pedido-loading-overlay">
+  <div class="pedido-loading-box">
+    <div class="pl-spinner" id="pl-spinner"></div>
+    <div class="pl-icon" id="pl-icon" style="display:none"></div>
+    <div class="pl-title" id="pl-title">Confirmando seu pedido...</div>
+    <div class="pl-sub" id="pl-sub">Aguarde um instante, não feche nem saia desta página</div>
+    <div class="pl-actions" id="pl-actions" style="display:none">
+      <button class="pl-retry" onclick="_retryEnvioPedido()">🔄 Tentar novamente</button>
+      <button class="pl-skip" onclick="_skipParaWhatsapp()">Continuar para o WhatsApp assim mesmo</button>
     </div>
   </div>
 </div>
