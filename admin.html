@@ -82,6 +82,11 @@
   .sc-badge.pronto{background:#cce5ff;color:#004085}
   .sc-badge.entregue{background:#e2e3e5;color:#383d41}
   .sc-badge.cancelado{background:#f8d7da;color:#721c24}
+
+  .status-group{margin-bottom:24px}
+  .status-group-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .status-group-header .sc-badge{margin-top:0;font-size:12.5px;padding:4px 12px}
+  .status-group-count{font-size:12px;color:var(--text3);font-weight:600}
   .loading-state{text-align:center;padding:60px 20px;color:var(--text3)}
   .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
 
@@ -498,30 +503,46 @@ async function carregarStatus(){
       }
     }
 
-    el.innerHTML=pedidos.map(p=>{
+    // Agrupa os pedidos por status, na ordem do fluxo (STATUS_OPTS) — fica mais fácil
+    // de bater o olho e ver quantos pedidos estão em cada etapa.
+    const grupos={};
+    pedidos.forEach(p=>{
       const status=p.status||'Aguardando confirmação';
-      const cls=STATUS_CLS[status]||'aguardando';
-      const ps=p.pedidoStatus||'';
-      const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
-      const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
-      const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
-      const restante=Math.round((total-(p.valorPago||0))*100)/100;
-      const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
-      return`<div class="status-card">
-        <div class="sc-info">
-          <div class="sc-nome">${esc(p.cliente||'—')}</div>
-          <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
-          <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
-            <span class="sc-badge ${cls}">${status}</span>
-            ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
+      (grupos[status]=grupos[status]||[]).push(p);
+    });
+    const ordemStatus=[...STATUS_OPTS,...Object.keys(grupos).filter(s=>!STATUS_OPTS.includes(s))];
+
+    el.innerHTML=ordemStatus.filter(s=>grupos[s]&&grupos[s].length).map(status=>{
+      const lista=grupos[status];
+      const clsGrupo=STATUS_CLS[status]||'aguardando';
+      const cardsHtml=lista.map(p=>{
+        const cls=STATUS_CLS[status]||'aguardando';
+        const ps=p.pedidoStatus||'';
+        const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+        const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
+        const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+        const restante=Math.round((total-(p.valorPago||0))*100)/100;
+        const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
+        return`<div class="status-card">
+          <div class="sc-info">
+            <div class="sc-nome">${esc(p.cliente||'—')}</div>
+            <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
+            <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+              <span class="sc-badge ${cls}">${status}</span>
+              ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
+            </div>
+            ${podeRestante?`<button onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')" style="margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
           </div>
-          ${podeRestante?`<button onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')" style="margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
-        </div>
-        <div class="sc-actions">
-          <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
-          ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
-        </div>
+          <div class="sc-actions">
+            <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
+            ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
+          </div>
+        </div>`;
+      }).join('');
+      return`<div class="status-group">
+        <div class="status-group-header"><span class="sc-badge ${clsGrupo}">${esc(status)}</span><span class="status-group-count">${lista.length} pedido${lista.length!==1?'s':''}</span></div>
+        ${cardsHtml}
       </div>`;
     }).join('');
   }catch(e){
@@ -544,12 +565,13 @@ async function atualizarStatus(rowId,sel){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({rowId,status:novoStatus})
     });
-    const badge=sel.closest('.status-card').querySelector('.sc-badge');
-    if(badge){badge.textContent=novoStatus;badge.className='sc-badge '+(STATUS_CLS[novoStatus]||'aguardando');}
     showToast('Status atualizado: '+novoStatus);
+    // Recarrega a lista pra mover o card pro grupo correto (pedidos são agrupados por status)
+    carregarStatus();
   }catch(e){
     showToast('Erro ao atualizar: '+e.message);
-  }finally{sel.disabled=false;}
+    sel.disabled=false;
+  }
 }
 
 // ── FINALIZAR PEDIDO (manual, ex: pago por fora sem Infinite Pay) ────────────
@@ -569,22 +591,16 @@ async function _confirmFinalizarOk(){
   if(!_finalizarRowId)return;
   const okBtn=document.getElementById('confirm-ok-btn');
   okBtn.disabled=true;okBtn.textContent='Finalizando...';
-  const rowId=_finalizarRowId,card=_finalizarBtnEl?_finalizarBtnEl.closest('.status-card'):null;
+  const rowId=_finalizarRowId;
   try{
     await fetch(`${WORKER}/atualizar-status`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({rowId,status:'Finalizado'})
     });
-    if(card){
-      const badge=card.querySelector('.sc-badge');
-      if(badge){badge.textContent='Finalizado';badge.className='sc-badge entregue';}
-      const sel=card.querySelector('.status-select');
-      if(sel)sel.value='Finalizado';
-      const fbtn=card.querySelector('.btn-finalizar');
-      if(fbtn)fbtn.remove();
-    }
     showToast('Pedido finalizado ✅');
+    // Recarrega a lista pra mover o card pro grupo "Finalizado"
+    carregarStatus();
   }catch(e){
     showToast('Erro ao finalizar: '+e.message);
   }finally{

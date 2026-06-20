@@ -1470,6 +1470,42 @@ async function finalizar(){
 let _pedidoPendente=null; // dados do pedido aguardando confirmação no Coda (usado por retry/skip)
 let _confirmandoPedido=false;
 
+// Redimensiona a foto de referência do topper (canvas, máx. 1280px / JPEG 82%) e sobe
+// pro Google Drive via worker — devolve a URL pública de visualização.
+async function uploadFotoTopperDrive(prodId,file){
+  const MAX_DIM=1280,QUALITY=0.82;
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+  const img=await new Promise((resolve,reject)=>{
+    const im=new Image();
+    im.onload=()=>resolve(im);
+    im.onerror=reject;
+    im.src=dataUrl;
+  });
+  let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  if(w>MAX_DIM||h>MAX_DIM){
+    if(w>=h){h=Math.round(h*MAX_DIM/w);w=MAX_DIM;}
+    else{w=Math.round(w*MAX_DIM/h);h=MAX_DIM;}
+  }
+  const canvas=document.createElement('canvas');
+  canvas.width=w;canvas.height=h;
+  canvas.getContext('2d').drawImage(img,0,0,w,h);
+  const base64=canvas.toDataURL('image/jpeg',QUALITY).split(',')[1];
+
+  const res=await fetch(`${CONFIG.WORKER_URL}/upload-topper-imagem`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({imagemBase64:base64,mimeType:'image/jpeg',filename:`topper_${prodId}_${Date.now()}.jpg`})
+  });
+  const data=await res.json();
+  if(!data.ok||!data.url)throw new Error(data.error||'upload falhou');
+  return data.url;
+}
+
 async function _doFinalizar(){
   // Proteção contra envio duplicado
   if(_enviandoPedido)return;
@@ -1515,15 +1551,15 @@ async function _doFinalizar(){
     const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
 
     // Sobe a foto de referência do topper (se o cliente anexou) ANTES de montar
-    // as subrows — assim o link do Firebase já entra pronto na coluna "Topo Info"
+    // as subrows — assim o link do Drive já entra pronto na coluna "Topo Info"
     // do Coda, e por consequência aparece também no Telegram e no admin.
     // Se o upload falhar, segue o pedido sem a imagem (não bloqueia o cliente).
     const itensComFotoTopper=items.filter(i=>isBolo(i.tipo)&&topperPorProduto[i.id]?.quero&&topperPorProduto[i.id].refFile&&!topperPorProduto[i.id].refUrl);
-    if(itensComFotoTopper.length&&window._fbUploadTopper){
+    if(itensComFotoTopper.length){
       setPedidoLoadingState('uploading');
       for(const i of itensComFotoTopper){
         const td=topperPorProduto[i.id];
-        try{ td.refUrl=await window._fbUploadTopper(i.id,td.refFile); }
+        try{ td.refUrl=await uploadFotoTopperDrive(i.id,td.refFile); }
         catch(e){ console.warn('Falha ao subir imagem do topper:',e); }
       }
       setPedidoLoadingState('loading');
@@ -1632,7 +1668,7 @@ async function _confirmarESeguirWhats(){
 
     // Extras não-críticos: não atrasam a ida ao WhatsApp, só disparam depois que o essencial confirmou
     salvarPedidoFirebase({nome:p.nome,tel:p.tel,entrega:p.entrega,endereco:p.endereco,pagamento:p.pagamento,data:p.data,hora:p.horaVal,obs:p.obs,total:p.total,entradaVal:p.entradaVal,restoVal:p.restoVal,itensTexto:p.itensTexto});
-    // (a foto de referência do topper, se houver, já foi enviada ao Firebase antes
+    // (a foto de referência do topper, se houver, já foi enviada ao Drive antes
     // de montar as subrows — o link está em topperPorProduto[id].refUrl / na subrow)
 
     setPedidoLoadingState('success');
