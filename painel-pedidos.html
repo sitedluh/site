@@ -706,10 +706,11 @@ async function fetchOrders() {
       pageToken = data.nextPageToken || null;
     } while (pageToken);
 
-    // Busca o valor a cobrar pelo NOME da coluna ("Valor Total"), não pelo ID.
-    // O ID c-lTihbeP5Cj usado acima pode apontar para outra coluna (ex.: valor unitário/parcial),
-    // então buscamos os mesmos registros com useColumnNames=true só para pegar "Valor Total" certo.
+    // Busca o valor a cobrar e o valor já pago pelo NOME da coluna ("Valor Total" / "Valor Pago"),
+    // não pelo ID. O ID c-lTihbeP5Cj usado acima pode apontar para outra coluna (ex.: valor unitário/parcial),
+    // então buscamos os mesmos registros com useColumnNames=true para pegar os valores certos.
     const valorTotalMap = {};
+    const valorPagoMap = {};
     try {
       let vItems = [];
       let vToken = null;
@@ -722,11 +723,13 @@ async function fetchOrders() {
         vToken = vData.nextPageToken || null;
       } while (vToken);
       vItems.forEach(row => {
-        valorTotalMap[row.id] = row.values ? row.values['Valor Total'] : undefined;
+        const vv = row.values || {};
+        valorTotalMap[row.id] = vv['Valor Total'];
+        valorPagoMap[row.id] = (vv['Valor Pago'] !== undefined ? vv['Valor Pago'] : vv['Valor pago']);
       });
-    } catch(e) { /* se falhar, parseRows cai no fallback pelo ID antigo */ }
+    } catch(e) { /* se falhar, parseRows cai no fallback pelo ID antigo / sem valor pago */ }
 
-    const newAllOrders = parseRows(allItems, valorTotalMap);
+    const newAllOrders = parseRows(allItems, valorTotalMap, valorPagoMap);
 
     // Detecta pedidos novos (que não existiam antes)
     if (allOrders.length > 0) {
@@ -745,9 +748,10 @@ async function fetchOrders() {
   }
 }
 
-function parseRows(rows, valorTotalMap) {
+function parseRows(rows, valorTotalMap, valorPagoMap) {
   const c = CFG.cols;
   valorTotalMap = valorTotalMap || {};
+  valorPagoMap = valorPagoMap || {};
   return rows
     .filter(row => !row.parent) // ignora linhas filho (subpáginas)
     .map((row, i) => {
@@ -796,6 +800,8 @@ function parseRows(rows, valorTotalMap) {
       valor: (valorTotalMap[row.id] !== undefined && valorTotalMap[row.id] !== null && valorTotalMap[row.id] !== '')
         ? valorTotalMap[row.id]
         : (v[c.valor] || ''),
+      // "Valor Pago" pelo nome da coluna — usado para calcular o que falta cobrar na entrega.
+      valorPago: (valorPagoMap[row.id] !== undefined && valorPagoMap[row.id] !== null) ? valorPagoMap[row.id] : 0,
       entregue: String(v[c.status] || '').toLowerCase() === String(c.statusValor).toLowerCase()
     };
   }).filter(Boolean).sort((a,b) => a.datetime - b.datetime);
@@ -825,6 +831,8 @@ async function markDelivered(id) {
     // Gera link InfinitePay e abre WhatsApp com a mensagem
     if (o) {
       const totalNum = parseFloat(String(o.valor || '0').replace(/[^\d,.]/g,'').replace(',','.')) || 0;
+      const pagoNum = parseFloat(String(o.valorPago || '0').replace(/[^\d,.]/g,'').replace(',','.')) || 0;
+      const restanteNum = Math.max(Math.round((totalNum - pagoNum) * 100) / 100, 0);
       fetch('https://coda-proxy.sitedluh.workers.dev/entrega-confirmada', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -833,6 +841,8 @@ async function markDelivered(id) {
           cliente: o.nome,
           telefone: o.telefone,
           total: totalNum,
+          valorPago: pagoNum,
+          restante: restanteNum,
         })
       }).then(r => r.json()).then(d => {
         if (d.ok && d.waUrl) {

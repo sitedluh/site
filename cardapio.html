@@ -1530,9 +1530,6 @@ async function _doFinalizar(){
     ];
     const subrowInputs=items.map(i=>{
       const recheiosTxt=(isBolo(i.tipo)&&i.recheios)?i.recheios.map((r,idx)=>`Bolo ${idx+1}: ${Array.isArray(r)?r.join(' + '):r||'sem recheio'}`).join(' | '):'';
-      const td=topperPorProduto[i.id];
-      const topperTxt=(isBolo(i.tipo)&&td?.quero)?`Tema: ${td.tema}${td.detalhes?'\nDetalhes: '+td.detalhes:''}${td.refUrl?'\nReferência: '+td.refUrl:''}` :'';
-      const obsItem=topperTxt?(obs?obs+'\n\n':'')+'TOPPER:\n'+topperTxt:obs;
       return [
         {column:'Produto',value:i.nome},
         {column:'Row ID Produto',value:i.id},
@@ -1547,9 +1544,31 @@ async function _doFinalizar(){
         {column:'Restante',value:restoVal},
         {column:'Data Desejada',value:data},
         {column:'Hora',value:horaVal},
-        {column:'Observações',value:obsItem},
-        {column:'Topo Info',value:topperTxt},
+        {column:'Observações',value:obs},
       ];
+    });
+    // Topper personalizado vira uma subrow própria (filha do mesmo pedido pai),
+    // assim aparece junto com os outros itens no Coda, no admin e no Telegram —
+    // mesmo padrão já usado para "🛵 Taxa de Entrega".
+    items.forEach(i=>{
+      const td=topperPorProduto[i.id];
+      if(!(isBolo(i.tipo)&&td?.quero))return;
+      const topperTxt=`Tema: ${td.tema}${td.detalhes?'\nDetalhes: '+td.detalhes:''}${td.refUrl?'\nReferência: '+td.refUrl:''}`;
+      subrowInputs.push([
+        {column:'Produto',value:`🎀 Topper — ${i.nome}`},
+        {column:'Row ID Produto',value:i.id},
+        {column:'Quantidade',value:1},
+        {column:'Valor Unit',value:20},
+        {column:'Cliente',value:nome},
+        {column:'WhatsApp',value:tel},
+        {column:'Entrega',value:entrega},
+        {column:'Pagamento',value:pagamento},
+        {column:'Entrada',value:entradaVal},
+        {column:'Restante',value:restoVal},
+        {column:'Data Desejada',value:data},
+        {column:'Hora',value:horaVal},
+        {column:'Topo Info',value:topperTxt},
+      ]);
     });
 
     const itensTexto=items.map(i=>{
