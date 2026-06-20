@@ -687,7 +687,7 @@ body.checkout-active .cat-mobile{display:none!important}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="form-row">
         <div><label>Data desejada *</label><input type="date" id="f-data" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"></div>
-        <div class="form-row" id="frow-hora" style="margin-bottom:0"><label>Horário desejado *</label><select id="f-hora" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"><option value="">Selecione uma data primeiro</option></select><div id="f-hora-status" style="font-size:13px;color:var(--text-muted,#888);margin-top:6px"></div><div class="form-error-msg">Selecione um horário disponível entre 08:00 e 22:00</div></div>
+        <div class="form-row" id="frow-hora" style="margin-bottom:0"><label>Horário desejado *</label><select id="f-hora" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"><option value="">Selecione uma data primeiro</option></select><div id="f-hora-status" style="font-size:13px;color:var(--text-muted,#888);margin-top:6px"></div><div class="form-error-msg">Selecione um horário disponível entre 08:00 e 19:00</div></div>
       </div>
       <div class="form-row"><label>Observações</label><textarea id="f-obs" placeholder="Alergias, preferências, detalhes..."></textarea></div>
     </div>
@@ -1325,15 +1325,15 @@ function atualizarEntrada(){
   if(document.getElementById('entrada-resto'))document.getElementById('entrada-resto').textContent=fmtBRL(Math.max(0,resto));
 }
 function getRadio(groupId){const a=document.querySelector('#'+groupId+' .radio-opt.active');return a?a.dataset.val:'';}
-// Carrega os horários disponíveis (slots fixos de 15 em 15 min, 08:00–22:00) para a data
+// Carrega os horários disponíveis (slots fixos de 15 em 15 min, 08:00–19:00) para a data
 // escolhida, consultando o Worker, que verifica a capacidade já comprometida em "Calendário Base"
 // contra o limite cadastrado em "Limites". Slots cheios ficam desabilitados com aviso "Horário cheio".
 let _horariosIndisponiveis=new Set();
 function gerarSlotsHorario(){
   const slots=[];
-  for(let h=8;h<=22;h++){
+  for(let h=8;h<=19;h++){
     for(let m=0;m<60;m+=15){
-      if(h===22&&m>0)break;
+      if(h===19&&m>0)break;
       slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
     }
   }
@@ -1348,6 +1348,12 @@ async function carregarHorarios(dataStr){
     horaEl.innerHTML='<option value="">Selecione uma data primeiro</option>';
     horaEl.disabled=true;
     if(statusEl)statusEl.textContent='';
+    return;
+  }
+  if(new Date(dataStr+'T00:00:00').getDay()===0){
+    horaEl.innerHTML='<option value="">Não atendemos aos domingos</option>';
+    horaEl.disabled=true;
+    if(statusEl)statusEl.textContent='Não atendemos aos domingos — escolha outro dia.';
     return;
   }
   horaEl.disabled=true;
@@ -1398,15 +1404,20 @@ function validate(){
       if(invalido)ok=false;
     });
   }
-  // Horário desejado: obrigatório e somente entre 08:00 e 22:00
+  // Horário desejado: obrigatório e somente entre 08:00 e 19:00
   const horaRow=document.getElementById('frow-hora');
   const horaEl=document.getElementById('f-hora');
   const horaMsgEl=horaRow?horaRow.querySelector('.form-error-msg'):null;
   const horaVal=horaEl?horaEl.value:'';
+  const dataValChk=document.getElementById('f-data')?document.getElementById('f-data').value:'';
+  const ehDomingo=dataValChk&&new Date(dataValChk+'T00:00:00').getDay()===0;
   let horaInvalida=false,horaMsg='';
-  if(!horaVal){
+  if(ehDomingo){
     horaInvalida=true;
-    horaMsg='Selecione um horário desejado entre 08:00 e 22:00';
+    horaMsg='Não atendemos aos domingos — escolha outro dia';
+  }else if(!horaVal){
+    horaInvalida=true;
+    horaMsg='Selecione um horário desejado entre 08:00 e 19:00';
   }else if(_horariosIndisponiveis.has(horaVal)){
     horaInvalida=true;
     horaMsg='Esse horário ficou cheio — selecione outro horário disponível';
