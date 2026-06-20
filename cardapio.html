@@ -1514,6 +1514,21 @@ async function _doFinalizar(){
     if(obs)msg+=`\n\n📝 *Obs:* ${obs}`;
     const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
 
+    // Sobe a foto de referência do topper (se o cliente anexou) ANTES de montar
+    // as subrows — assim o link do Firebase já entra pronto na coluna "Topo Info"
+    // do Coda, e por consequência aparece também no Telegram e no admin.
+    // Se o upload falhar, segue o pedido sem a imagem (não bloqueia o cliente).
+    const itensComFotoTopper=items.filter(i=>isBolo(i.tipo)&&topperPorProduto[i.id]?.quero&&topperPorProduto[i.id].refFile&&!topperPorProduto[i.id].refUrl);
+    if(itensComFotoTopper.length&&window._fbUploadTopper){
+      setPedidoLoadingState('uploading');
+      for(const i of itensComFotoTopper){
+        const td=topperPorProduto[i.id];
+        try{ td.refUrl=await window._fbUploadTopper(i.id,td.refFile); }
+        catch(e){ console.warn('Falha ao subir imagem do topper:',e); }
+      }
+      setPedidoLoadingState('loading');
+    }
+
     // ── MONTA DADOS PARA O CODA (síncrono, sem await) ──
     const paiCells=[
       {column:'Cliente',value:nome},
@@ -1617,12 +1632,8 @@ async function _confirmarESeguirWhats(){
 
     // Extras não-críticos: não atrasam a ida ao WhatsApp, só disparam depois que o essencial confirmou
     salvarPedidoFirebase({nome:p.nome,tel:p.tel,entrega:p.entrega,endereco:p.endereco,pagamento:p.pagamento,data:p.data,hora:p.horaVal,obs:p.obs,total:p.total,entradaVal:p.entradaVal,restoVal:p.restoVal,itensTexto:p.itensTexto});
-    for(const item of p.items){
-      const td=topperPorProduto[item.id];
-      if(td?.quero&&td.refFile&&window._fbUploadTopper){
-        window._fbUploadTopper(item.id,td.refFile).catch(()=>{});
-      }
-    }
+    // (a foto de referência do topper, se houver, já foi enviada ao Firebase antes
+    // de montar as subrows — o link está em topperPorProduto[id].refUrl / na subrow)
 
     setPedidoLoadingState('success');
     clearCart();topperPorProduto={};
@@ -1670,6 +1681,10 @@ function setPedidoLoadingState(state){
   if(state==='loading'){
     spinner.style.display='block';icon.style.display='none';actions.style.display='none';
     title.textContent='Confirmando seu pedido...';
+    sub.textContent='Aguarde um instante, não feche nem saia desta página';
+  }else if(state==='uploading'){
+    spinner.style.display='block';icon.style.display='none';actions.style.display='none';
+    title.textContent='Enviando a foto do topper...';
     sub.textContent='Aguarde um instante, não feche nem saia desta página';
   }else if(state==='success'){
     spinner.style.display='none';icon.style.display='block';icon.textContent='✅';actions.style.display='none';
