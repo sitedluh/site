@@ -91,8 +91,13 @@
   .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
 
   .sc-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  .sc-actions-row{display:flex;gap:8px}
   .btn-finalizar{background:var(--surface);color:var(--accent);border:1.5px solid var(--accent);border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
   .btn-finalizar:hover{background:var(--accent);color:#fff}
+  .btn-apagar{background:var(--surface);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
+  .btn-apagar:hover{background:#c0392b;color:#fff}
+  .btn-cobrar-restante{margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+  .itens-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
   /* Modal de confirmação */
   .confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px}
@@ -106,6 +111,26 @@
   .confirm-btn.cancel{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
   .confirm-btn.ok{background:var(--accent);color:#fff}
   .confirm-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  @media(max-width:600px){
+    header{padding:14px 16px;flex-wrap:wrap;gap:10px}
+    .header-title{font-size:18px}
+    main{padding:16px 10px}
+    .card-header{padding:14px 14px;flex-wrap:wrap}
+    .card-body{padding:12px 14px}
+    .card-footer{padding:12px 14px;flex-direction:column;align-items:stretch;gap:10px}
+    .card-footer button{width:100%;justify-content:center}
+    .itens-table-wrap{margin:0 -14px;padding:0 14px}
+    .itens-table-wrap table{min-width:460px}
+    .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tab-btn{white-space:nowrap;padding:10px 14px;font-size:13px}
+    .status-card{flex-direction:column;align-items:stretch;padding:14px}
+    .sc-actions{flex-direction:row;align-items:stretch;width:100%;margin-top:6px}
+    .sc-actions-row{flex:1}
+    .status-select{min-width:0;flex:1}
+    .btn-finalizar,.btn-apagar{flex:1}
+    .btn-cobrar-restante{width:100%;justify-content:center}
+  }
 </style>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -170,12 +195,12 @@
 
 <div class="confirm-overlay" id="confirm-overlay">
   <div class="confirm-box">
-    <div class="confirm-icon">✅</div>
-    <div class="confirm-title">Finalizar pedido?</div>
+    <div class="confirm-icon" id="confirm-icon">✅</div>
+    <div class="confirm-title" id="confirm-title">Finalizar pedido?</div>
     <div class="confirm-msg" id="confirm-msg">Tem certeza?</div>
     <div class="confirm-actions">
       <button class="confirm-btn cancel" onclick="closeConfirm()">Cancelar</button>
-      <button class="confirm-btn ok" id="confirm-ok-btn" onclick="_confirmFinalizarOk()">Sim, finalizar</button>
+      <button class="confirm-btn ok" id="confirm-ok-btn" onclick="_confirmOk()">Sim, finalizar</button>
     </div>
   </div>
 </div>
@@ -304,6 +329,7 @@ function cardPedido(p){
     </div>
     <div class="card-body">
       <div class="itens-titulo" style="margin-bottom:6px">Itens &mdash; <span style="font-weight:400;font-size:11px;color:var(--text3)">edite se precisar trocar produto</span></div>
+      <div class="itens-table-wrap">
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px">
@@ -316,6 +342,7 @@ function cardPedido(p){
         </thead>
         <tbody id="itens-body-${esc(id)}">${rows}</tbody>
       </table>
+      </div>
       <button onclick="addItem('${esc(id)}')" style="background:none;border:1px dashed var(--border);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--text3);cursor:pointer;width:100%;margin-top:8px;font-family:inherit">+ Adicionar item</button>
 
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:12px">
@@ -332,6 +359,9 @@ function cardPedido(p){
       </div>
     </div>
     <div class="card-footer">
+      <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId||'')}','${esc(p.cliente)}',this)">
+        🗑️ Apagar
+      </button>
       <button onclick="notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
         📱 Avisar cliente
       </button>
@@ -532,11 +562,14 @@ async function carregarStatus(){
               <span class="sc-badge ${cls}">${status}</span>
               ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
             </div>
-            ${podeRestante?`<button onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')" style="margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
+            ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
           </div>
           <div class="sc-actions">
             <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
-            ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
+            <div class="sc-actions-row">
+              ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
+              <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
+            </div>
           </div>
         </div>`;
       }).join('');
@@ -574,24 +607,39 @@ async function atualizarStatus(rowId,sel){
   }
 }
 
-// ── FINALIZAR PEDIDO (manual, ex: pago por fora sem Infinite Pay) ────────────
-let _finalizarRowId=null,_finalizarBtnEl=null;
+// ── FINALIZAR / APAGAR PEDIDO — modal de confirmação compartilhado ──────────
+let _pendingAction=null,_actionRowId=null,_actionBtnEl=null;
 
 function abrirConfirmFinalizar(rowId,nomeCliente,btnEl){
-  _finalizarRowId=rowId;
-  _finalizarBtnEl=btnEl;
+  _pendingAction='finalizar';_actionRowId=rowId;_actionBtnEl=btnEl;
+  document.getElementById('confirm-icon').textContent='✅';
+  document.getElementById('confirm-title').textContent='Finalizar pedido?';
   document.getElementById('confirm-msg').innerHTML=`Marcar o pedido de <b>${esc(nomeCliente||'cliente')}</b> como <b>Finalizado</b>?<br>Use isso quando o pagamento foi feito por fora (sem o Infinite Pay).`;
+  document.getElementById('confirm-ok-btn').textContent='Sim, finalizar';
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function abrirConfirmApagar(rowId,nomeCliente,btnEl){
+  if(!rowId){showToast('Pedido ainda não tem linha no Coda — não dá pra apagar.');return;}
+  _pendingAction='apagar';_actionRowId=rowId;_actionBtnEl=btnEl;
+  document.getElementById('confirm-icon').textContent='🗑️';
+  document.getElementById('confirm-title').textContent='Apagar pedido?';
+  document.getElementById('confirm-msg').innerHTML=`Apagar definitivamente o pedido de <b>${esc(nomeCliente||'cliente')}</b>?<br>Isso também apaga a linha no Coda. Essa ação não pode ser desfeita.`;
+  document.getElementById('confirm-ok-btn').textContent='Sim, apagar';
   document.getElementById('confirm-overlay').classList.add('open');
 }
 function closeConfirm(){
   document.getElementById('confirm-overlay').classList.remove('open');
-  _finalizarRowId=null;_finalizarBtnEl=null;
+  _pendingAction=null;_actionRowId=null;_actionBtnEl=null;
+}
+function _confirmOk(){
+  if(_pendingAction==='finalizar')return _confirmFinalizarOk();
+  if(_pendingAction==='apagar')return _confirmApagarOk();
 }
 async function _confirmFinalizarOk(){
-  if(!_finalizarRowId)return;
+  if(!_actionRowId)return;
   const okBtn=document.getElementById('confirm-ok-btn');
   okBtn.disabled=true;okBtn.textContent='Finalizando...';
-  const rowId=_finalizarRowId;
+  const rowId=_actionRowId;
   try{
     await fetch(`${WORKER}/atualizar-status`,{
       method:'POST',
@@ -604,7 +652,31 @@ async function _confirmFinalizarOk(){
   }catch(e){
     showToast('Erro ao finalizar: '+e.message);
   }finally{
-    okBtn.disabled=false;okBtn.textContent='Sim, finalizar';
+    okBtn.disabled=false;
+    closeConfirm();
+  }
+}
+async function _confirmApagarOk(){
+  if(!_actionRowId)return;
+  const okBtn=document.getElementById('confirm-ok-btn');
+  okBtn.disabled=true;okBtn.textContent='Apagando...';
+  const rowId=_actionRowId;
+  try{
+    const res=await fetch(`${WORKER}/apagar-pedido`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rowId})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.ok===false)throw new Error(data.error||'Falha ao apagar no Coda');
+    showToast('Pedido apagado 🗑️');
+    // Recarrega as duas listas — o pedido pode estar visível em Estoque e/ou Status
+    carregarStatus();
+    carregarPedidos();
+  }catch(e){
+    showToast('Erro ao apagar: '+e.message);
+  }finally{
+    okBtn.disabled=false;
     closeConfirm();
   }
 }
