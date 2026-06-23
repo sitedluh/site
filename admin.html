@@ -66,6 +66,14 @@
   .tab-btn{background:none;border:none;padding:12px 20px;font-size:14px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'DM Sans',sans-serif}
   .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
   .tab-pane{display:none}.tab-pane.active{display:block}
+  .tab-count{color:var(--text3);font-weight:600}
+  .tab-btn.active .tab-count{color:var(--accent)}
+
+  @keyframes pedidoHighlight{
+    0%,100%{box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    25%,75%{box-shadow:0 0 0 4px rgba(192,114,90,.6)}
+  }
+  .highlight-pedido{animation:pedidoHighlight 1.4s ease-in-out 2}
 
   .status-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
   .sc-info{flex:1;min-width:0}
@@ -169,9 +177,8 @@
 </header>
 
 <div style="max-width:800px;margin:0 auto;padding:20px 16px 0">
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('estoque')">📦 Estoque pendente</button>
-    <button class="tab-btn" onclick="switchTab('status')">🚦 Status dos pedidos</button>
+  <div class="tabs" id="tabs-bar">
+    <button class="tab-btn active" data-tab="estoque" onclick="switchTab('estoque')">📦 Estoque pendente</button>
   </div>
 </div>
 <div class="tab-pane active" id="tab-estoque">
@@ -181,15 +188,9 @@
     Carregando pedidos…
   </div>
 </main>
-
-</main>
 </div><!-- /tab-estoque -->
 
-<div class="tab-pane" id="tab-status">
-  <main style="max-width:800px;margin:0 auto;padding:0 16px 40px">
-    <div id="status-list"><div class="loading-state"><div class="spinner"></div>Carregando...</div></div>
-  </main>
-</div>
+<div id="status-tabs-container"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -207,6 +208,24 @@
 
 <script>
 const WORKER = 'https://coda-proxy.sitedluh.workers.dev';
+
+// Deep-link: o link "Ver Admin" do Telegram chega como admin.html?rowId=XXX — depois que
+// os pedidos carregarem, localizamos o card com esse rowId, trocamos pra aba certa e damos
+// um destaque visual nele. Tentamos de novo a cada carregamento até achar (e então paramos).
+let _deepLinkRowId = new URLSearchParams(location.search).get('rowId') || null;
+function tentarDeepLink(){
+  if(!_deepLinkRowId)return;
+  const el=[...document.querySelectorAll('[data-rowid]')].find(c=>c.dataset.rowid===_deepLinkRowId);
+  if(!el)return;
+  const pane=el.closest('.tab-pane');
+  if(pane)switchTab(pane.id.replace(/^tab-/,''));
+  _deepLinkRowId=null; // achou — não tenta de novo
+  setTimeout(()=>{
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.classList.add('highlight-pedido');
+    setTimeout(()=>el.classList.remove('highlight-pedido'),2900);
+  },150);
+}
 
 function fmtBRL(v){return'R$ '+Number(v||0).toFixed(2).replace('.',',');}
 function fmtData(d){if(!d)return'—';const p=d.split('-');return p.length===3?p.reverse().join('/'):d;}
@@ -254,6 +273,7 @@ function renderPedidos(pedidos){
   }
   main.innerHTML=pedidos.map(p=>cardPedido(p)).join('');
   pedidos.forEach(p=>recalcCard(p.idPedido));
+  tentarDeepLink();
 }
 
 // Monta <select> de produto com todos os itens do catálogo
@@ -317,7 +337,7 @@ function cardPedido(p){
       </td>
     </tr>`).join('');
 
-  return`<div class="card" id="card-${esc(id)}" data-id="${esc(id)}" data-cliente="${esc(p.cliente)}" data-telefone="${esc(p.telefone)}">
+  return`<div class="card" id="card-${esc(id)}" data-id="${esc(id)}" data-rowid="${esc(p.rowId||'')}" data-cliente="${esc(p.cliente)}" data-telefone="${esc(p.telefone)}">
     <div class="card-header">
       <div>
         <div class="card-nome">${esc(p.cliente)}</div>
@@ -418,6 +438,8 @@ function addItem(id){
 })();
 
 carregarPedidos();
+carregarStatus();
+setInterval(carregarStatus,30000);
 
 function notificarCliente(id){
   const card=document.getElementById(`card-${CSS.escape(id)}`);
@@ -487,18 +509,46 @@ const STATUS_CLS = {
   'Finalizado':                      'entregue',
 };
 
-let _statusTimer=null;
+// Cada status agora é a sua própria aba de nível superior (igual "Estoque pendente"),
+// em vez de ficarem todos agrupados dentro de uma única aba "Status dos pedidos".
+function statusTabId(idx){ return 'status-'+idx; }
+
+(function buildStatusTabs(){
+  const tabsBar=document.getElementById('tabs-bar');
+  const container=document.getElementById('status-tabs-container');
+  STATUS_OPTS.forEach((status,idx)=>{
+    const tabId=statusTabId(idx);
+    const btn=document.createElement('button');
+    btn.className='tab-btn';
+    btn.dataset.tab=tabId;
+    btn.onclick=()=>switchTab(tabId);
+    btn.innerHTML=`${esc(status)} <span class="tab-count" id="count-${tabId}"></span>`;
+    tabsBar.appendChild(btn);
+
+    const pane=document.createElement('div');
+    pane.className='tab-pane';
+    pane.id='tab-'+tabId;
+    pane.innerHTML=`<main style="max-width:800px;margin:0 auto;padding:0 16px 40px"><div id="list-${tabId}"><div class="loading-state"><div class="spinner"></div>Carregando...</div></div></main>`;
+    container.appendChild(pane);
+  });
+  // Aba extra de segurança — qualquer status fora da lista padrão cai aqui (não deveria
+  // acontecer no fluxo normal, mas evita que um pedido "desapareça" silenciosamente).
+  const btnOutros=document.createElement('button');
+  btnOutros.className='tab-btn';
+  btnOutros.dataset.tab='status-outros';
+  btnOutros.onclick=()=>switchTab('status-outros');
+  btnOutros.innerHTML=`Outros <span class="tab-count" id="count-status-outros"></span>`;
+  tabsBar.appendChild(btnOutros);
+  const paneOutros=document.createElement('div');
+  paneOutros.className='tab-pane';
+  paneOutros.id='tab-status-outros';
+  paneOutros.innerHTML=`<main style="max-width:800px;margin:0 auto;padding:0 16px 40px"><div id="list-status-outros"><div class="empty">Nenhum pedido.</div></div></main>`;
+  container.appendChild(paneOutros);
+})();
 
 function switchTab(tab){
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['estoque','status'][i]===tab));
-  document.getElementById('tab-estoque').classList.toggle('active',tab==='estoque');
-  document.getElementById('tab-status').classList.toggle('active',tab==='status');
-  if(tab==='status'){
-    carregarStatus();
-    if(!_statusTimer)_statusTimer=setInterval(carregarStatus,30000);
-  }else{
-    if(_statusTimer){clearInterval(_statusTimer);_statusTimer=null;}
-  }
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id==='tab-'+tab));
 }
 
 // Mapeamento Pedido Status (tabela Pedidos) → Status do admin
@@ -506,15 +556,49 @@ const PEDIDO_STATUS_MAP = {
   'Entregue':    'Entregue — Esperando restante',
 };
 
+function renderStatusList(tabId,lista,statusFixo){
+  const countEl=document.getElementById('count-'+tabId);
+  if(countEl)countEl.textContent=lista.length?`· ${lista.length}`:'';
+  const el=document.getElementById('list-'+tabId);
+  if(!el)return;
+  if(!lista.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido aqui.</div>';return;}
+  el.innerHTML=lista.map(p=>statusCardHtml(p,statusFixo||p.status||'Aguardando confirmação')).join('');
+}
+
+function statusCardHtml(p,status){
+  const cls=STATUS_CLS[status]||'aguardando';
+  const ps=p.pedidoStatus||'';
+  const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+  const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
+  const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+  const restante=Math.round((total-(p.valorPago||0))*100)/100;
+  const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
+  return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
+    <div class="sc-info">
+      <div class="sc-nome">${esc(p.cliente||'—')}</div>
+      <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
+      <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+        <span class="sc-badge ${cls}">${status}</span>
+        ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
+      </div>
+      ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
+    </div>
+    <div class="sc-actions">
+      <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
+      <div class="sc-actions-row">
+        ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
+        <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 async function carregarStatus(){
-  const el=document.getElementById('status-list');
-  if(!el.querySelector('.status-card'))
-    el.innerHTML='<div class="loading-state"><div class="spinner"></div>Carregando...</div>';
   try{
     const res=await fetch(`${WORKER}/pedidos-pendentes?todos=1`);
     const data=await res.json();
     const pedidos=data.pedidos||[];
-    if(!pedidos.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido encontrado.</div>';return;}
 
     // Auto-atualiza status baseado em Pedido Status da tabela Pedidos
     for(const p of pedidos){
@@ -533,53 +617,25 @@ async function carregarStatus(){
       }
     }
 
-    // Agrupa os pedidos por status, na ordem do fluxo (STATUS_OPTS) — fica mais fácil
-    // de bater o olho e ver quantos pedidos estão em cada etapa.
+    // Agrupa os pedidos por status
     const grupos={};
     pedidos.forEach(p=>{
       const status=p.status||'Aguardando confirmação';
       (grupos[status]=grupos[status]||[]).push(p);
     });
-    const ordemStatus=[...STATUS_OPTS,...Object.keys(grupos).filter(s=>!STATUS_OPTS.includes(s))];
 
-    el.innerHTML=ordemStatus.filter(s=>grupos[s]&&grupos[s].length).map(status=>{
-      const lista=grupos[status];
-      const clsGrupo=STATUS_CLS[status]||'aguardando';
-      const cardsHtml=lista.map(p=>{
-        const cls=STATUS_CLS[status]||'aguardando';
-        const ps=p.pedidoStatus||'';
-        const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
-        const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
-        const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
-        const restante=Math.round((total-(p.valorPago||0))*100)/100;
-        const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
-        return`<div class="status-card">
-          <div class="sc-info">
-            <div class="sc-nome">${esc(p.cliente||'—')}</div>
-            <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
-            <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
-              <span class="sc-badge ${cls}">${status}</span>
-              ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
-            </div>
-            ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
-          </div>
-          <div class="sc-actions">
-            <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
-            <div class="sc-actions-row">
-              ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
-              <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-      return`<div class="status-group">
-        <div class="status-group-header"><span class="sc-badge ${clsGrupo}">${esc(status)}</span><span class="status-group-count">${lista.length} pedido${lista.length!==1?'s':''}</span></div>
-        ${cardsHtml}
-      </div>`;
-    }).join('');
+    // Renderiza cada status na sua própria aba
+    STATUS_OPTS.forEach((status,idx)=>{
+      renderStatusList(statusTabId(idx),grupos[status]||[],status);
+    });
+
+    // Qualquer status fora da lista padrão cai na aba "Outros"
+    const outros=Object.keys(grupos).filter(s=>!STATUS_OPTS.includes(s)).flatMap(s=>grupos[s]);
+    renderStatusList('status-outros',outros,null);
+
+    tentarDeepLink();
   }catch(e){
-    el.innerHTML=`<div class="empty">⚠️ Erro: ${e.message}</div>`;
+    showToast('Erro ao carregar status: '+e.message);
   }
 }
 
