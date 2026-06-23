@@ -130,7 +130,9 @@
     .card-footer button{width:100%;justify-content:center}
     .itens-table-wrap{margin:0 -14px;padding:0 14px}
     .itens-table-wrap table{min-width:460px}
-    .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    #tabs-wrap{padding-left:0!important;padding-right:0!important}
+    .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 12px;scrollbar-width:none;-ms-overflow-style:none}
+    .tabs::-webkit-scrollbar{display:none}
     .tab-btn{white-space:nowrap;padding:10px 14px;font-size:13px}
     .status-card{flex-direction:column;align-items:stretch;padding:14px}
     .sc-actions{flex-direction:row;align-items:stretch;width:100%;margin-top:6px}
@@ -176,7 +178,7 @@
   </button>
 </header>
 
-<div style="max-width:800px;margin:0 auto;padding:20px 16px 0">
+<div id="tabs-wrap" style="max-width:800px;margin:0 auto;padding:20px 16px 0">
   <div class="tabs" id="tabs-bar">
     <button class="tab-btn active" data-tab="estoque" onclick="switchTab('estoque')">📦 Estoque pendente</button>
   </div>
