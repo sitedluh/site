@@ -23,7 +23,7 @@
   .btn-refresh.loading svg{animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  main{max-width:800px;margin:0 auto;padding:20px 16px}
+  main{padding:20px 24px}
 
   .empty{text-align:center;padding:60px 20px;color:var(--text3);font-size:15px}
   .empty-icon{font-size:40px;margin-bottom:12px}
@@ -178,7 +178,7 @@
   </button>
 </header>
 
-<div id="tabs-wrap" style="max-width:800px;margin:0 auto;padding:20px 16px 0">
+<div id="tabs-wrap" style="padding:20px 24px 0">
   <div class="tabs" id="tabs-bar">
     <button class="tab-btn active" data-tab="estoque" onclick="switchTab('estoque')">📦 Estoque pendente</button>
   </div>
@@ -530,7 +530,7 @@ function statusTabId(idx){ return 'status-'+idx; }
     const pane=document.createElement('div');
     pane.className='tab-pane';
     pane.id='tab-'+tabId;
-    pane.innerHTML=`<main style="max-width:800px;margin:0 auto;padding:0 16px 40px"><div id="list-${tabId}"><div class="loading-state"><div class="spinner"></div>Carregando...</div></div></main>`;
+    pane.innerHTML=`<main style="padding:0 24px 40px"><div id="list-${tabId}"><div class="loading-state"><div class="spinner"></div>Carregando...</div></div></main>`;
     container.appendChild(pane);
   });
   // Aba extra de segurança — qualquer status fora da lista padrão cai aqui (não deveria
@@ -544,7 +544,7 @@ function statusTabId(idx){ return 'status-'+idx; }
   const paneOutros=document.createElement('div');
   paneOutros.className='tab-pane';
   paneOutros.id='tab-status-outros';
-  paneOutros.innerHTML=`<main style="max-width:800px;margin:0 auto;padding:0 16px 40px"><div id="list-status-outros"><div class="empty">Nenhum pedido.</div></div></main>`;
+  paneOutros.innerHTML=`<main style="padding:0 24px 40px"><div id="list-status-outros"><div class="empty">Nenhum pedido.</div></div></main>`;
   container.appendChild(paneOutros);
 })();
 
@@ -569,8 +569,14 @@ function renderStatusList(tabId,lista,statusFixo){
 
 function statusCardHtml(p,status){
   const cls=STATUS_CLS[status]||'aguardando';
-  const ps=p.pedidoStatus||'';
-  const opts=STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+  // "Pedido Status" no Coda é multi-select → chega como array (ex: ["Entregue"]).
+  const ps=Array.isArray(p.pedidoStatus)?(p.pedidoStatus[0]||''):(p.pedidoStatus||'');
+  // Se o status atual for legado/desconhecido (não está em STATUS_OPTS), mostra ele
+  // mesmo no topo do select — senão o dropdown mostraria a 1ª opção como "selecionada"
+  // sem realmente refletir o status real do pedido (confuso).
+  const statusConhecido=STATUS_OPTS.includes(status);
+  const extraOpt=!statusConhecido?`<option value="${esc(status)}" selected>⚠️ ${esc(status)} (antigo)</option>`:'';
+  const opts=extraOpt+STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
   const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
   const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
