@@ -32,7 +32,8 @@
   .card-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
   .card-id{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase}
   .card-nome{font-size:16px;font-weight:600;color:var(--text)}
-  .card-meta{font-size:13px;color:var(--text3);margin-top:3px}
+  .card-meta{font-size:13px;color:var(--text2);font-weight:500;margin-top:3px}
+  .card-meta b{color:var(--text);font-weight:700}
   .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fff3cd;color:#856404;border:1px solid #ffc107}
 
   .card-body{padding:14px 18px}
@@ -78,7 +79,8 @@
   .status-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
   .sc-info{flex:1;min-width:0}
   .sc-nome{font-size:15px;font-weight:600;color:var(--text)}
-  .sc-meta{font-size:12px;color:var(--text3);margin-top:2px}
+  .sc-meta{font-size:13px;color:var(--text2);font-weight:500;margin-top:3px}
+  .sc-meta b{color:var(--text);font-weight:700}
   .sc-itens{font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5}
   .status-select{border:1.5px solid var(--accent);border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;font-weight:600;color:var(--accent);background:var(--surface);cursor:pointer;font-family:'DM Sans',sans-serif;min-width:200px}
   .status-select:focus{outline:none}
@@ -342,8 +344,8 @@ function cardPedido(p){
   return`<div class="card" id="card-${esc(id)}" data-id="${esc(id)}" data-rowid="${esc(p.rowId||'')}" data-cliente="${esc(p.cliente)}" data-telefone="${esc(p.telefone)}">
     <div class="card-header">
       <div>
-        <div class="card-nome">${esc(p.cliente)}</div>
-        <div class="card-meta">📱 ${esc(p.telefone)} · ${esc(p.entrega||'—')} · ${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</div>
+        <div class="card-nome">${esc(p.cliente)}${p.tipoCliente==='Empresa'?' <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dbeafe;color:#1e40af;vertical-align:middle">🏢 Empresa</span>':''}</div>
+        <div class="card-meta">📱 ${esc(p.telefone)} · <b>${esc(p.entrega||'—')}</b> · <b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
         ${p.pagamento?`<div class="card-meta" style="margin-top:2px">💳 ${esc(p.pagamento)}</div>`:''}
         ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
       </div>
@@ -583,8 +585,8 @@ function statusCardHtml(p,status){
   const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
   return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
     <div class="sc-info">
-      <div class="sc-nome">${esc(p.cliente||'—')}</div>
-      <div class="sc-meta">📱 ${esc(p.telefone||'—')} · ${esc(p.entrega||'Retirada')} · ${p.data||'—'}${p.hora?' às '+p.hora:''}</div>
+      <div class="sc-nome">${esc(p.cliente||'—')}${p.tipoCliente==='Empresa'?' <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dbeafe;color:#1e40af;vertical-align:middle">🏢 Empresa</span>':''}</div>
+      <div class="sc-meta">📱 ${esc(p.telefone||'—')} · <b>${esc(p.entrega||'Retirada')}</b> · <b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
       <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <span class="sc-badge ${cls}">${status}</span>

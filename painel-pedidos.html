@@ -860,20 +860,26 @@ let _entregaPendingId = null;
 // worker, WhatsApp) é feita aqui — só abre a caixa de confirmação. Só depois que o
 // usuário responder (entregaConfirmResposta) é que markDelivered roda de fato.
 function confirmarEntrega(id) {
-  const o = orders.find(x => x.id === id);
-  if (!o) return;
+  // Procura em orders e também em allOrders (fallback de segurança — orders é o
+  // subconjunto filtrado pela data selecionada, então se algo ficar fora do filtro
+  // ainda achamos o pedido aqui em vez de simplesmente não fazer nada).
+  const o = (orders.find(x => x.id === id)) || (allOrders.find(x => x.id === id));
+  if (!o) { console.error('confirmarEntrega: pedido não encontrado', id); return; }
   const isEntrega = String(o.tipo || '').toLowerCase().includes('entrega');
   const { restanteNum } = calcRestante(o);
-  if (restanteNum <= 0) {
-    // Nada a cobrar — marca direto, sem perguntar.
-    markDelivered(id, false);
-    return;
-  }
   _entregaPendingId = id;
   document.getElementById('entrega-confirm-title').textContent = `Marcar como ${isEntrega ? 'entregue' : 'retirado'}?`;
   document.getElementById('entrega-confirm-nome').textContent = o.nome;
   document.getElementById('entrega-confirm-valor').textContent = fmtMoneyBR(restanteNum);
-  document.getElementById('entrega-confirm-yes').textContent = `💳 Marcar e cobrar ${fmtMoneyBR(restanteNum)}`;
+  const yesBtn = document.getElementById('entrega-confirm-yes');
+  if (restanteNum > 0) {
+    yesBtn.style.display = '';
+    yesBtn.textContent = `💳 Marcar e cobrar ${fmtMoneyBR(restanteNum)}`;
+  } else {
+    // Sem valor de "Valor Total"/"Valor Pago" cadastrado no Coda para este pedido —
+    // não dá pra gerar cobrança de verdade, então some com o botão de cobrar.
+    yesBtn.style.display = 'none';
+  }
   document.getElementById('entrega-confirm-no').textContent = `✓ Marcar sem cobrar`;
   document.getElementById('entrega-confirm-overlay').classList.add('open');
 }
