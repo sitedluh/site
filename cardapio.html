@@ -2034,23 +2034,8 @@ async function sbStatusConsultar(tel){
 // ── 2.2 — Fazer um pedido ──
 function sbNovoPedido(){
   sbEsconderInput();
-  sbAddMsg('bot','Que delícia! 🎂 É um pedido pra você ou pra sua empresa/evento?');
-  sbBotoes([
-    {label:'🙋 Pra mim (pessoa física)',onClick:()=>sbNovoPedidoFisica()},
-    {label:'🏢 Pra empresa (B2B)',onClick:()=>sbNovoPedidoEmpresa()},
-  ]);
-}
-function sbNovoPedidoFisica(){
-  // Já estamos no cardapio.html (pessoa física) — não precisa de link.
-  sbAddMsg('bot','Boa notícia: você já está no lugar certo! É só fechar este chat, rolar a página e montar seu pedido aqui mesmo. 😉');
+  sbAddMsg('bot','Que delícia! 🎂 Boa notícia: você já está no lugar certo! É só fechar este chat, rolar a página e montar seu pedido aqui mesmo. 😉');
   sbNovoPedidoAjuda();
-}
-function sbNovoPedidoEmpresa(){
-  sbAddMsg('bot','Pedidos pra empresa têm preços e quantidades especiais — é só usar nosso cardápio B2B.');
-  sbBotoes([
-    {label:'🏢 Abrir cardápio de empresas',onClick:()=>{window.open('empresas.html','_blank');sbNovoPedidoAjuda();}},
-    {label:'👍 Depois eu vejo',onClick:()=>sbNovoPedidoAjuda()},
-  ]);
 }
 function sbNovoPedidoAjuda(){
   sbAddMsg('bot','Quer ajuda pra escolher sabores ou montar o pedido?');
