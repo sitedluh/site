@@ -247,6 +247,32 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .pl-skip{background:none;color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer}
 .pl-skip:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ── Bot de Status do Pedido (chat próprio, sem depender do Tawk) ── */
+.status-bot-fab{position:fixed;left:16px;bottom:24px;z-index:590;background:var(--accent);color:#fff;border:none;border-radius:50px;width:54px;height:54px;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,112,58,.4);cursor:pointer;transition:transform .15s}
+.status-bot-fab:hover{transform:scale(1.06)}
+.status-bot-fab.hide{display:none}
+.status-bot-panel{position:fixed;left:16px;bottom:24px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(480px,calc(100vh - 100px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
+.status-bot-panel.open{display:flex}
+.sb-header{background:var(--accent);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:14px;font-family:'DM Sans',sans-serif}
+.sb-header button{background:none;border:none;color:#fff;font-size:16px;cursor:pointer;opacity:.85}
+.sb-header button:hover{opacity:1}
+.sb-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
+.sb-msg{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;white-space:pre-line}
+.sb-msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
+.sb-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.sb-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border)}
+.sb-input-row input{flex:1;min-width:0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:13.5px;font-family:'DM Sans',sans-serif}
+.sb-input-row input:focus{outline:none;border-color:var(--accent)}
+.sb-input-row button{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:0 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.sb-input-row button:hover{background:var(--accent-dark)}
+.sb-input-row button:disabled{opacity:.6;cursor:default}
+.sb-human{background:none;border:none;border-top:1px solid var(--border);color:var(--text2);font-size:12px;padding:9px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.sb-human:hover{color:var(--accent)}
+@media (max-width:480px){
+  .status-bot-fab{left:12px;bottom:16px}
+  .status-bot-panel{left:8px;right:8px;bottom:12px;width:auto}
+}
+
 
 /* ══════════════════════════════════════
    CHECKOUT
@@ -1680,7 +1706,7 @@ async function _confirmarESeguirWhats(){
 
     try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}
 
-    // Extras não-críticos: não atrasam a ida ao WhatsApp, só disparam depois que o essencial confirmou
+    // Extras não-críticos: não atrasam a abertura do chat, só disparam depois que o essencial confirmou
     salvarPedidoFirebase({nome:p.nome,tel:p.tel,entrega:p.entrega,endereco:p.endereco,pagamento:p.pagamento,data:p.data,hora:p.horaVal,obs:p.obs,total:p.total,entradaVal:p.entradaVal,restoVal:p.restoVal,itensTexto:p.itensTexto});
     // (a foto de referência do topper, se houver, já foi enviada ao Drive antes
     // de montar as subrows — o link está em topperPorProduto[id].refUrl / na subrow)
@@ -1688,7 +1714,9 @@ async function _confirmarESeguirWhats(){
     setPedidoLoadingState('success');
     clearCart();topperPorProduto={};
     _pedidoPendente=null;
-    setTimeout(()=>irParaWhatsapp(p.waUrl),700);
+    // Em vez de ir direto pro WhatsApp, abre o bot de status (chat próprio) —
+    // ele já mostra a situação atual e pode ser consultado de novo a qualquer momento.
+    setTimeout(()=>abrirStatusBotPosPedido(p),700);
   }catch(e){
     console.warn('Erro ao confirmar pedido no Coda:',e);
     setPedidoLoadingState('error');
@@ -1739,12 +1767,122 @@ function setPedidoLoadingState(state){
   }else if(state==='success'){
     spinner.style.display='none';icon.style.display='block';icon.textContent='✅';actions.style.display='none';
     title.textContent='Pedido confirmado!';
-    sub.textContent='Abrindo o WhatsApp...';
+    sub.textContent='Abrindo seu chat de acompanhamento...';
   }else if(state==='error'){
     spinner.style.display='none';icon.style.display='block';icon.textContent='⚠️';actions.style.display='flex';
     title.textContent='Não foi possível confirmar';
     sub.textContent='Seu pedido pode não ter sido registrado. Tente novamente ou continue para o WhatsApp.';
   }
+}
+
+// ── Bot de Status do Pedido (chat próprio, sem depender do Tawk) ──
+// Substitui o redirect direto pro WhatsApp depois do pedido: o cliente fica
+// numa caixa de chat própria que já explica a situação e, a qualquer momento
+// (inclusive dias depois), pode digitar o WhatsApp e consultar o status real
+// vindo do Coda (worker /status-pedido).
+let _statusBotTel='';
+
+function sbTelSalvo(){
+  try{
+    const saved=localStorage.getItem('dluh_userdata');
+    if(saved){const d=JSON.parse(saved);if(d&&d.tel)return d.tel;}
+  }catch(_){}
+  return '';
+}
+
+function abrirStatusBot(mensagemInicial){
+  document.getElementById('status-bot-panel').classList.add('open');
+  document.getElementById('status-bot-fab').classList.add('hide');
+  const msgs=document.getElementById('status-bot-msgs');
+  const tel=document.getElementById('status-bot-tel');
+  if(!_statusBotTel)_statusBotTel=sbTelSalvo();
+  if(_statusBotTel&&!tel.value)tel.value=_statusBotTel;
+  if(!msgs.dataset.iniciado){
+    msgs.dataset.iniciado='1';
+    sbAddMsg('bot',mensagemInicial||'Oi! 👋 Sou o assistente da D\'Luh Festas. Digite o WhatsApp usado no pedido pra eu consultar o status — pode voltar aqui quando quiser, mesmo dias depois.');
+  }
+}
+function fecharStatusBot(){
+  document.getElementById('status-bot-panel').classList.remove('open');
+  document.getElementById('status-bot-fab').classList.remove('hide');
+}
+function sbAddMsg(quem,texto){
+  const msgs=document.getElementById('status-bot-msgs');
+  const div=document.createElement('div');
+  div.className='sb-msg '+quem;
+  div.textContent=texto;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+// Chamado depois que o pedido é registrado no Coda com sucesso (substitui irParaWhatsapp).
+function abrirStatusBotPosPedido(p){
+  fecharPedidoLoading();
+  _statusBotTel=p.tel||sbTelSalvo();
+  const msgs=document.getElementById('status-bot-msgs');
+  if(msgs){msgs.innerHTML='';delete msgs.dataset.iniciado;}
+  const nomeTxt=p.nome?(' '+p.nome.split(' ')[0]):'';
+  const msgInicial=`Oi${nomeTxt}! 🎉 Recebi seu pedido e já registrei aqui.\n\nStatus atual: Aguardando confirmação — nossa equipe confirma o estoque em breve e te avisa por aqui e pelo WhatsApp.\n\nPode voltar a este chat quando quiser (mesmo dias depois) e digitar seu WhatsApp pra ver o status atualizado.`;
+  abrirStatusBot(msgInicial);
+}
+
+const STATUS_BOT_EXPLICACAO={
+  'Aguardando confirmação':'sua equipe ainda vai confirmar o estoque dos itens. Assim que confirmar, te aviso por aqui e pelo WhatsApp.',
+  'Confirmado — Esperando pagamento':'o estoque já foi confirmado! Falta só o pagamento da entrada pra entrar em produção.',
+  'Pago — Em produção':'a entrada foi paga e seu pedido já está sendo produzido com todo cuidado. 🎂',
+  'Entregue — Esperando restante':'seu pedido já foi entregue! Falta só o pagamento do restante pra finalizar.',
+  'Finalizado':'esse pedido já foi concluído — pagamento e entrega 100% ok. Obrigada pela confiança! 🩷',
+};
+
+async function statusBotConsultar(){
+  const input=document.getElementById('status-bot-tel');
+  const btn=document.getElementById('status-bot-btn');
+  const tel=(input.value||'').trim();
+  const telDigits=tel.replace(/\D/g,'');
+  if(telDigits.length<8){
+    sbAddMsg('bot','Esse número não parece completo — digite o WhatsApp com DDD que você usou no pedido (ex: 11999998888).');
+    return;
+  }
+  sbAddMsg('user',tel);
+  _statusBotTel=tel;
+  btn.disabled=true;btn.textContent='...';
+  try{
+    const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(telDigits)}`);
+    const d=await res.json().catch(()=>({}));
+    const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    if(!res.ok||!pedidos.length){
+      sbAddMsg('bot','Não encontrei nenhum pedido com esse WhatsApp. Confere se digitou certo, ou fale com um atendente humano pelo botão abaixo. 💬');
+      return;
+    }
+    pedidos.forEach(p=>{
+      const explicacao=STATUS_BOT_EXPLICACAO[p.status]||'';
+      let txt=`Pedido de ${p.data||'data a confirmar'} — status: ${p.status}`;
+      if(explicacao)txt+=`\n${explicacao}`;
+      if(p.itens&&p.itens.length)txt+='\n\nItens: '+p.itens.map(i=>`${i.quantidade}x ${i.produto}`).join(', ');
+      if(p.total>0){
+        txt+=`\n\nTotal: ${fmtBRL(p.total)} · Pago até agora: ${fmtBRL(p.valorPago)}`;
+        if(p.restante>0)txt+=` · Falta: ${fmtBRL(p.restante)}`;
+      }
+      sbAddMsg('bot',txt);
+    });
+  }catch(e){
+    console.warn('Erro ao consultar status:',e);
+    sbAddMsg('bot','Tive um problema pra consultar agora. Tente de novo em alguns instantes ou fale com um atendente. 💬');
+  }finally{
+    btn.disabled=false;btn.textContent='Ver status';
+  }
+}
+
+function statusBotFalarComAtendente(){
+  try{
+    if(window.Tawk_API&&typeof window.Tawk_API.maximize==='function'){
+      window.Tawk_API.maximize();
+      fecharStatusBot();
+      return;
+    }
+  }catch(_){}
+  // Fallback: WhatsApp direto, caso o Tawk não tenha carregado ainda
+  window.open(`https://wa.me/${CONFIG.WHATSAPP}`,'_blank');
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
@@ -2581,6 +2719,24 @@ document.addEventListener('DOMContentLoaded', () => { loadTicker(); });
     </div>
   </div>
 </div>
+
+<!-- Bot de Status do Pedido -->
+<button class="status-bot-fab" id="status-bot-fab" onclick="abrirStatusBot()" aria-label="Status do meu pedido">
+  📦
+</button>
+<div class="status-bot-panel" id="status-bot-panel">
+  <div class="sb-header">
+    <span>📦 Status do Pedido</span>
+    <button onclick="fecharStatusBot()" aria-label="Fechar">✕</button>
+  </div>
+  <div class="sb-msgs" id="status-bot-msgs"></div>
+  <div class="sb-input-row">
+    <input id="status-bot-tel" type="tel" inputmode="numeric" placeholder="Seu WhatsApp (com DDD)" onkeydown="if(event.key==='Enter')statusBotConsultar()">
+    <button onclick="statusBotConsultar()" id="status-bot-btn">Ver status</button>
+  </div>
+  <button class="sb-human" onclick="statusBotFalarComAtendente()">💬 Prefere falar com um atendente?</button>
+</div>
+
 <!--Start of Tawk.to Script-->
 <script type="text/javascript">
 var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
