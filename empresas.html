@@ -1852,18 +1852,6 @@ function sbResetInatividade(){
   },3*60*1000);
 }
 
-// Registra a opção escolhida no menu (telemetria via Telegram, fire-and-forget) —
-// não bloqueia o fluxo do cliente, só avisa o time do que ele está buscando.
-function sbRegistrarIntencao(intencao,detalhe){
-  try{
-    fetch(`${CONFIG.WORKER_URL}/bot-intencao`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({intencao,detalhe:detalhe||'',tel:_statusBotTel||'',pagina:location.pathname})
-    }).catch(()=>{});
-  }catch(_){}
-}
-
 // ── Botões de opção (em vez de texto livre, reduz erro e acelera) ──
 function sbBotoes(opcoes){
   sbLimparBotoes();
@@ -1945,10 +1933,10 @@ function sbMenuPrincipal(saudacao){
   if(saudacao)sbAddMsg('bot',saudacao);
   sbAddMsg('bot','O que você precisa? 😊');
   sbBotoes([
-    {label:'📦 Status do meu pedido',onClick:()=>{sbRegistrarIntencao('Status do pedido');sbStatusPedirTelefone();}},
-    {label:'🛒 Fazer um pedido',onClick:()=>{sbRegistrarIntencao('Fazer um pedido');sbNovoPedido();}},
-    {label:'❓ Tirar uma dúvida',onClick:()=>{sbRegistrarIntencao('Dúvidas');sbDuvidas();}},
-    {label:'💬 Falar com um atendente',onClick:()=>{sbRegistrarIntencao('Falar com atendente');sbAtendente();}},
+    {label:'📦 Status do meu pedido',onClick:()=>{sbStatusPedirTelefone();}},
+    {label:'🛒 Fazer um pedido',onClick:()=>{sbNovoPedido();}},
+    {label:'❓ Tirar uma dúvida',onClick:()=>{sbDuvidas();}},
+    {label:'💬 Falar com um atendente',onClick:()=>{sbAtendente();}},
   ]);
 }
 
@@ -2097,10 +2085,10 @@ function sbDuvidas(){
   sbEsconderInput();
   sbAddMsg('bot','Pode perguntar! Sobre o que é sua dúvida?');
   sbBotoes([
-    {label:'🍰 Sabores e recheios',onClick:()=>{sbRegistrarIntencao('Dúvida: sabores/recheios');sbDuvidaSabores();}},
-    {label:'💰 Preços',onClick:()=>{sbRegistrarIntencao('Dúvida: preços');sbDuvidaPrecos();}},
-    {label:'📅 Prazos e datas',onClick:()=>{sbRegistrarIntencao('Dúvida: prazos/datas');sbDuvidaPrazos();}},
-    {label:'❓ Outra dúvida',onClick:()=>{sbRegistrarIntencao('Dúvida: outra');sbAtendente();}},
+    {label:'🍰 Sabores e recheios',onClick:()=>{sbDuvidaSabores();}},
+    {label:'💰 Preços',onClick:()=>{sbDuvidaPrecos();}},
+    {label:'📅 Prazos e datas',onClick:()=>{sbDuvidaPrazos();}},
+    {label:'❓ Outra dúvida',onClick:()=>{sbAtendente();}},
   ]);
 }
 async function sbDuvidaSabores(){
