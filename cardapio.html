@@ -248,10 +248,10 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .pl-skip:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ── Bot de Status do Pedido (chat próprio, sem depender do Tawk) ── */
-.status-bot-fab{position:fixed;left:16px;bottom:24px;z-index:590;background:var(--accent);color:#fff;border:none;border-radius:50px;width:54px;height:54px;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,112,58,.4);cursor:pointer;transition:transform .15s}
+.status-bot-fab{position:fixed;right:16px;bottom:170px;z-index:590;background:var(--accent);color:#fff;border:none;border-radius:50px;width:54px;height:54px;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,112,58,.4);cursor:pointer;transition:transform .15s}
 .status-bot-fab:hover{transform:scale(1.06)}
 .status-bot-fab.hide{display:none}
-.status-bot-panel{position:fixed;left:16px;bottom:24px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(480px,calc(100vh - 100px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
+.status-bot-panel{position:fixed;right:16px;bottom:170px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(420px,calc(100vh - 250px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
 .status-bot-panel.open{display:flex}
 .sb-header{background:var(--accent);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:14px;font-family:'DM Sans',sans-serif}
 .sb-header button{background:none;border:none;color:#fff;font-size:16px;cursor:pointer;opacity:.85}
@@ -269,8 +269,8 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .sb-human{background:none;border:none;border-top:1px solid var(--border);color:var(--text2);font-size:12px;padding:9px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .sb-human:hover{color:var(--accent)}
 @media (max-width:480px){
-  .status-bot-fab{left:12px;bottom:16px}
-  .status-bot-panel{left:8px;right:8px;bottom:12px;width:auto}
+  .status-bot-fab{right:12px;bottom:158px}
+  .status-bot-panel{left:8px;right:8px;bottom:142px;width:auto;max-height:min(420px,calc(100vh - 222px))}
 }
 
 
