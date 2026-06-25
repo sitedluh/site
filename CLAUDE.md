@@ -71,11 +71,13 @@ As Options da coluna "Status" no Coda devem corresponder exatamente às strings 
 ### Colunas extras pro fluxo de Empresas
 
 - Tabela **Produtos**: colunas `Valor Empresa` (preço unitário B2B) e `Quanti. Empresa` (quantidade mínima B2B), paralelas a `Valor`/`Quantidade mínima`. O worker (`/produtos`) lê as duas e expõe `valorEmpresa`/`qtdMinEmpresa` na resposta, com fallback pro valor normal quando a coluna empresa está vazia num produto — então é seguro deixar produtos sem preço B2B definido ainda.
+- Tabela **Produtos**: coluna `Mostrar Empresa` (checkbox), paralela a `Mostrar`. Mesma semântica (`!== false` esconde o produto), mas só afeta o catálogo de `empresas.html` — `Mostrar` continua controlando `cardapio.html`/`index.html` normalmente, sem mudança. O worker (`/produtos`) expõe `mostrarEmpresa` na resposta; o filtro acontece client-side em `empresas.html` (`loadProducts()`), em cima do array que já passou pelo filtro de `Mostrar`. Por ser coluna nova, produtos existentes nascem **desmarcados** — ficam ocultos no site de empresas até alguém marcar manualmente os que devem aparecer lá.
 - Tabela **Orçamentos**: coluna `Tipo Cliente` (single-select, precisa ter a Option `Empresa` cadastrada) — `empresas.html` grava esse valor no row pai a cada pedido; `cardapio.html` não grava nada nela (fica em branco = cliente pessoa física). O worker (`/pedidos-pendentes`) repassa esse campo como `tipoCliente`, e `admin.html` mostra um badge "🏢 Empresa" no card quando esse valor é `'Empresa'`.
 - Se essas colunas não existirem no Coda com esses nomes exatos, a leitura/escrita falha silenciosamente (mesmo padrão de risco já documentado pra `STATUS_OPTS`).
 
 ## Histórico do projeto (principais marcos, mais recentes primeiro)
 
+- Coluna `Mostrar Empresa` (Produtos): permite ocultar/exibir produtos especificamente no catálogo de `empresas.html`, independente de `Mostrar`. Worker (`/produtos`) e `empresas.html` (`loadProducts()`) atualizados.
 - `empresas.html` (novo): cardápio B2B clonado de `cardapio.html`, com preço/quantidade mínima vindos de `Valor Empresa`/`Quanti. Empresa` e tag `Tipo Cliente=Empresa` no pedido. Worker (`/produtos`, `/pedidos-pendentes`) e `admin.html` (badge "🏢 Empresa") atualizados em conjunto.
 - Caixa de confirmação no `painel-pedidos.html` antes de marcar entregue/cobrar restante (gate: nenhuma alteração — Coda, worker, WhatsApp — ocorre antes da resposta do usuário).
 - `admin.html`: dados do pedido (telefone/data/hora/tipo) mais evidentes visualmente; data exibida em dd/mm/aaaa.
