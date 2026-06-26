@@ -2454,6 +2454,8 @@ async function sbChecarStatusPedido(){
         // critério antigo, pra não ficar travado em silêncio pro resto da sessão.
         if(_sbPollNaoAchou>=8){ _sbPollPaiId=null; atual=pedidos[0]; }
         else return;
+      }else{
+        _sbPollNaoAchou=0; // encontrou — zera para não acumular falhas não-consecutivas
       }
     }else{
       atual=pedidos[0]; // sem ID pra rastrear — mais recente da lista (worker já ordena assim)
@@ -2461,10 +2463,18 @@ async function sbChecarStatusPedido(){
     if(atual.status===_sbPollUltimoStatus)return;
     if(atual.status==='Confirmado — Esperando pagamento'){
       if(!atual.linkPagamento)return; // link ainda sendo gerado — espera o próximo ciclo
-      _sbPollUltimoStatus=atual.status;
+      // parseFloat: "entrada" e "total" chegam crus do Coda e podem vir como string
+      // (ex.: "150.00") em vez de number — fmtBRL(string) lança TypeError. Antes dessa
+      // correção, _sbPollUltimoStatus era definido ANTES do sbAddMsg: se a chamada
+      // lançasse, o guard "atual.status===_sbPollUltimoStatus" bloqueava TODOS os
+      // ciclos seguintes, deixando o bot travado em silêncio sem nunca postar a cobrança.
+      const entradaNum=parseFloat(atual.entrada)||parseFloat(atual.total)||0;
       _sbPollLinkPagamento=atual.linkPagamento;
-      _sbPollEntradaValor=atual.entrada||atual.total;
-      sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(atual.entrada||atual.total)}:`);
+      _sbPollEntradaValor=entradaNum;
+      sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
+      // Só marca como "já avisado" DEPOIS que a mensagem entrou no DOM — se sbAddMsg
+      // lançar por qualquer razão, o próximo ciclo do poll tenta novamente.
+      _sbPollUltimoStatus=atual.status;
       sbBotoes([
         {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
         {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
