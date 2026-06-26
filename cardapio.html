@@ -280,9 +280,12 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .status-bot-fab.hide{display:none}
 /* Quando "Falar com atendente" abre o Tawk no mesmo canto, o bot desliza pro lado
    em vez de ficar embaixo do widget — ambos visíveis lado a lado (sbAtendente()/
-   Tawk_API.onChatMinimized restauram a posição original ao minimizar). */
-.status-bot-fab.sb-lado{transform:translateX(-64px)}
-.status-bot-fab.sb-lado:hover{transform:translateX(-64px) scale(1.06)}
+   Tawk_API.onChatMinimized restauram a posição original ao minimizar). Distância
+   aumentada (-64px → -92px) porque os dois ícones ficavam quase colados; o Tawk
+   desktop agora tem xOffset/yOffset alinhados aos do nosso FAB (ver customStyle
+   do embed, perto do fim do arquivo) pra ficar exatamente na mesma altura. */
+.status-bot-fab.sb-lado{transform:translateX(-92px)}
+.status-bot-fab.sb-lado:hover{transform:translateX(-92px) scale(1.06)}
 /* Ponto vermelho de "mensagem nova" — aparece quando uma atualização de pedido
    chega via polling enquanto o painel está fechado (sbAvisarNovaMensagem). */
 .status-bot-fab.sb-unread::after{content:'';position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#e63946;border:2px solid var(--surface)}
@@ -313,8 +316,8 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .sb-input-row.sb-hide{display:none}
 @media (max-width:480px){
   .status-bot-fab{right:12px;bottom:78px}
-  .status-bot-fab.sb-lado{transform:translateX(-58px)}
-  .status-bot-fab.sb-lado:hover{transform:translateX(-58px) scale(1.06)}
+  .status-bot-fab.sb-lado{transform:translateX(-76px)}
+  .status-bot-fab.sb-lado:hover{transform:translateX(-76px) scale(1.06)}
   .status-bot-panel{left:8px;right:8px;bottom:62px;width:auto;max-height:min(420px,calc(100vh - 222px))}
 }
 
@@ -3583,8 +3586,11 @@ document.addEventListener('DOMContentLoaded', () => { loadTicker(); mpInit(); sb
 <!--Start of Tawk.to Script-->
 <script type="text/javascript">
 var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-// Evita que o widget fique em cima do botão "Meu Carrinho" no mobile (precisa vir antes do embed)
-Tawk_API.customStyle={visibility:{mobile:{position:'br',xOffset:10,yOffset:90}}};
+// Mobile: evita que o widget fique em cima do botão "Meu Carrinho" (precisa vir antes do embed).
+// Desktop: xOffset/yOffset iguais ao right/bottom do nosso .status-bot-fab (16px/16px), pra que a
+// bolinha do Tawk apareça exatamente na mesma altura do nosso bot quando os dois ficam visíveis
+// lado a lado (sbAtendente() desliza nosso FAB pro lado em vez de empilhar os dois).
+Tawk_API.customStyle={visibility:{desktop:{position:'br',xOffset:16,yOffset:16},mobile:{position:'br',xOffset:10,yOffset:90}}};
 // Esconde a bolha própria do Tawk: o único botão de chat visível na tela é o bot de status (📦).
 // "Falar com atendente" dentro do bot reabre o Tawk via showWidget()+maximize(); ao minimizar, esconde de novo.
 Tawk_API.onLoad=function(){ try{Tawk_API.hideWidget();}catch(_){} };
