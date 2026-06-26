@@ -2166,10 +2166,13 @@ function sbInputSubmit(){
 // Botão clicável em vez de window.open() direto, porque aqui o disparo costuma vir
 // depois de um await (erro de fetch), então não é mais um gesto síncrono do usuário
 // e o navegador pode bloquear um popup automático.
-function sbWhatsappFallback(motivo){
+// 'waUrl' é opcional — quando informado (caso do acompanhamento pós-pedido), o
+// WhatsApp já abre com o resumo do pedido pré-preenchido (padrão antigo, de antes
+// do bot existir), em vez de um chat em branco.
+function sbWhatsappFallback(motivo,waUrl){
   sbAddMsg('bot',`${motivo} Me chama no WhatsApp que resolvo rapidinho. 👇`);
   sbBotoes([
-    {label:'👉 Abrir WhatsApp',onClick:()=>window.open(`https://wa.me/${CONFIG.WHATSAPP}`,'_blank')},
+    {label:'👉 Abrir WhatsApp',onClick:()=>window.open(waUrl||`https://wa.me/${CONFIG.WHATSAPP}`,'_blank')},
   ]);
 }
 
@@ -2237,7 +2240,7 @@ function abrirStatusBotPosPedido(p){
   if(p.msg)sbAddMsg('user',p.msg.replace(/\*/g,''));
   sbAddMsg('bot','Pedido recebido! ✅ Já tô verificando o estoque dos itens com a cozinha. Assim que confirmar, mando o link de pagamento aqui mesmo. 🙂');
   sbBotoes([{label:'💬 Falar com atendente',onClick:()=>sbAtendente()}]);
-  sbIniciarAcompanhamento(_statusBotTel);
+  sbIniciarAcompanhamento(_statusBotTel,p.waUrl);
 }
 
 // ── 2.5 (notas técnicas) — Acompanhamento automático pós-pedido, via polling ──
@@ -2249,12 +2252,18 @@ let _sbPollTimer=null;
 let _sbPollTel=null;
 let _sbPollUltimoStatus=null;
 let _sbPollFalhas=0;
-function sbIniciarAcompanhamento(tel){
+let _sbPollWaUrl=null; // guarda o link wa.me com o resumo do pedido, pro fallback usar
+function sbIniciarAcompanhamento(tel,waUrl){
   sbPararAcompanhamento();
   if(!tel)return;
   _sbPollTel=tel;
   _sbPollUltimoStatus='Aguardando confirmação';
   _sbPollFalhas=0;
+  _sbPollWaUrl=waUrl||null;
+  // 1ª checagem já dispara na hora (em vez de esperar os 12s do 1º tick do
+  // interval) — evita que uma falha transiente bem no começo (ex.: Coda ainda
+  // processando, rede instável) já conte demais antes de dar tempo de tentar de novo.
+  sbChecarStatusPedido();
   _sbPollTimer=setInterval(sbChecarStatusPedido,12000);
 }
 function sbPararAcompanhamento(){
@@ -2300,9 +2309,9 @@ async function sbChecarStatusPedido(){
     }
   }catch(e){
     _sbPollFalhas++;
-    if(_sbPollFalhas>=3){
+    if(_sbPollFalhas>=5){
       sbPararAcompanhamento();
-      sbWhatsappFallback('Tive um probleminha pra acompanhar seu pedido automaticamente.');
+      sbWhatsappFallback('Tive um probleminha pra acompanhar seu pedido automaticamente.',_sbPollWaUrl);
     }
   }
 }
