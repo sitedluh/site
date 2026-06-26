@@ -81,8 +81,8 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 @media(max-width:767px){.auth-btn .auth-label{display:none}}
 .mp-trigger-btn{align-items:center;gap:6px;background:none;border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;font-weight:500;color:rgba(255,255,255,.8);cursor:pointer;transition:all .15s;white-space:nowrap}
 .mp-trigger-btn:hover{border-color:var(--accent);color:var(--accent)}
-#mp-trigger-badge{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:767px){.mp-trigger-btn .mp-trigger-label{display:none}#mp-trigger-badge{max-width:90px}}
+#mp-trigger-badge{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:767px){.mp-trigger-btn .mp-trigger-label{display:none}#mp-trigger-badge{max-width:130px}}
 .cart-btn{display:none;align-items:center;gap:6px;background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;white-space:nowrap;transition:background .15s}
 .cart-btn:hover{background:var(--accent-dark)}
 .cart-badge{background:#fff;color:var(--accent);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -283,6 +283,9 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
    Tawk_API.onChatMinimized restauram a posição original ao minimizar). */
 .status-bot-fab.sb-lado{transform:translateX(-64px)}
 .status-bot-fab.sb-lado:hover{transform:translateX(-64px) scale(1.06)}
+/* Ponto vermelho de "mensagem nova" — aparece quando uma atualização de pedido
+   chega via polling enquanto o painel está fechado (sbAvisarNovaMensagem). */
+.status-bot-fab.sb-unread::after{content:'';position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#e63946;border:2px solid var(--surface)}
 .status-bot-panel{position:fixed;right:16px;bottom:90px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(420px,calc(100vh - 250px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
 .status-bot-panel.open{display:flex}
 .status-bot-panel.fullscreen{left:0;right:0;top:0;bottom:0;width:100vw;height:100vh;max-height:100vh;border-radius:0;z-index:650}
@@ -599,10 +602,10 @@ body.checkout-active .cat-mobile{display:none!important}
         <span class="cart-badge" id="cart-badge">0</span>
       </button>
     <div class="header-actions" style="margin-left:auto">
+      <span class="mp-badge" id="mp-trigger-badge" style="display:none"></span>
       <button class="mp-trigger-btn" id="mp-trigger-btn" onclick="mpAbrirModal()" style="display:none">
         📦 <span class="mp-trigger-label">Meus Pedidos</span>
       </button>
-      <span class="mp-badge" id="mp-trigger-badge" style="display:none"></span>
       <button class="auth-btn" id="auth-btn" onclick="handleAuth()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
         <span class="auth-label" id="auth-label">Entrar</span>
@@ -1960,7 +1963,7 @@ async function mpCarregar(){
       }
       if(ultimoToast!==p.status){
         localStorage.setItem(tKey,p.status);
-        showToast(`📦 Pedido atualizado: ${p.status}`);
+        dluhNotificar(`📦 Pedido atualizado: ${p.status}`);
       }
     });
     _mpFirstLoad=false;
@@ -1980,27 +1983,19 @@ const MP_STATUS_CLS={
   'Cancelado':'mp-st-cancelado',
 };
 const MP_PODE_CANCELAR=['Aguardando confirmação','Confirmado — Esperando pagamento','Pago — Em produção'];
-// Rótulo curto pro badge do header (ao lado do botão "Meus Pedidos") — o status
-// completo (ex. "Confirmado — Esperando pagamento") não cabe num espaço pequeno.
-const MP_TRIGGER_BADGE_LABEL={
-  'Aguardando confirmação':'Aguardando',
-  'Confirmado — Esperando pagamento':'Aguard. pagamento',
-  'Pago — Em produção':'Em produção',
-  'Entregue — Esperando restante':'Aguard. restante',
-};
-
-// Mostra, ao lado do botão "Meus Pedidos" no header, o status do PRIMEIRO
-// pedido que ainda não chegou a 'Finalizado'/'Cancelado' (pedidos já vêm do
-// worker ordenados do mais recente pro mais antigo) — visão rápida sem abrir
-// o modal. Sem nenhum pedido em andamento, esconde o badge.
+// Mostra, ao lado do botão "Meus Pedidos" no header, o status do ÚLTIMO pedido
+// (pedidos já vêm do worker ordenados do mais recente pro mais antigo) — texto
+// literal "Status: <status>", visão rápida sem abrir o modal.
 function mpRenderTriggerBadge(pedidos){
   const badge=document.getElementById('mp-trigger-badge');
   if(!badge)return;
-  const ativo=(pedidos||[]).find(p=>p.status!=='Finalizado'&&p.status!=='Cancelado');
-  if(!ativo){ badge.style.display='none'; return; }
-  const cls=MP_STATUS_CLS[ativo.status]||'mp-st-aguardando';
+  const ultimo=(pedidos||[])[0];
+  if(!ultimo){ badge.style.display='none'; return; }
+  const cls=MP_STATUS_CLS[ultimo.status]||'mp-st-aguardando';
   badge.className='mp-badge '+cls;
-  badge.textContent=MP_TRIGGER_BADGE_LABEL[ativo.status]||ativo.status;
+  const texto='Status: '+ultimo.status;
+  badge.textContent=texto;
+  badge.title=texto;
   badge.style.display='';
 }
 
@@ -2124,6 +2119,7 @@ function abrirStatusBot(mensagemInicial,fullscreen,semAutoPopular){
   panel.classList.add('open');
   panel.classList.toggle('fullscreen',!!fullscreen);
   document.getElementById('status-bot-fab').classList.add('hide');
+  document.getElementById('status-bot-fab').classList.remove('sb-unread');
   if(!_statusBotTel)_statusBotTel=sbTelSalvo();
   const msgs=document.getElementById('status-bot-msgs');
   if(!msgs.dataset.iniciado){
@@ -2157,6 +2153,21 @@ function sbAddMsg(quem,texto){
   div.textContent=texto;
   msgs.appendChild(div);
   msgs.scrollTop=msgs.scrollHeight;
+  // Enquanto há um pedido sendo acompanhado (_sbPollTel ativo), mantém a sessão salva
+  // a cada mensagem nova — é o que permite a conversa sobreviver a um F5 ou ao X.
+  if(_sbPollTel)sbSalvarSessao();
+  // Avisa o cliente quando chega mensagem de atualização e o painel não está aberto
+  // (toast sempre; notificação do navegador quando a aba está em segundo plano).
+  if(quem==='bot')sbAvisarNovaMensagem(texto);
+}
+// Painel fechado = mensagem chegou em segundo plano (caso típico: polling do
+// acompanhamento pós-pedido) — avisa e marca o FAB com um ponto de "não lida".
+function sbAvisarNovaMensagem(texto){
+  const panel=document.getElementById('status-bot-panel');
+  if(panel&&panel.classList.contains('open'))return; // já está vendo a conversa
+  dluhNotificar('📦 '+texto);
+  const fab=document.getElementById('status-bot-fab');
+  if(fab)fab.classList.add('sb-unread');
 }
 
 // Timeout de inatividade: depois de alguns minutos sem interação, pergunta se
@@ -2307,6 +2318,7 @@ function abrirStatusBotPosPedido(p){
   sbAddMsg('bot','Pedido recebido! ✅ Já tô verificando o estoque dos itens com a cozinha. Assim que confirmar, mando o link de pagamento aqui mesmo. 🙂');
   sbBotoes([{label:'💬 Falar com atendente',onClick:()=>sbAtendente()}]);
   sbIniciarAcompanhamento(_statusBotTel,p.waUrl,p.paiId);
+  sbPedirPermissaoNotificacao();
 }
 
 // ── 2.5 (notas técnicas) — Acompanhamento automático pós-pedido, via polling ──
@@ -2321,6 +2333,75 @@ let _sbPollFalhas=0;
 let _sbPollWaUrl=null; // guarda o link wa.me com o resumo do pedido, pro fallback usar
 let _sbPollPaiId=null; // ID (Coda) do pedido recém-criado — rastreia ESSE pedido específico, não "o mais recente da lista"
 let _sbPollNaoAchou=0; // tentativas seguidas sem achar _sbPollPaiId na listagem (consistência eventual do Coda)
+let _sbPollLinkPagamento=null; // link de cobrança já avisado ao cliente (persistido pra reconstruir o botão "Pagar agora" após reload)
+let _sbPollEntradaValor=null; // valor cobrado já avisado ao cliente (idem)
+
+// ── Persistência da sessão de acompanhamento (localStorage) ──────────
+// Sem isso, um F5 (ou às vezes até fechar/reabrir o painel) zerava _sbPollTimer e todo
+// o estado em memória — o polling parava de rodar e o cliente nunca recebia o aviso de
+// cobrança que o bot ia postar sozinho mais tarde. Persistimos transcript + estado do
+// polling e retomamos tudo no carregamento da página (sbRestaurarSessao, chamado no
+// DOMContentLoaded).
+const SB_SESSAO_KEY='dluh_sb_sessao';
+function sbSalvarSessao(){
+  if(!_sbPollTel)return;
+  try{
+    const msgsEls=document.querySelectorAll('#status-bot-msgs .sb-msg');
+    const mensagens=Array.from(msgsEls).slice(-60).map(el=>({
+      quem:el.classList.contains('user')?'user':'bot',
+      texto:el.textContent,
+    }));
+    localStorage.setItem(SB_SESSAO_KEY,JSON.stringify({
+      tel:_sbPollTel,
+      paiId:_sbPollPaiId,
+      waUrl:_sbPollWaUrl,
+      status:_sbPollUltimoStatus,
+      linkPagamento:_sbPollLinkPagamento,
+      entrada:_sbPollEntradaValor,
+      mensagens,
+    }));
+  }catch(_){}
+}
+function sbLimparSessao(){
+  try{localStorage.removeItem(SB_SESSAO_KEY);}catch(_){}
+  _sbPollTel=null;_sbPollPaiId=null;_sbPollWaUrl=null;_sbPollUltimoStatus=null;_sbPollLinkPagamento=null;_sbPollEntradaValor=null;
+}
+function sbRestaurarSessao(){
+  let sessao=null;
+  try{
+    const saved=localStorage.getItem(SB_SESSAO_KEY);
+    if(saved)sessao=JSON.parse(saved);
+  }catch(_){}
+  if(!sessao||!sessao.tel||!sessao.mensagens||!sessao.mensagens.length)return;
+  // Status terminal — não há mais nada a acompanhar, não vale a pena restaurar.
+  if(['Pago — Em produção','Finalizado','Cancelado'].includes(sessao.status)){sbLimparSessao();return;}
+  const msgs=document.getElementById('status-bot-msgs');
+  if(!msgs)return;
+  _statusBotTel=sessao.tel;
+  msgs.innerHTML='';
+  sessao.mensagens.forEach(m=>sbAddMsg(m.quem,m.texto));
+  msgs.dataset.iniciado='1';
+  if(sessao.status==='Confirmado — Esperando pagamento'&&sessao.linkPagamento){
+    sbBotoes([
+      {label:'💳 Pagar agora',onClick:()=>window.open(sessao.linkPagamento,'_blank')},
+      {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+    ]);
+  }else{
+    sbFimOpcoes();
+  }
+  // Retoma o polling em segundo plano, sem abrir o painel sozinho.
+  _sbPollTel=sessao.tel;
+  _sbPollPaiId=sessao.paiId||null;
+  _sbPollWaUrl=sessao.waUrl||null;
+  _sbPollUltimoStatus=sessao.status||'Aguardando confirmação';
+  _sbPollLinkPagamento=sessao.linkPagamento||null;
+  _sbPollEntradaValor=sessao.entrada||null;
+  _sbPollFalhas=0;
+  _sbPollNaoAchou=0;
+  sbChecarStatusPedido();
+  _sbPollTimer=setInterval(sbChecarStatusPedido,12000);
+}
+
 function sbIniciarAcompanhamento(tel,waUrl,paiId){
   sbPararAcompanhamento();
   if(!tel)return;
@@ -2330,6 +2411,9 @@ function sbIniciarAcompanhamento(tel,waUrl,paiId){
   _sbPollWaUrl=waUrl||null;
   _sbPollPaiId=paiId||null;
   _sbPollNaoAchou=0;
+  _sbPollLinkPagamento=null;
+  _sbPollEntradaValor=null;
+  sbSalvarSessao(); // grava já de início, pra um reload logo após o pedido não perder o resumo
   // 1ª checagem já dispara na hora (em vez de esperar os 12s do 1º tick do
   // interval) — evita que uma falha transiente bem no começo (ex.: Coda ainda
   // processando, rede instável) já conte demais antes de dar tempo de tentar de novo.
@@ -2369,6 +2453,8 @@ async function sbChecarStatusPedido(){
     if(atual.status==='Confirmado — Esperando pagamento'){
       if(!atual.linkPagamento)return; // link ainda sendo gerado — espera o próximo ciclo
       _sbPollUltimoStatus=atual.status;
+      _sbPollLinkPagamento=atual.linkPagamento;
+      _sbPollEntradaValor=atual.entrada||atual.total;
       sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(atual.entrada||atual.total)}:`);
       sbBotoes([
         {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
@@ -2383,6 +2469,7 @@ async function sbChecarStatusPedido(){
         {label:'💬 Falar com a gente',onClick:()=>sbAtendente()},
       ]);
       sbPararAcompanhamento();
+      sbLimparSessao(); // fim do que o acompanhamento automático cobre — não há mais o que persistir
     }else if(atual.status==='Aguardando confirmação'){
       _sbPollUltimoStatus=atual.status;
     }else{
@@ -2393,12 +2480,14 @@ async function sbChecarStatusPedido(){
       sbAddMsg('bot',explicacao?`Atualização do seu pedido: ${explicacao}`:`Status atualizado: ${atual.status}`);
       sbFimOpcoes();
       sbPararAcompanhamento();
+      sbLimparSessao();
     }
   }catch(e){
     _sbPollFalhas++;
     if(_sbPollFalhas>=5){
       sbPararAcompanhamento();
       sbWhatsappFallback('Tive um probleminha pra acompanhar seu pedido automaticamente.',_sbPollWaUrl);
+      sbLimparSessao();
     }
   }
 }
@@ -2630,6 +2719,25 @@ function sbAtendente(){
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+
+// ── Notificações de atualização de pedido (toast sempre + Notification do navegador) ──
+// Unifica os dois pontos que avisam o cliente sobre mudança de status (bot de
+// acompanhamento e painel "Meus Pedidos") — toast sempre aparece; a notificação do
+// navegador só dispara se a aba estiver em segundo plano/sem foco e a permissão já
+// tiver sido concedida (pedida uma única vez, em sbPedirPermissaoNotificacao()).
+function dluhNotificar(texto){
+  showToast(texto);
+  try{
+    if((document.hidden||!document.hasFocus())&&window.Notification&&Notification.permission==='granted'){
+      new Notification("D'Luh Festas",{body:texto});
+    }
+  }catch(_){}
+}
+function sbPedirPermissaoNotificacao(){
+  try{
+    if(window.Notification&&Notification.permission==='default')Notification.requestPermission();
+  }catch(_){}
+}
 
 // SWIPE — desliza lista atual para o lado, nova aparece
 let touchStartX=0,touchStartY=0,touchStartTime=0,isSwiping=false,swipeBlocked=false,nextCat=null;
@@ -3442,7 +3550,7 @@ async function loadTicker() {
   } catch(e) {}
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadTicker(); mpInit(); });
+document.addEventListener('DOMContentLoaded', () => { loadTicker(); mpInit(); sbRestaurarSessao(); });
 
 </script>
 
