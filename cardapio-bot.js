@@ -304,7 +304,14 @@ function sbRestaurarSessao(){
   _sbPollTel=sessao.tel;
   _sbPollPaiId=sessao.paiId||null;
   _sbPollWaUrl=sessao.waUrl||null;
-  _sbPollUltimoStatus=sessao.status||'Aguardando confirmação';
+  // Se o status salvo é 'Confirmado — Esperando pagamento' mas linkPagamento não estava
+  // disponível ainda, restaura _sbPollUltimoStatus como 'Aguardando confirmação' para que
+  // o próximo ciclo do poll detecte a transição e poste a mensagem de pagamento com o
+  // botão. Sem esse ajuste, o guard 'atual.status===_sbPollUltimoStatus' bloquearia todos
+  // os ciclos seguintes em silêncio e o bot nunca enviaria a mensagem.
+  _sbPollUltimoStatus=(sessao.status==='Confirmado — Esperando pagamento'&&!sessao.linkPagamento)
+    ?'Aguardando confirmação'
+    :(sessao.status||'Aguardando confirmação');
   _sbPollLinkPagamento=sessao.linkPagamento||null;
   _sbPollEntradaValor=sessao.entrada||null;
   _sbPollFalhas=0;

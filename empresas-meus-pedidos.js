@@ -10,6 +10,7 @@ let _mpPollTimer=null;
 let _mpFirstLoad=true;
 let _mpUltimosPedidos=[];
 let _mpCancelarIdPedido=null;
+let _mpCancelandoId=null; // ID do pedido cujo cancelamento foi enviado mas o Coda ainda não refletiu — mantém o botão desabilitado até o próximo poll confirmar
 
 function mpUltimoStatusKey(idPedido){return 'dluh_mp_status_'+idPedido;}
 function mpToastKey(idPedido){return 'dluh_mp_toast_'+idPedido;}
@@ -73,6 +74,12 @@ async function mpCarregar(){
     const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(_mpTel)}`);
     const d=await res.json().catch(()=>({}));
     const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    // Limpa o estado de "cancelando" assim que o status do pedido deixar de permitir
+    // cancelamento (Cancelado chegou do Coda) ou o pedido sumiu da listagem.
+    if(_mpCancelandoId){
+      const pd=pedidos.find(p=>p.idPedido===_mpCancelandoId);
+      if(!pd||!MP_PODE_CANCELAR.includes(pd.status)){_mpCancelandoId=null;}
+    }
     pedidos.forEach(p=>{
       const tKey=mpToastKey(p.idPedido);
       const ultimoToast=localStorage.getItem(tKey);
@@ -127,6 +134,10 @@ function mpCardHtml(p){
   const podePagar=!!p.linkPagamento&&(p.status==='Confirmado — Esperando pagamento'||p.status==='Entregue — Esperando restante');
   const valorPagar=p.status==='Entregue — Esperando restante'?p.restante:(p.entrada||p.total);
   const podeCancelar=MP_PODE_CANCELAR.includes(p.status);
+  // Enquanto o POST de cancelamento já foi enviado mas o Coda ainda não refletiu o
+  // novo status, mostra o botão desabilitado ("⏳ Cancelando...") para evitar duplo envio.
+  // _mpCancelandoId é limpo pelo mpCarregar() assim que o status deixar de permitir cancelamento.
+  const estaCancelando=p.idPedido===_mpCancelandoId;
   return `<div class="mp-card" data-idpedido="${esc(p.idPedido)}" onclick="mpMarcarVisto('${esc(p.idPedido)}')">
     <div class="mp-card-top">
       <span class="mp-badge ${cls}">${esc(p.status)}</span>
@@ -137,7 +148,7 @@ function mpCardHtml(p){
     <div class="mp-card-valores">${p.total?`Total: ${fmtBRL(p.total)}`:''}${p.valorPago?` · Pago: ${fmtBRL(p.valorPago)}`:''}${p.restante>0?` · Falta: ${fmtBRL(p.restante)}`:''}</div>
     <div class="mp-card-actions">
       ${podePagar?`<button class="mp-btn-pagar" onclick="event.stopPropagation();window.open('${esc(p.linkPagamento)}','_blank')">💳 Pagar ${fmtBRL(valorPagar)}</button>`:''}
-      ${podeCancelar?`<button class="mp-btn-cancelar" onclick="event.stopPropagation();mpIniciarCancelamento('${esc(p.idPedido)}')">❌ Cancelar</button>`:''}
+      ${estaCancelando?'<button class="mp-btn-cancelar" disabled>⏳ Cancelando...</button>':podeCancelar?`<button class="mp-btn-cancelar" onclick="event.stopPropagation();mpIniciarCancelamento('${esc(p.idPedido)}')">❌ Cancelar</button>`:''}
     </div>
   </div>`;
 }
@@ -216,6 +227,9 @@ async function mpConfirmarCancelamento(){
       return;
     }
     showToast('✅ Pedido cancelado.');
+    // Marca o pedido como "cancelando" ANTES de fechar o modal (que zera _mpCancelarIdPedido),
+    // para que mpCardHtml() mostre "⏳ Cancelando..." enquanto o Coda não confirma o novo status.
+    _mpCancelandoId=_mpCancelarIdPedido;
     mpFecharModalCancelar();
     mpCarregar();
   }catch(e){
