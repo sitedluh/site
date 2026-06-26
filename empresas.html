@@ -2714,6 +2714,13 @@ async function sbDuvidaPrazosConsultar(valor){
 
 // ── 2.4 — Falar com atendente ──
 function sbAtendente(){
+  const h=new Date().getHours();
+  if(h<8||h>=19){
+    sbEsconderInput();
+    sbAddMsg('bot','Nosso atendimento humano funciona das 8h às 19h. Tente novamente nesse horário! 😊');
+    sbFimOpcoes();
+    return;
+  }
   sbEsconderInput();
   try{
     if(window.Tawk_API&&typeof window.Tawk_API.maximize==='function'){
