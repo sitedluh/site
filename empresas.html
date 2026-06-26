@@ -79,10 +79,10 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .auth-btn:hover{border-color:var(--accent);color:var(--accent)}
 .auth-btn img{width:20px;height:20px;border-radius:50%}
 @media(max-width:767px){.auth-btn .auth-label{display:none}}
-.mp-trigger-btn{align-items:center;gap:6px;background:none;border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;font-weight:500;color:rgba(255,255,255,.8);cursor:pointer;transition:all .15s;white-space:nowrap}
+.mp-trigger-btn{position:relative;align-items:center;gap:6px;background:none;border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;font-weight:500;color:rgba(255,255,255,.8);cursor:pointer;transition:all .15s;white-space:nowrap}
 .mp-trigger-btn:hover{border-color:var(--accent);color:var(--accent)}
-#mp-trigger-badge{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:767px){.mp-trigger-btn .mp-trigger-label{display:none}#mp-trigger-badge{max-width:130px}}
+.mp-trigger-btn.mp-unread::after{content:'';position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:#e63946;border:2px solid var(--surface)}
+@media(max-width:767px){.mp-trigger-btn .mp-trigger-label{display:none}}
 .cart-btn{display:none;align-items:center;gap:6px;background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;white-space:nowrap;transition:background .15s}
 .cart-btn:hover{background:var(--accent-dark)}
 .cart-badge{background:#fff;color:var(--accent);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -613,9 +613,8 @@ body.checkout-active .cat-mobile{display:none!important}
         <span class="cart-badge" id="cart-badge">0</span>
       </button>
     <div class="header-actions" style="margin-left:auto">
-      <span class="mp-badge" id="mp-trigger-badge" style="display:none"></span>
       <button class="mp-trigger-btn" id="mp-trigger-btn" onclick="mpAbrirModal()" style="display:none">
-        📦 <span class="mp-trigger-label">Meus Pedidos</span>
+        📦 <span class="mp-trigger-label">Pedidos</span>
       </button>
       <button class="auth-btn" id="auth-btn" onclick="handleAuth()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
@@ -1934,8 +1933,8 @@ function mpInit(){
 }
 
 function mpEsconderBadge(){
-  const badge=document.getElementById('mp-trigger-badge');
-  if(badge)badge.style.display='none';
+  const btn=document.getElementById('mp-trigger-btn');
+  if(btn)btn.classList.remove('mp-unread');
 }
 
 // Abre o modal "Meus Pedidos" (botão no header, ao lado do perfil) — antes
@@ -1943,6 +1942,7 @@ function mpEsconderBadge(){
 function mpAbrirModal(){
   const modal=document.getElementById('mp-modal-pedidos');
   if(!modal)return;
+  document.getElementById('mp-trigger-btn')?.classList.remove('mp-unread');
   if(!window._fbUser){
     document.getElementById('mp-login').style.display='';
     document.getElementById('mp-lista').innerHTML='';
@@ -1996,20 +1996,13 @@ const MP_STATUS_CLS={
   'Cancelado':'mp-st-cancelado',
 };
 const MP_PODE_CANCELAR=['Aguardando confirmação','Confirmado — Esperando pagamento','Pago — Em produção'];
-// Mostra, ao lado do botão "Meus Pedidos" no header, o status do ÚLTIMO pedido
-// (pedidos já vêm do worker ordenados do mais recente pro mais antigo) — texto
-// literal "Status: <status>", visão rápida sem abrir o modal.
+// Acende o ponto vermelho (.mp-unread) no botão "Pedidos" do header quando há
+// algum pedido cujo status ainda não foi marcado como visto pelo cliente (mpMarcarVisto).
 function mpRenderTriggerBadge(pedidos){
-  const badge=document.getElementById('mp-trigger-badge');
-  if(!badge)return;
-  const ultimo=(pedidos||[])[0];
-  if(!ultimo){ badge.style.display='none'; return; }
-  const cls=MP_STATUS_CLS[ultimo.status]||'mp-st-aguardando';
-  badge.className='mp-badge '+cls;
-  const texto='Status: '+ultimo.status;
-  badge.textContent=texto;
-  badge.title=texto;
-  badge.style.display='';
+  const btn=document.getElementById('mp-trigger-btn');
+  if(!btn)return;
+  const temNovo=(pedidos||[]).some(p=>localStorage.getItem(mpUltimoStatusKey(p.idPedido))!==p.status);
+  btn.classList.toggle('mp-unread',temNovo);
 }
 
 function mpRenderLista(pedidos){

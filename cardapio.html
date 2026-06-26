@@ -613,9 +613,8 @@ body.checkout-active .cat-mobile{display:none!important}
         <span class="cart-badge" id="cart-badge">0</span>
       </button>
     <div class="header-actions" style="margin-left:auto">
-      <span class="mp-badge" id="mp-trigger-badge" style="display:none"></span>
       <button class="mp-trigger-btn" id="mp-trigger-btn" onclick="mpAbrirModal()" style="display:none">
-        📦 <span class="mp-trigger-label">Meus Pedidos</span>
+        📦 <span class="mp-trigger-label">Pedidos</span>
       </button>
       <button class="auth-btn" id="auth-btn" onclick="handleAuth()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
@@ -1932,8 +1931,8 @@ function mpInit(){
 }
 
 function mpEsconderBadge(){
-  const badge=document.getElementById('mp-trigger-badge');
-  if(badge)badge.style.display='none';
+  const btn=document.getElementById('mp-trigger-btn');
+  if(btn)btn.classList.remove('mp-unread');
 }
 
 // Abre o modal "Meus Pedidos" (botão no header, ao lado do perfil) — antes
@@ -1941,6 +1940,7 @@ function mpEsconderBadge(){
 function mpAbrirModal(){
   const modal=document.getElementById('mp-modal-pedidos');
   if(!modal)return;
+  document.getElementById('mp-trigger-btn')?.classList.remove('mp-unread');
   if(!window._fbUser){
     document.getElementById('mp-login').style.display='';
     document.getElementById('mp-lista').innerHTML='';
@@ -1994,22 +1994,13 @@ const MP_STATUS_CLS={
   'Cancelado':'mp-st-cancelado',
 };
 const MP_PODE_CANCELAR=['Aguardando confirmação','Confirmado — Esperando pagamento','Pago — Em produção'];
-// Rótulo curto pro badge do header (ao lado do botão "Meus Pedidos") — o status
-// completo (ex. "Confirmado — Esperando pagamento") não cabe num espaço pequeno.
-// Mostra, ao lado do botão "Meus Pedidos" no header, o status do ÚLTIMO pedido
-// (pedidos já vêm do worker ordenados do mais recente pro mais antigo) — texto
-// literal "Status: <status>", visão rápida sem abrir o modal.
+// Acende o ponto vermelho (.mp-unread) no botão "Pedidos" do header quando há
+// algum pedido cujo status ainda não foi marcado como visto pelo cliente (mpMarcarVisto).
 function mpRenderTriggerBadge(pedidos){
-  const badge=document.getElementById('mp-trigger-badge');
-  if(!badge)return;
-  const ultimo=(pedidos||[])[0];
-  if(!ultimo){ badge.style.display='none'; return; }
-  const cls=MP_STATUS_CLS[ultimo.status]||'mp-st-aguardando';
-  badge.className='mp-badge '+cls;
-  const texto='Status: '+ultimo.status;
-  badge.textContent=texto;
-  badge.title=texto;
-  badge.style.display='';
+  const btn=document.getElementById('mp-trigger-btn');
+  if(!btn)return;
+  const temNovo=(pedidos||[]).some(p=>localStorage.getItem(mpUltimoStatusKey(p.idPedido))!==p.status);
+  btn.classList.toggle('mp-unread',temNovo);
 }
 
 function mpRenderLista(pedidos){
