@@ -1675,7 +1675,9 @@ async function _doFinalizar(){
     }).join('\n');
 
     // Guarda os dados montados — usados pela confirmação (e por retry/skip se algo falhar)
-    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items};
+    // 'msg' (resumo formatado p/ WhatsApp) é reaproveitado pelo bot pra postar o mesmo
+    // resumo dentro do próprio chat, ver abrirStatusBotPosPedido() (seção 2.5).
+    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,msg,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items};
 
     // Só passa para o WhatsApp depois que o pedido for registrado no Coda
     await _confirmarESeguirWhats();
@@ -1799,7 +1801,7 @@ function sbTelSalvo(){
   return '';
 }
 
-function abrirStatusBot(mensagemInicial,fullscreen){
+function abrirStatusBot(mensagemInicial,fullscreen,semAutoPopular){
   const panel=document.getElementById('status-bot-panel');
   panel.classList.add('open');
   panel.classList.toggle('fullscreen',!!fullscreen);
@@ -1808,7 +1810,10 @@ function abrirStatusBot(mensagemInicial,fullscreen){
   const msgs=document.getElementById('status-bot-msgs');
   if(!msgs.dataset.iniciado){
     msgs.dataset.iniciado='1';
-    if(mensagemInicial){
+    if(semAutoPopular){
+      // Quem chamou (ex.: acompanhamento pós-pedido, seção 2.5) já vai montar
+      // o conteúdo do chat sozinho — não populamos nada aqui.
+    }else if(mensagemInicial){
       // Aberto logo após um pedido: a mensagem já explica a situação, então só
       // oferece as saídas padrão em vez de repetir o menu principal.
       sbAddMsg('bot',mensagemInicial);
@@ -1931,22 +1936,123 @@ function sbMenuPrincipal(saudacao){
   if(saudacao)sbAddMsg('bot',saudacao);
   sbAddMsg('bot','O que você precisa? 😊');
   sbBotoes([
-    {label:'📦 Status do meu pedido',onClick:()=>{sbStatusPedirTelefone();}},
+    {label:'📦 Status do meu pedido',onClick:()=>{sbExigeLogin(sbStatusPedirTelefone);}},
     {label:'🛒 Fazer um pedido',onClick:()=>{sbNovoPedido();}},
-    {label:'❓ Tirar uma dúvida',onClick:()=>{sbDuvidas();}},
+    {label:'❓ Tirar uma dúvida',onClick:()=>{sbExigeLogin(sbDuvidas);}},
     {label:'💬 Falar com um atendente',onClick:()=>{sbAtendente();}},
   ]);
 }
 
+// ── 2.0.1 — Login obrigatório (Status, Dúvidas e acompanhamento pós-pedido) ──
+// "Fazer um pedido" e "Falar com atendente" continuam abertos, sem login.
+function sbExigeLogin(continuarCom){
+  if(window._fbUser){ continuarCom(); return; }
+  sbEsconderInput();
+  sbAddMsg('bot','Pra te mostrar isso com segurança, preciso te identificar. É rapidinho: entra com sua conta Google. 🔒');
+  sbBotoes([
+    {label:'🔵 Entrar com Google',onClick:()=>sbFazerLogin(continuarCom)},
+    {label:'🔙 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+  ]);
+}
+async function sbFazerLogin(continuarCom){
+  if(!window._fbSignIn){ sbWhatsappFallback('Login indisponível agora.'); return; }
+  try{
+    await window._fbSignIn();
+    continuarCom();
+  }catch(e){
+    sbAddMsg('bot','Sem problema! Essa parte precisa de login. Quer tentar de novo ou falar com a gente?');
+    sbBotoes([
+      {label:'🔵 Entrar com Google',onClick:()=>sbFazerLogin(continuarCom)},
+      {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+      {label:'🔙 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+    ]);
+  }
+}
+
 // Chamado depois que o pedido é registrado no Coda com sucesso (substitui irParaWhatsapp).
+// Seção 2.5: em vez de só explicar a situação, o bot posta o resumo do pedido aqui no
+// próprio chat (mesmo texto que ia pro WhatsApp) e passa a acompanhar o status em tempo
+// real (polling em /status-pedido), avisando sozinho quando o estoque for confirmado
+// (link de pagamento automático) e quando o pagamento cair.
 function abrirStatusBotPosPedido(p){
   fecharPedidoLoading();
   _statusBotTel=p.tel||sbTelSalvo();
   const msgs=document.getElementById('status-bot-msgs');
   if(msgs){msgs.innerHTML='';delete msgs.dataset.iniciado;}
-  const nomeTxt=p.nome?(' '+p.nome.split(' ')[0]):'';
-  const msgInicial=`Oi${nomeTxt}! 🎉 Recebi seu pedido e já registrei aqui.\n\nStatus atual: Aguardando confirmação — nossa equipe confirma o estoque em breve e te avisa por aqui e pelo WhatsApp.\n\nPode voltar a este chat quando quiser (mesmo dias depois) e digitar seu WhatsApp pra ver o status atualizado.`;
-  abrirStatusBot(msgInicial,true);
+  abrirStatusBot(null,true,true);
+  // Resumo do pedido entra no chat como se fosse o cliente mandando (Passo 1) —
+  // textContent não renderiza o *negrito* do WhatsApp, então tiramos os asteriscos.
+  if(p.msg)sbAddMsg('user',p.msg.replace(/\*/g,''));
+  sbAddMsg('bot','Pedido recebido! ✅ Já tô verificando o estoque dos itens com a cozinha. Assim que confirmar, mando o link de pagamento aqui mesmo. 🙂');
+  sbBotoes([{label:'💬 Falar com atendente',onClick:()=>sbAtendente()}]);
+  sbIniciarAcompanhamento(_statusBotTel);
+}
+
+// ── 2.5 (notas técnicas) — Acompanhamento automático pós-pedido, via polling ──
+// Continua rodando em segundo plano mesmo se o cliente fechar o painel (as mensagens
+// ficam guardadas e aparecem quando ele reabrir); para sozinho ao chegar em "Pago — Em
+// produção" (fim do que esta seção cobre) ou depois de falhas seguidas (cai no fallback
+// de WhatsApp, regra transversal #2).
+let _sbPollTimer=null;
+let _sbPollTel=null;
+let _sbPollUltimoStatus=null;
+let _sbPollFalhas=0;
+function sbIniciarAcompanhamento(tel){
+  sbPararAcompanhamento();
+  if(!tel)return;
+  _sbPollTel=tel;
+  _sbPollUltimoStatus='Aguardando confirmação';
+  _sbPollFalhas=0;
+  _sbPollTimer=setInterval(sbChecarStatusPedido,12000);
+}
+function sbPararAcompanhamento(){
+  if(_sbPollTimer){clearInterval(_sbPollTimer);_sbPollTimer=null;}
+}
+async function sbChecarStatusPedido(){
+  if(!_sbPollTel)return;
+  try{
+    const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(_sbPollTel)}`);
+    const d=await res.json().catch(()=>({}));
+    const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    if(!res.ok||!pedidos.length)throw new Error('sem pedido');
+    _sbPollFalhas=0;
+    const atual=pedidos[0]; // mais recente primeiro (worker já ordena assim)
+    if(atual.status===_sbPollUltimoStatus)return;
+    if(atual.status==='Confirmado — Esperando pagamento'){
+      if(!atual.linkPagamento)return; // link ainda sendo gerado — espera o próximo ciclo
+      _sbPollUltimoStatus=atual.status;
+      sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(atual.entrada||atual.total)}:`);
+      sbBotoes([
+        {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
+        {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+      ]);
+      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
+    }else if(atual.status==='Pago — Em produção'){
+      _sbPollUltimoStatus=atual.status;
+      sbAddMsg('bot','Pagamento confirmado! 🎉 Seu pedido está confirmado e já entrou em produção.\nMuito obrigado pela preferência! 💛 Qualquer coisa, é só chamar a gente por aqui.');
+      sbBotoes([
+        {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+        {label:'💬 Falar com a gente',onClick:()=>sbAtendente()},
+      ]);
+      sbPararAcompanhamento();
+    }else if(atual.status==='Aguardando confirmação'){
+      _sbPollUltimoStatus=atual.status;
+    }else{
+      // Foge do que essa seção cobre (ex.: já foi direto pra Entregue/Finalizado) —
+      // avisa com a explicação padrão e encerra o acompanhamento automático.
+      _sbPollUltimoStatus=atual.status;
+      const explicacao=STATUS_BOT_EXPLICACAO[atual.status];
+      sbAddMsg('bot',explicacao?`Atualização do seu pedido: ${explicacao}`:`Status atualizado: ${atual.status}`);
+      sbFimOpcoes();
+      sbPararAcompanhamento();
+    }
+  }catch(e){
+    _sbPollFalhas++;
+    if(_sbPollFalhas>=3){
+      sbPararAcompanhamento();
+      sbWhatsappFallback('Tive um probleminha pra acompanhar seu pedido automaticamente.');
+    }
+  }
 }
 
 // ── 2.1 — Status do pedido ──
