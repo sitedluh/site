@@ -1,0 +1,85 @@
+flowchart TB
+    subgraph CLIENTE["🛍️ Páginas do Cliente"]
+        IDX["index.html<br/>(landing)"]
+        CARD["cardapio.html<br/>(pedido pessoa física)"]
+        EMP["empresas.html<br/>(pedido B2B)"]
+    end
+
+    subgraph CHAT["💬 Chat"]
+        TAWKW["Widget Tawk.to<br/>(atendimento humano)"]
+        BOT["Bot de Status 📦<br/>(chat próprio)"]
+    end
+
+    subgraph INTERNO["🔧 Ferramentas Internas"]
+        ADM["admin.html<br/>(gestão de pedidos)"]
+        PAINEL["painel-pedidos.html<br/>(cozinha/entrega)"]
+    end
+
+    subgraph WORKER["☁️ worker-completo-pronto.js"]
+        R_PROD["/produtos<br/>/recheios<br/>/horarios-disponiveis"]
+        R_NOVO["/novo-pedido"]
+        R_PEND["/pedidos-pendentes"]
+        R_CONF["/confirmar-estoque"]
+        R_COB["/gerar-cobranca<br/>/cobrar-restante"]
+        R_WHP["/webhook-pagamento"]
+        R_ENT["/entrega-confirmada"]
+        R_AT["/atualizar-status"]
+        R_DEL["/apagar-pedido"]
+        R_STA["/status-pedido"]
+        R_TOP["/upload-topper-imagem"]
+        R_TGW["/webhook-telegram"]
+        R_CRI["/criar-pedido<br/>/orcamentos"]
+    end
+
+    subgraph EXT["🌐 Integrações Externas"]
+        CODA[("Coda<br/>Orçamentos / Produtos")]
+        TG["Telegram Bot"]
+        IP["InfinitePay"]
+        GC["Google Calendar"]
+        GD["Google Drive"]
+        WA["WhatsApp wa.me"]
+    end
+
+    IDX -->|GET| R_PROD
+    CARD -->|GET| R_PROD
+    CARD -->|POST| R_NOVO
+    EMP -->|GET| R_PROD
+    EMP -->|POST| R_NOVO
+    ADM -->|GET| R_PEND
+    ADM -->|POST| R_CONF
+    ADM -->|POST| R_AT
+    ADM -->|POST| R_DEL
+    PAINEL -->|"token hardcoded"| CODA
+    PAINEL -->|POST| R_ENT
+
+    IDX --> TAWKW
+    CARD --> TAWKW
+    EMP --> TAWKW
+    CARD -->|"pedido OK"| BOT
+    EMP -->|"pedido OK"| BOT
+    CARD -.->|"erro no Coda"| WA
+    EMP -.->|"erro no Coda"| WA
+
+    BOT -->|"GET ?tel="| R_STA
+    BOT -->|"Falar com atendente"| TAWKW
+    BOT -.->|"Tawk não carregou"| WA
+
+    R_NOVO -->|"'Aguardando confirmação'"| CODA
+    R_NOVO --> TG
+    R_NOVO --> GC
+    R_TOP --> GD
+    R_CONF -->|"'Confirmado — Esperando pagamento'"| CODA
+    R_CONF --> TG
+    R_CONF --> R_COB
+    R_COB --> IP
+    IP -.->|"callback"| R_WHP
+    R_WHP -->|"'Pago — Em produção'"| CODA
+    R_ENT -->|"'Entregue — Esperando restante'"| CODA
+    R_AT -->|"inclui 'Finalizado'"| CODA
+    R_STA -->|"leitura"| CODA
+    R_DEL -->|"delete"| CODA
+    TG -.->|"callback do botão"| R_TGW
+    R_TGW --> CODA
+    R_PEND --> CODA
+    R_PROD --> CODA
+    R_CRI --> CODA

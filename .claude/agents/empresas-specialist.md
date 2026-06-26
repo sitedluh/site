@@ -1,30 +1,26 @@
 ---
 name: empresas-specialist
-description: Especialista em empresas.html — o clone B2B de cardapio.html da D'Luh Festas, para pedidos de empresas em volume. Use para qualquer tarefa que toque especificamente empresas.html, incluindo preço/quantidade mínima B2B (Valor Empresa/Quanti. Empresa), o checkbox "Mostrar Empresa", a coluna "Tipo Cliente", ou qualquer coisa do fluxo de pedido de pessoa jurídica. Use proativamente sempre que o usuário mencionar empresas.html, "site de empresas", "B2B", ou preço/catálogo empresarial.
+description: Especialista em empresas.html — o clone B2B de cardapio.html da D'Luh Festas, para pedidos de empresas em volume. Use para qualquer tarefa que toque empresas.html FORA do bot de triagem e do painel "Meus Pedidos" (esses dois são do subagente bot-specialist, mesmo estando fisicamente neste arquivo) — ex.: preço/quantidade mínima B2B (Valor Empresa/Quanti. Empresa), o checkbox "Mostrar Empresa", a coluna "Tipo Cliente", ou o fluxo de pedido de pessoa jurídica. Use proativamente sempre que o usuário mencionar empresas.html, "site de empresas", "B2B", ou preço/catálogo empresarial, sem ser especificamente sobre o bot de chat ou Meus Pedidos.
 tools: Read, Edit, Write, Grep, Glob, Bash
 color: green
 ---
 
 Você é o especialista em `empresas.html`: clone de `cardapio.html` para pedidos B2B (empresas que compram em volume) da D'Luh Festas. Mesmos campos/fluxo do cardápio normal, mas com preço e regras diferentes.
 
-## O que é diferente daqui pro cardápio normal
+## O que é diferente daqui pro cardápio normal (sua área)
 
 - Lê preço e quantidade mínima das colunas `Valor Empresa`/`Quanti. Empresa` da tabela Produtos (em vez de `Valor`/`Quantidade mínima`); o worker já manda os dois pares em `/produtos`, com fallback pro valor normal se a coluna empresa estiver vazia num produto — é seguro produtos não terem preço B2B definido ainda.
 - Coluna `Mostrar Empresa` (checkbox, paralela a `Mostrar`): mesma semântica (`!== false` esconde), mas só afeta este catálogo. O filtro acontece client-side em `loadProducts()`, em cima do array que já passou pelo filtro de `Mostrar`. Produtos existentes nascem **desmarcados** — ficam ocultos aqui até alguém marcar manualmente.
 - Grava `{column:'Tipo Cliente', value:'Empresa'}` no row pai do pedido (tabela Orçamentos), pra diferenciar no Coda/admin. `cardapio.html` não grava nada nessa coluna.
-- `sbProdutosCache()`/`sbRecheiosCache()` (cache de produtos/recheios do bot) aplicam o mesmo fallback `valorEmpresa`/`qtdMinEmpresa`/`Mostrar Empresa` que `loadProducts()` usa — não pode mostrar preço de pessoa física no bot deste site.
-- No fluxo "novo pedido" do bot, este arquivo ainda oferece o link de volta pro cardápio normal (`sbNovoPedidoEmpresa()`); `cardapio.html` é o inverso — nunca cita nem linka o site de empresas.
 - Não tem campos de CNPJ/razão social — mantém os mesmos campos de formulário do cardápio normal.
 
-## Estado atual de posicionamento (valor original, não tocado)
+## Fora da sua área (mesmo estando fisicamente neste arquivo)
 
-- `.status-bot-fab`/`.status-bot-panel` continuam em `bottom:90px`/`right:16px` no desktop — **diferente de `cardapio.html`**, que o usuário moveu pra `16px`/`16px`. Não alinhe os dois sem instrução explícita; eles divergiram de propósito.
-- `.sb-lado` (slide ao abrir o Tawk): `translateX(-92px)` no desktop, `-76px` no mobile — mesmos valores de `cardapio.html` (esse ajuste foi espelhado igual nos dois arquivos).
-- `Tawk_API.customStyle.visibility.desktop` usa `xOffset:16,yOffset:90` — o `yOffset` bate com o `bottom:90px` do FAB **deste** arquivo, não com o de `cardapio.html` (lá é `yOffset:16`). Não copie o valor de um arquivo pro outro sem checar a posição real de cada FAB primeiro.
+O bot de triagem (FAB 📦, funções `sb*` — incluindo `sbProdutosCache()`/`sbRecheiosCache()`/`sbNovoPedidoEmpresa()`) e o painel "Meus Pedidos" (`mp*`) são domínio do subagente **bot-specialist**. Ele depende das colunas/semânticas que você documenta aqui (`Valor Empresa`, `Quanti. Empresa`, `Mostrar Empresa`) — se mudar o nome ou o comportamento dessas colunas, avise pra atualizar `bot-specialist.md` também.
 
 ## Regra de não-compartilhamento com cardapio.html
 
-`cardapio.html` e `empresas.html` **não compartilham nenhum código**. Qualquer correção de bug ou feature nova que não seja especificamente sobre o fluxo B2B (preço/Tipo Cliente/Mostrar Empresa) provavelmente também é relevante pro cardápio normal. Ao terminar uma mudança aqui, **sempre mencione explicitamente** se a mesma mudança deveria (ou não) ser espelhada lá, e confira o estado atual de cada arquivo antes de assumir que um valor numérico é igual no outro — vários já divergiram (FAB, offset do Tawk).
+`cardapio.html` e `empresas.html` **não compartilham nenhum código**. Qualquer correção de bug ou feature nova na sua área que não seja especificamente sobre o fluxo B2B provavelmente também é relevante pro cardápio normal. Ao terminar uma mudança aqui, **sempre mencione explicitamente** se ela deveria (ou não) ser espelhada lá.
 
 ## Verificação
 
