@@ -46,6 +46,34 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .header-logo-name span{color:var(--accent);font-style:italic}
 .search-section{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px}
 .search-bar-outer{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 14px;transition:border .15s}
+.mp-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin:14px 20px;padding:14px 16px}
+.mp-header{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px}
+.mp-login{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--text2)}
+.mp-login-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif}
+.mp-lista{display:flex;flex-direction:column;gap:10px}
+.mp-vazio{font-size:13px;color:var(--text3)}
+.mp-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;cursor:pointer;transition:border-color .15s}
+.mp-card:hover{border-color:var(--accent)}
+.mp-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.mp-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.mp-st-aguardando{background:#fff3cd;color:#856404}
+.mp-st-confirmado{background:#d1ecf1;color:#0c5460}
+.mp-st-preparo{background:#fde2ff;color:#6a0080}
+.mp-st-entregue{background:#d4edda;color:#155724}
+.mp-st-final{background:#e2e3e5;color:#383d41}
+.mp-st-cancelado{background:#f8d7da;color:#721c24}
+.mp-novo{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;animation:mpPulse 1.6s infinite}
+@keyframes mpPulse{0%,100%{opacity:1}50%{opacity:.55}}
+.mp-card-data{font-size:12px;color:var(--text3);margin-bottom:2px}
+.mp-card-itens{font-size:13px;color:var(--text2);margin-bottom:4px}
+.mp-card-valores{font-size:12px;color:var(--text3);margin-bottom:8px}
+.mp-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.mp-btn-pagar{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.mp-btn-cancelar{background:none;border:1px solid #c0725a;color:#c0725a;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.mp-cancel-erro{color:#c0392b;font-size:13px}
+@media (max-width:480px){
+  .mp-section{margin:10px 14px;padding:12px 12px}
+}
 .search-bar-outer:focus-within{border-color:var(--accent)}
 .search-bar-outer svg{color:var(--text3);flex-shrink:0}
 .search-bar-outer input{background:none;border:none;outline:none;height:42px;font-size:15px;color:var(--text);flex:1;min-width:0}
@@ -248,10 +276,15 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .pl-skip:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ── Bot de Status do Pedido (chat próprio, sem depender do Tawk) ── */
-.status-bot-fab{position:fixed;right:16px;bottom:170px;z-index:590;background:var(--accent);color:#fff;border:none;border-radius:50px;width:54px;height:54px;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,112,58,.4);cursor:pointer;transition:transform .15s}
+.status-bot-fab{position:fixed;right:16px;bottom:90px;z-index:590;background:var(--accent);color:#fff;border:none;border-radius:50px;width:54px;height:54px;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,112,58,.4);cursor:pointer;transition:transform .15s}
 .status-bot-fab:hover{transform:scale(1.06)}
 .status-bot-fab.hide{display:none}
-.status-bot-panel{position:fixed;right:16px;bottom:170px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(420px,calc(100vh - 250px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
+/* Quando "Falar com atendente" abre o Tawk no mesmo canto, o bot desliza pro lado
+   em vez de ficar embaixo do widget — ambos visíveis lado a lado (sbAtendente()/
+   Tawk_API.onChatMinimized restauram a posição original ao minimizar). */
+.status-bot-fab.sb-lado{transform:translateX(-64px)}
+.status-bot-fab.sb-lado:hover{transform:translateX(-64px) scale(1.06)}
+.status-bot-panel{position:fixed;right:16px;bottom:90px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(420px,calc(100vh - 250px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
 .status-bot-panel.open{display:flex}
 .status-bot-panel.fullscreen{left:0;right:0;top:0;bottom:0;width:100vw;height:100vh;max-height:100vh;border-radius:0;z-index:650}
 .status-bot-panel.fullscreen .sb-header{padding:16px 18px;font-size:15px}
@@ -277,8 +310,10 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .sb-btn-opcao:disabled{opacity:.5;cursor:default}
 .sb-input-row.sb-hide{display:none}
 @media (max-width:480px){
-  .status-bot-fab{right:12px;bottom:158px}
-  .status-bot-panel{left:8px;right:8px;bottom:142px;width:auto;max-height:min(420px,calc(100vh - 222px))}
+  .status-bot-fab{right:12px;bottom:78px}
+  .status-bot-fab.sb-lado{transform:translateX(-58px)}
+  .status-bot-fab.sb-lado:hover{transform:translateX(-58px) scale(1.06)}
+  .status-bot-panel{left:8px;right:8px;bottom:62px;width:auto;max-height:min(420px,calc(100vh - 222px))}
 }
 
 
@@ -590,6 +625,30 @@ body.checkout-active .cat-mobile{display:none!important}
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input type="text" id="search-input" placeholder="Buscar produtos, ingredientes..." oninput="handleSearch()">
     <button class="search-clear" id="search-clear" onclick="clearSearch()" style="display:none">✕</button>
+  </div>
+</div>
+
+<!-- MEUS PEDIDOS — painel na home com status, pagamento e cancelamento -->
+<div class="mp-section" id="mp-section" style="display:none">
+  <div class="mp-header">📦 Meus pedidos</div>
+  <div class="mp-login" id="mp-login" style="display:none">
+    <span>Entre com sua conta Google para ver seus pedidos aqui.</span>
+    <button class="mp-login-btn" onclick="mpFazerLogin()">🔵 Entrar com Google</button>
+  </div>
+  <div class="mp-lista" id="mp-lista"></div>
+</div>
+
+<!-- Modal de confirmação de cancelamento (Meus Pedidos) -->
+<div class="modal-overlay" id="mp-modal-cancelar">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Cancelar pedido?</div>
+    </div>
+    <div class="modal-body" id="mp-modal-cancelar-body"></div>
+    <div class="modal-footer">
+      <button class="modal-btn-skip" onclick="mpFecharModalCancelar()">Voltar</button>
+      <button class="modal-btn-next" id="mp-modal-cancelar-confirmar" onclick="mpConfirmarCancelamento()">Confirmar cancelamento</button>
+    </div>
   </div>
 </div>
 
@@ -1803,6 +1862,199 @@ function sbTelSalvo(){
   return '';
 }
 
+// ── MEUS PEDIDOS (painel na home) ──────────────────────────────
+// Mostra os pedidos do cliente (via /status-pedido, mesma rota do bot),
+// com badge de status, aviso quando o status muda, botão de pagamento
+// (sinal ou restante, reaproveitando o link já gerado pelo worker em
+// "Link de Pagamento") e botão de cancelamento (via /cancelar-pedido).
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+let _mpTel='';
+let _mpPollTimer=null;
+let _mpFirstLoad=true;
+let _mpUltimosPedidos=[];
+let _mpCancelarIdPedido=null;
+
+function mpUltimoStatusKey(idPedido){return 'dluh_mp_status_'+idPedido;}
+function mpToastKey(idPedido){return 'dluh_mp_toast_'+idPedido;}
+
+function mpInit(){
+  const tel=sbTelSalvo();
+  const sec=document.getElementById('mp-section');
+  if(!sec)return;
+  if(!tel){
+    sec.style.display='none';
+    if(_mpPollTimer){clearInterval(_mpPollTimer);_mpPollTimer=null;}
+    return;
+  }
+  _mpTel=tel;
+  sec.style.display='';
+  if(!window._fbUser){
+    document.getElementById('mp-login').style.display='';
+    document.getElementById('mp-lista').innerHTML='';
+    if(_mpPollTimer){clearInterval(_mpPollTimer);_mpPollTimer=null;}
+    return;
+  }
+  document.getElementById('mp-login').style.display='none';
+  mpCarregar();
+  if(!_mpPollTimer)_mpPollTimer=setInterval(mpCarregar,45000);
+}
+
+async function mpFazerLogin(){
+  if(!window._fbSignIn)return;
+  try{await window._fbSignIn();mpInit();}catch(_){}
+}
+
+async function mpCarregar(){
+  if(!_mpTel||!window._fbUser)return;
+  try{
+    const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(_mpTel)}`);
+    const d=await res.json().catch(()=>({}));
+    const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    pedidos.forEach(p=>{
+      const tKey=mpToastKey(p.idPedido);
+      const ultimoToast=localStorage.getItem(tKey);
+      if(_mpFirstLoad){
+        localStorage.setItem(tKey,p.status);
+        return;
+      }
+      if(ultimoToast!==p.status){
+        localStorage.setItem(tKey,p.status);
+        showToast(`📦 Pedido atualizado: ${p.status}`);
+      }
+    });
+    _mpFirstLoad=false;
+    mpRenderLista(pedidos);
+  }catch(e){
+    console.warn('Erro ao carregar Meus Pedidos:',e);
+  }
+}
+
+const MP_STATUS_CLS={
+  'Aguardando confirmação':'mp-st-aguardando',
+  'Confirmado — Esperando pagamento':'mp-st-confirmado',
+  'Pago — Em produção':'mp-st-preparo',
+  'Entregue — Esperando restante':'mp-st-entregue',
+  'Finalizado':'mp-st-final',
+  'Cancelado':'mp-st-cancelado',
+};
+const MP_PODE_CANCELAR=['Aguardando confirmação','Confirmado — Esperando pagamento','Pago — Em produção'];
+
+function mpRenderLista(pedidos){
+  _mpUltimosPedidos=pedidos;
+  const el=document.getElementById('mp-lista');
+  if(!el)return;
+  if(!pedidos.length){el.innerHTML='<div class="mp-vazio">Nenhum pedido encontrado com esse número.</div>';return;}
+  el.innerHTML=pedidos.map(mpCardHtml).join('');
+}
+
+function mpCardHtml(p){
+  const cls=MP_STATUS_CLS[p.status]||'mp-st-aguardando';
+  const ultimoVisto=localStorage.getItem(mpUltimoStatusKey(p.idPedido));
+  const mudou=ultimoVisto&&ultimoVisto!==p.status;
+  const itensResumo=(p.itens||[]).slice(0,3).map(i=>`${i.quantidade}x ${i.produto}`).join(', ');
+  const podePagar=!!p.linkPagamento&&(p.status==='Confirmado — Esperando pagamento'||p.status==='Entregue — Esperando restante');
+  const valorPagar=p.status==='Entregue — Esperando restante'?p.restante:(p.entrada||p.total);
+  const podeCancelar=MP_PODE_CANCELAR.includes(p.status);
+  return `<div class="mp-card" data-idpedido="${esc(p.idPedido)}" onclick="mpMarcarVisto('${esc(p.idPedido)}')">
+    <div class="mp-card-top">
+      <span class="mp-badge ${cls}">${esc(p.status)}</span>
+      ${mudou?'<span class="mp-novo">🔔 Atualizado</span>':''}
+    </div>
+    <div class="mp-card-data">${esc(p.data||'')}</div>
+    <div class="mp-card-itens">${esc(itensResumo)}</div>
+    <div class="mp-card-valores">${p.total?`Total: ${fmtBRL(p.total)}`:''}${p.valorPago?` · Pago: ${fmtBRL(p.valorPago)}`:''}${p.restante>0?` · Falta: ${fmtBRL(p.restante)}`:''}</div>
+    <div class="mp-card-actions">
+      ${podePagar?`<button class="mp-btn-pagar" onclick="event.stopPropagation();window.open('${esc(p.linkPagamento)}','_blank')">💳 Pagar ${fmtBRL(valorPagar)}</button>`:''}
+      ${podeCancelar?`<button class="mp-btn-cancelar" onclick="event.stopPropagation();mpIniciarCancelamento('${esc(p.idPedido)}')">❌ Cancelar</button>`:''}
+    </div>
+  </div>`;
+}
+
+function mpMarcarVisto(idPedido){
+  const p=_mpUltimosPedidos.find(x=>x.idPedido===idPedido);
+  if(p)localStorage.setItem(mpUltimoStatusKey(idPedido),p.status);
+  mpRenderLista(_mpUltimosPedidos);
+}
+
+async function mpIniciarCancelamento(idPedido){
+  _mpCancelarIdPedido=idPedido;
+  const modal=document.getElementById('mp-modal-cancelar');
+  const body=document.getElementById('mp-modal-cancelar-body');
+  const btn=document.getElementById('mp-modal-cancelar-confirmar');
+  body.innerHTML='Calculando taxa de cancelamento...';
+  btn.disabled=true;
+  btn.textContent='Confirmar cancelamento';
+  modal.classList.add('open');
+  try{
+    const res=await fetch(`${CONFIG.WORKER_URL}/cancelar-pedido`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pedidoId:idPedido,tel:_mpTel,confirmar:false})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||!d||d.ok!==true){
+      body.innerHTML=`<div class="mp-cancel-erro">${esc((d&&d.error)||'Não foi possível calcular o cancelamento.')}</div>`;
+      btn.disabled=true;
+      return;
+    }
+    const feePct=d.feePct||0;
+    const valorPago=d.valorPago||0;
+    const valorRetido=d.valorRetido||0;
+    const valorReembolso=d.valorReembolso!=null?d.valorReembolso:(valorPago-valorRetido);
+    let html='';
+    if(valorPago<=0){
+      html='<p>Esse pedido ainda não tem pagamento registrado. Pode ser cancelado sem nenhuma taxa.</p>';
+    }else if(feePct<=0){
+      html=`<p>Você está dentro do prazo de cancelamento sem taxa (até 2 dias após a confirmação).</p>
+        <p>Valor pago: <strong>${fmtBRL(valorPago)}</strong> — reembolso integral.</p>`;
+    }else{
+      html=`<p>Esse pedido já passou do prazo sem taxa. Como a entrega está mais próxima, a taxa de cancelamento é de <strong>${feePct}%</strong> sobre o valor pago.</p>
+        <p>Valor pago: ${fmtBRL(valorPago)}<br>Taxa: ${fmtBRL(valorRetido)}<br>Reembolso estimado: <strong>${fmtBRL(valorReembolso)}</strong></p>`;
+    }
+    html+='<p style="margin-top:10px;color:var(--text3);font-size:12px">Essa ação não pode ser desfeita.</p>';
+    body.innerHTML=html;
+    btn.disabled=false;
+  }catch(e){
+    body.innerHTML='<div class="mp-cancel-erro">Erro ao consultar. Tente novamente.</div>';
+    btn.disabled=true;
+  }
+}
+
+function mpFecharModalCancelar(){
+  document.getElementById('mp-modal-cancelar').classList.remove('open');
+  _mpCancelarIdPedido=null;
+}
+
+async function mpConfirmarCancelamento(){
+  if(!_mpCancelarIdPedido)return;
+  const btn=document.getElementById('mp-modal-cancelar-confirmar');
+  btn.disabled=true;
+  btn.textContent='Cancelando...';
+  try{
+    const res=await fetch(`${CONFIG.WORKER_URL}/cancelar-pedido`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pedidoId:_mpCancelarIdPedido,tel:_mpTel,confirmar:true})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||!d||d.ok!==true){
+      showToast((d&&d.error)||'Não foi possível cancelar o pedido.');
+      btn.disabled=false;
+      btn.textContent='Confirmar cancelamento';
+      return;
+    }
+    showToast('✅ Pedido cancelado.');
+    mpFecharModalCancelar();
+    mpCarregar();
+  }catch(e){
+    showToast('Erro ao cancelar. Tente novamente.');
+    btn.disabled=false;
+    btn.textContent='Confirmar cancelamento';
+  }
+}
+// ─────────────────────────────────────────────────────────────
+
 function abrirStatusBot(mensagemInicial,fullscreen,semAutoPopular){
   const panel=document.getElementById('status-bot-panel');
   panel.classList.add('open');
@@ -2064,6 +2316,7 @@ const STATUS_BOT_EXPLICACAO={
   'Pago — Em produção':'a entrada foi paga e seu pedido já está sendo produzido com todo cuidado. 🎂',
   'Entregue — Esperando restante':'seu pedido já foi entregue! Falta só o pagamento do restante pra finalizar.',
   'Finalizado':'esse pedido já foi concluído — pagamento e entrega 100% ok. Obrigada pela confiança! 🩷',
+  'Cancelado':'esse pedido foi cancelado.',
 };
 
 function sbStatusPedirTelefone(){
@@ -2272,6 +2525,10 @@ function sbAtendente(){
       if(typeof window.Tawk_API.showWidget==='function')window.Tawk_API.showWidget();
       window.Tawk_API.maximize();
       fecharStatusBot();
+      // Tawk acabou de assumir o canto inferior direito — desliza o ícone do bot
+      // pro lado em vez de deixar os dois sobrepostos (volta ao normal em onChatMinimized).
+      const fab=document.getElementById('status-bot-fab');
+      if(fab)fab.classList.add('sb-lado');
       return;
     }
   }catch(_){}
@@ -2685,6 +2942,9 @@ function initStatusBar(user) {
 }
 
 // Hook into auth change
+// Nota: window._onAuthChange é reatribuído de novo mais abaixo (seção "AUTH &
+// HISTÓRICO"), o que sobrescreve este wrapper — então o mpInit() do painel
+// "Meus Pedidos" foi colocado direto naquela atribuição final, não aqui.
 const _origOnAuth = window._onAuthChange;
 window._onAuthChange = (user) => {
   if (_origOnAuth) _origOnAuth(user);
@@ -2821,16 +3081,23 @@ document.addEventListener('click', e=>{
 // ── AUTH & HISTÓRICO ──
 window._onAuthChange = function(user) {
   const btn = document.getElementById('auth-btn');
-  if (!btn) return;
-  if (user) {
-    const parts = user.displayName.trim().split(' ');
-    const shortName = parts.length >= 2 ? parts[0] + ' ' + parts[1] : parts[0];
-    btn.innerHTML = `<img src="${user.photoURL}" alt="" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--accent)"> <span class="auth-label">${shortName}</span>`;
-    const fNome = document.getElementById('f-nome');
-    if (fNome && !fNome.value) fNome.value = user.displayName;
-  } else {
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="auth-label" id="auth-label">Entrar</span>`;
+  if (btn) {
+    if (user) {
+      const parts = user.displayName.trim().split(' ');
+      const shortName = parts.length >= 2 ? parts[0] + ' ' + parts[1] : parts[0];
+      btn.innerHTML = `<img src="${user.photoURL}" alt="" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--accent)"> <span class="auth-label">${shortName}</span>`;
+      const fNome = document.getElementById('f-nome');
+      if (fNome && !fNome.value) fNome.value = user.displayName;
+    } else {
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="auth-label" id="auth-label">Entrar</span>`;
+    }
   }
+  // Nota: a reatribuição acima de window._onAuthChange sobrescreve o wrapper
+  // definido lá em cima (seção "Hook into auth change" / initStatusBar) — como
+  // esta é a última atribuição no arquivo, é ela que realmente roda quando o
+  // Firebase dispara onAuthStateChanged. Por isso o aviso de "Meus Pedidos"
+  // (mpInit) é chamado direto aqui, não lá em cima.
+  mpInit();
 };
 
 
@@ -3081,7 +3348,7 @@ async function loadTicker() {
   } catch(e) {}
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadTicker(); });
+document.addEventListener('DOMContentLoaded', () => { loadTicker(); mpInit(); });
 
 </script>
 
@@ -3138,7 +3405,11 @@ Tawk_API.customStyle={visibility:{mobile:{position:'br',xOffset:10,yOffset:90}}}
 // Esconde a bolha própria do Tawk: o único botão de chat visível na tela é o bot de status (📦).
 // "Falar com atendente" dentro do bot reabre o Tawk via showWidget()+maximize(); ao minimizar, esconde de novo.
 Tawk_API.onLoad=function(){ try{Tawk_API.hideWidget();}catch(_){} };
-Tawk_API.onChatMinimized=function(){ try{Tawk_API.hideWidget();}catch(_){} };
+Tawk_API.onChatMinimized=function(){
+  try{Tawk_API.hideWidget();}catch(_){}
+  const fab=document.getElementById('status-bot-fab');
+  if(fab)fab.classList.remove('sb-lado');
+};
 (function(){
 var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
 s1.async=true;
