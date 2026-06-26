@@ -1772,6 +1772,7 @@ async function _confirmarESeguirWhats(){
     }finally{ clearTimeout(timeoutId); }
     d=await res.json().catch(()=>({}));
     if(!res.ok||!d||d.ok===false) throw new Error((d&&d.error)?d.error:'Falha ao registrar pedido no Coda');
+    p.paiId=d.paiId||null; // ID (Coda) do pedido recém-criado — usado pra rastrear ESSE pedido no acompanhamento pós-pedido
 
     try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}
 
@@ -2242,7 +2243,7 @@ function abrirStatusBotPosPedido(p){
   if(p.msg)sbAddMsg('user',p.msg.replace(/\*/g,''));
   sbAddMsg('bot','Pedido recebido! ✅ Já tô verificando o estoque dos itens com a cozinha. Assim que confirmar, mando o link de pagamento aqui mesmo. 🙂');
   sbBotoes([{label:'💬 Falar com atendente',onClick:()=>sbAtendente()}]);
-  sbIniciarAcompanhamento(_statusBotTel,p.waUrl);
+  sbIniciarAcompanhamento(_statusBotTel,p.waUrl,p.paiId);
 }
 
 // ── 2.5 (notas técnicas) — Acompanhamento automático pós-pedido, via polling ──
@@ -2255,13 +2256,17 @@ let _sbPollTel=null;
 let _sbPollUltimoStatus=null;
 let _sbPollFalhas=0;
 let _sbPollWaUrl=null; // guarda o link wa.me com o resumo do pedido, pro fallback usar
-function sbIniciarAcompanhamento(tel,waUrl){
+let _sbPollPaiId=null; // ID (Coda) do pedido recém-criado — rastreia ESSE pedido específico, não "o mais recente da lista"
+let _sbPollNaoAchou=0; // tentativas seguidas sem achar _sbPollPaiId na listagem (consistência eventual do Coda)
+function sbIniciarAcompanhamento(tel,waUrl,paiId){
   sbPararAcompanhamento();
   if(!tel)return;
   _sbPollTel=tel;
   _sbPollUltimoStatus='Aguardando confirmação';
   _sbPollFalhas=0;
   _sbPollWaUrl=waUrl||null;
+  _sbPollPaiId=paiId||null;
+  _sbPollNaoAchou=0;
   // 1ª checagem já dispara na hora (em vez de esperar os 12s do 1º tick do
   // interval) — evita que uma falha transiente bem no começo (ex.: Coda ainda
   // processando, rede instável) já conte demais antes de dar tempo de tentar de novo.
@@ -2279,7 +2284,24 @@ async function sbChecarStatusPedido(){
     const pedidos=(d&&d.encontrado&&d.pedidos)||[];
     if(!res.ok||!pedidos.length)throw new Error('sem pedido');
     _sbPollFalhas=0;
-    const atual=pedidos[0]; // mais recente primeiro (worker já ordena assim)
+    // Rastreia o pedido recém-criado PELO ID, não "o primeiro da lista" — logo após o
+    // pedido, o Coda pode ainda não ter atualizado a listagem (consistência eventual) e o
+    // mais recente DISPONÍVEL pode ser, por coincidência, um pedido antigo (até cancelado)
+    // do mesmo telefone — foi exatamente isso que causou o bot avisar status errado.
+    let atual;
+    if(_sbPollPaiId){
+      atual=pedidos.find(pd=>pd.idPedido===_sbPollPaiId);
+      if(!atual){
+        _sbPollNaoAchou++;
+        // Só por segurança: se depois de várias tentativas o pedido específico nunca
+        // aparece (não deveria acontecer), desiste de rastrear por ID e volta pro
+        // critério antigo, pra não ficar travado em silêncio pro resto da sessão.
+        if(_sbPollNaoAchou>=8){ _sbPollPaiId=null; atual=pedidos[0]; }
+        else return;
+      }
+    }else{
+      atual=pedidos[0]; // sem ID pra rastrear — mais recente da lista (worker já ordena assim)
+    }
     if(atual.status===_sbPollUltimoStatus)return;
     if(atual.status==='Confirmado — Esperando pagamento'){
       if(!atual.linkPagamento)return; // link ainda sendo gerado — espera o próximo ciclo
