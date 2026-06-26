@@ -504,6 +504,7 @@ const STATUS_OPTS = [
   'Pago — Em produção',
   'Entregue — Esperando restante',
   'Finalizado',
+  'Cancelado',
 ];
 const STATUS_CLS = {
   'Aguardando confirmação':          'aguardando',
@@ -511,6 +512,7 @@ const STATUS_CLS = {
   'Pago — Em produção':              'preparo',
   'Entregue — Esperando restante':   'saiu',
   'Finalizado':                      'entregue',
+  'Cancelado':                       'cancelado',
 };
 
 // Cada status agora é a sua própria aba de nível superior (igual "Estoque pendente"),
@@ -588,6 +590,7 @@ function statusCardHtml(p,status){
       <div class="sc-nome">${esc(p.cliente||'—')}${p.tipoCliente==='Empresa'?' <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dbeafe;color:#1e40af;vertical-align:middle">🏢 Empresa</span>':''}</div>
       <div class="sc-meta">📱 ${esc(p.telefone||'—')} · <b>${esc(p.entrega||'Retirada')}</b> · <b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
       <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
+      ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <span class="sc-badge ${cls}">${status}</span>
         ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
