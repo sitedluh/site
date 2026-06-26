@@ -1,3 +1,4 @@
 # Worker Cloudflare — contém credenciais, não vai pro Git
 worker-completo-pronto.js
 .wrangler/cache/wrangler-account.json
+.wrangler/
