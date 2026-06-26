@@ -289,6 +289,10 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 /* Ponto vermelho de "mensagem nova" — aparece quando uma atualização de pedido
    chega via polling enquanto o painel está fechado (sbAvisarNovaMensagem). */
 .status-bot-fab.sb-unread::after{content:'';position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#e63946;border:2px solid var(--surface)}
+/* Ponto azul de "mensagem nova do atendente" — aparece quando o Tawk está minimizado e
+   o atendente enviou uma mensagem nova (onUnreadCountChanged com count > 0). Fica depois
+   de sb-unread no CSS, então vence quando os dois pontos seriam exibidos ao mesmo tempo. */
+.status-bot-fab.sb-tawk-unread::after{content:'';position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#1976d2;border:2px solid var(--surface)}
 .status-bot-panel{position:fixed;right:16px;bottom:16px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(420px,calc(100vh - 250px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
 .status-bot-panel.open{display:flex}
 .status-bot-panel.fullscreen{left:0;right:0;top:0;bottom:0;width:100vw;height:100vh;max-height:100vh;border-radius:0;z-index:650}
@@ -1872,6 +1876,8 @@ function setPedidoLoadingState(state){
 let _statusBotTel='';
 let _sbEtapa=null; // null | 'telefone' | 'data' — o que o campo de texto livre espera agora
 let _sbInactivityTimer=null;
+let _sbTawkAtivo=false;    // true enquanto uma conversa com atendente foi iniciada via sbAtendente()
+let _sbTawkMinimizado=false; // true quando o Tawk está ativo mas o widget foi minimizado/ocultado
 
 function sbTelSalvo(){
   try{
@@ -2118,6 +2124,10 @@ async function mpConfirmarCancelamento(){
 // ─────────────────────────────────────────────────────────────
 
 function abrirStatusBot(mensagemInicial,fullscreen,semAutoPopular){
+  // Se o cliente já tem uma conversa ativa com o atendente (Tawk minimizado), redireciona
+  // pro Tawk em vez de abrir o painel do bot — exceto quando a chamada é programática
+  // (fullscreen=true, ex.: fluxo pós-pedido), que tem prioridade sobre o Tawk.
+  if(_sbTawkAtivo&&_sbTawkMinimizado&&!fullscreen){sbReabrirAtendente();return;}
   const panel=document.getElementById('status-bot-panel');
   panel.classList.add('open');
   panel.classList.toggle('fullscreen',!!fullscreen);
@@ -2696,10 +2706,24 @@ function sbAtendente(){
       // pro lado em vez de deixar os dois sobrepostos (volta ao normal em onChatMinimized).
       const fab=document.getElementById('status-bot-fab');
       if(fab)fab.classList.add('sb-lado');
+      _sbTawkAtivo=true;_sbTawkMinimizado=false;
       return;
     }
   }catch(_){}
   sbWhatsappFallback('Nosso chat ao vivo está indisponível no momento.');
+}
+// Reabre o widget do Tawk quando a conversa com atendente está ativa mas minimizada.
+// Chamada por abrirStatusBot() quando _sbTawkAtivo && _sbTawkMinimizado.
+function sbReabrirAtendente(){
+  try{
+    if(window.Tawk_API&&typeof window.Tawk_API.maximize==='function'){
+      if(typeof window.Tawk_API.showWidget==='function')window.Tawk_API.showWidget();
+      window.Tawk_API.maximize();
+      const fab=document.getElementById('status-bot-fab');
+      if(fab){fab.classList.add('sb-lado');fab.classList.remove('sb-tawk-unread');}
+      _sbTawkMinimizado=false;
+    }
+  }catch(_){}
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
@@ -3598,6 +3622,34 @@ Tawk_API.onChatMinimized=function(){
   try{Tawk_API.hideWidget();}catch(_){}
   const fab=document.getElementById('status-bot-fab');
   if(fab)fab.classList.remove('sb-lado');
+  // Se a conversa com o atendente ainda está ativa, mantém o FAB no modo "atendente"
+  // (ícone 💬, aria-label atualizado) e sinaliza que o widget está minimizado —
+  // o próximo clique no FAB vai chamar sbReabrirAtendente() em vez de abrir o bot.
+  if(_sbTawkAtivo){
+    _sbTawkMinimizado=true;
+    if(fab){fab.textContent='💬';fab.setAttribute('aria-label','Retomar chat com atendente');}
+  }
+};
+Tawk_API.onChatMaximized=function(){
+  // Usuário reabriu o widget — limpa o indicador de não lida e atualiza o estado.
+  _sbTawkMinimizado=false;
+  const fab=document.getElementById('status-bot-fab');
+  if(fab)fab.classList.remove('sb-tawk-unread');
+};
+Tawk_API.onChatEnded=function(){
+  // Atendente encerrou a conversa — restaura FAB ao estado original.
+  // Não oculta o widget aqui: o cliente pode querer ler a mensagem final;
+  // onChatMinimized vai chamar hideWidget() quando ele fechar.
+  _sbTawkAtivo=false;_sbTawkMinimizado=false;
+  const fab=document.getElementById('status-bot-fab');
+  if(fab){fab.classList.remove('sb-tawk-unread');fab.textContent='📦';fab.setAttribute('aria-label',"Assistente D'Luh");}
+};
+Tawk_API.onUnreadCountChanged=function(count){
+  // Notifica o cliente quando o atendente manda mensagem e o widget está minimizado.
+  if(count<=0||!_sbTawkMinimizado)return;
+  const fab=document.getElementById('status-bot-fab');
+  if(fab)fab.classList.add('sb-tawk-unread');
+  dluhNotificar('💬 Mensagem nova do atendente!');
 };
 (function(){
 var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
