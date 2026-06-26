@@ -46,8 +46,6 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .header-logo-name span{color:var(--accent);font-style:italic}
 .search-section{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px}
 .search-bar-outer{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 14px;transition:border .15s}
-.mp-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin:14px 20px;padding:14px 16px}
-.mp-header{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px}
 .mp-login{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--text2)}
 .mp-login-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif}
 .mp-lista{display:flex;flex-direction:column;gap:10px}
@@ -71,9 +69,6 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .mp-btn-pagar{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .mp-btn-cancelar{background:none;border:1px solid #c0725a;color:#c0725a;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .mp-cancel-erro{color:#c0392b;font-size:13px}
-@media (max-width:480px){
-  .mp-section{margin:10px 14px;padding:12px 12px}
-}
 .search-bar-outer:focus-within{border-color:var(--accent)}
 .search-bar-outer svg{color:var(--text3);flex-shrink:0}
 .search-bar-outer input{background:none;border:none;outline:none;height:42px;font-size:15px;color:var(--text);flex:1;min-width:0}
@@ -84,6 +79,10 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .auth-btn:hover{border-color:var(--accent);color:var(--accent)}
 .auth-btn img{width:20px;height:20px;border-radius:50%}
 @media(max-width:767px){.auth-btn .auth-label{display:none}}
+.mp-trigger-btn{align-items:center;gap:6px;background:none;border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;font-weight:500;color:rgba(255,255,255,.8);cursor:pointer;transition:all .15s;white-space:nowrap}
+.mp-trigger-btn:hover{border-color:var(--accent);color:var(--accent)}
+#mp-trigger-badge{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:767px){.mp-trigger-btn .mp-trigger-label{display:none}#mp-trigger-badge{max-width:90px}}
 .cart-btn{display:none;align-items:center;gap:6px;background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;white-space:nowrap;transition:background .15s}
 .cart-btn:hover{background:var(--accent-dark)}
 .cart-badge{background:#fff;color:var(--accent);border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -599,10 +598,16 @@ body.checkout-active .cat-mobile{display:none!important}
         Carrinho
         <span class="cart-badge" id="cart-badge">0</span>
       </button>
-    <button class="auth-btn" id="auth-btn" onclick="handleAuth()" style="margin-left:auto">
+    <div class="header-actions" style="margin-left:auto">
+      <button class="mp-trigger-btn" id="mp-trigger-btn" onclick="mpAbrirModal()" style="display:none">
+        📦 <span class="mp-trigger-label">Meus Pedidos</span>
+      </button>
+      <span class="mp-badge" id="mp-trigger-badge" style="display:none"></span>
+      <button class="auth-btn" id="auth-btn" onclick="handleAuth()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
         <span class="auth-label" id="auth-label">Entrar</span>
       </button>
+    </div>
   </div>
 </header>
 
@@ -628,14 +633,23 @@ body.checkout-active .cat-mobile{display:none!important}
   </div>
 </div>
 
-<!-- MEUS PEDIDOS — painel na home com status, pagamento e cancelamento -->
-<div class="mp-section" id="mp-section" style="display:none">
-  <div class="mp-header">📦 Meus pedidos</div>
-  <div class="mp-login" id="mp-login" style="display:none">
-    <span>Entre com sua conta Google para ver seus pedidos aqui.</span>
-    <button class="mp-login-btn" onclick="mpFazerLogin()">🔵 Entrar com Google</button>
+<!-- MEUS PEDIDOS — modal aberto pelo botão no header (status, pagamento e cancelamento) -->
+<div class="modal-overlay" id="mp-modal-pedidos">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📦 Meus pedidos</div>
+    </div>
+    <div class="modal-body">
+      <div class="mp-login" id="mp-login" style="display:none">
+        <span>Entre com sua conta Google para ver seus pedidos aqui.</span>
+        <button class="mp-login-btn" onclick="mpFazerLogin()">🔵 Entrar com Google</button>
+      </div>
+      <div class="mp-lista" id="mp-lista"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn-skip" style="flex:1" onclick="mpFecharModal()">Fechar</button>
+    </div>
   </div>
-  <div class="mp-lista" id="mp-lista"></div>
 </div>
 
 <!-- Modal de confirmação de cancelamento (Meus Pedidos) -->
@@ -1881,29 +1895,54 @@ function mpToastKey(idPedido){return 'dluh_mp_toast_'+idPedido;}
 
 function mpInit(){
   const tel=sbTelSalvo();
-  const sec=document.getElementById('mp-section');
-  if(!sec)return;
+  const btn=document.getElementById('mp-trigger-btn');
+  if(!btn)return;
   if(!tel){
-    sec.style.display='none';
+    btn.style.display='none';
+    mpEsconderBadge();
     if(_mpPollTimer){clearInterval(_mpPollTimer);_mpPollTimer=null;}
     return;
   }
   _mpTel=tel;
-  sec.style.display='';
+  btn.style.display='flex';
   if(!window._fbUser){
-    document.getElementById('mp-login').style.display='';
-    document.getElementById('mp-lista').innerHTML='';
+    // Botão aparece (já existe telefone salvo de pedido anterior), mas sem
+    // login ainda não dá pra buscar status — o aviso "Entrar com Google" só
+    // aparece quando o cliente clica no botão e abre o modal (mpAbrirModal).
+    mpEsconderBadge();
     if(_mpPollTimer){clearInterval(_mpPollTimer);_mpPollTimer=null;}
     return;
   }
-  document.getElementById('mp-login').style.display='none';
   mpCarregar();
   if(!_mpPollTimer)_mpPollTimer=setInterval(mpCarregar,45000);
 }
 
+function mpEsconderBadge(){
+  const badge=document.getElementById('mp-trigger-badge');
+  if(badge)badge.style.display='none';
+}
+
+// Abre o modal "Meus Pedidos" (botão no header, ao lado do perfil) — antes
+// esse conteúdo (login ou lista) ficava fixo numa seção na home.
+function mpAbrirModal(){
+  const modal=document.getElementById('mp-modal-pedidos');
+  if(!modal)return;
+  if(!window._fbUser){
+    document.getElementById('mp-login').style.display='';
+    document.getElementById('mp-lista').innerHTML='';
+  }else{
+    document.getElementById('mp-login').style.display='none';
+    mpCarregar(); // atualiza na hora de abrir, não só espera o próximo ciclo do polling de 45s
+  }
+  modal.classList.add('open');
+}
+function mpFecharModal(){
+  document.getElementById('mp-modal-pedidos').classList.remove('open');
+}
+
 async function mpFazerLogin(){
   if(!window._fbSignIn)return;
-  try{await window._fbSignIn();mpInit();}catch(_){}
+  try{await window._fbSignIn();mpInit();mpAbrirModal();}catch(_){}
 }
 
 async function mpCarregar(){
@@ -1926,6 +1965,7 @@ async function mpCarregar(){
     });
     _mpFirstLoad=false;
     mpRenderLista(pedidos);
+    mpRenderTriggerBadge(pedidos);
   }catch(e){
     console.warn('Erro ao carregar Meus Pedidos:',e);
   }
@@ -1940,6 +1980,29 @@ const MP_STATUS_CLS={
   'Cancelado':'mp-st-cancelado',
 };
 const MP_PODE_CANCELAR=['Aguardando confirmação','Confirmado — Esperando pagamento','Pago — Em produção'];
+// Rótulo curto pro badge do header (ao lado do botão "Meus Pedidos") — o status
+// completo (ex. "Confirmado — Esperando pagamento") não cabe num espaço pequeno.
+const MP_TRIGGER_BADGE_LABEL={
+  'Aguardando confirmação':'Aguardando',
+  'Confirmado — Esperando pagamento':'Aguard. pagamento',
+  'Pago — Em produção':'Em produção',
+  'Entregue — Esperando restante':'Aguard. restante',
+};
+
+// Mostra, ao lado do botão "Meus Pedidos" no header, o status do PRIMEIRO
+// pedido que ainda não chegou a 'Finalizado'/'Cancelado' (pedidos já vêm do
+// worker ordenados do mais recente pro mais antigo) — visão rápida sem abrir
+// o modal. Sem nenhum pedido em andamento, esconde o badge.
+function mpRenderTriggerBadge(pedidos){
+  const badge=document.getElementById('mp-trigger-badge');
+  if(!badge)return;
+  const ativo=(pedidos||[]).find(p=>p.status!=='Finalizado'&&p.status!=='Cancelado');
+  if(!ativo){ badge.style.display='none'; return; }
+  const cls=MP_STATUS_CLS[ativo.status]||'mp-st-aguardando';
+  badge.className='mp-badge '+cls;
+  badge.textContent=MP_TRIGGER_BADGE_LABEL[ativo.status]||ativo.status;
+  badge.style.display='';
+}
 
 function mpRenderLista(pedidos){
   _mpUltimosPedidos=pedidos;
