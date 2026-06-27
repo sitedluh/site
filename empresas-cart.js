@@ -161,7 +161,7 @@ function renderProducts(){
     return`<div class="prod-item">
       ${p.imagem?`<img class="produto-img" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px 8px 0 0;display:block;">`:''}
       <div class="prod-item-top">
-        <div class="prod-item-icon">${getIcon(p.tipo)}${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>
+        ${!p.imagem?`<div class="prod-item-icon">${getIcon(p.tipo)}${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`:''}
         <div class="prod-item-body">
           <div class="prod-item-name">${p.nome}</div>
           <div class="prod-item-sub">Mín. ${p.qtdMin} unid. · ${p.tipo}</div>
@@ -183,7 +183,7 @@ function renderProducts(){
     const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
     return`<div class="prod-card">
       ${p.imagem?`<img class="produto-img" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px 8px 0 0;display:block;">`:''}
-      <div class="prod-card-thumb">${getIcon(p.tipo)}${p.qtdMin>1&&qty===0?`<span class="prod-card-badge">Mín. ${p.qtdMin} un.</span>`:''}${qty>0?`<span class="prod-card-badge" style="background:#fff;color:#0f0f0f">${qty} no pedido</span>`:''}</div>
+      <div class="prod-card-thumb">${!p.imagem?getIcon(p.tipo):''}${p.qtdMin>1&&qty===0?`<span class="prod-card-badge">Mín. ${p.qtdMin} un.</span>`:''}${qty>0?`<span class="prod-card-badge" style="background:#fff;color:#0f0f0f">${qty} no pedido</span>`:''}</div>
       <div class="prod-card-body">
         <div class="prod-card-type">${p.tipo}</div>
         <div class="prod-card-name">${p.nome}</div>
