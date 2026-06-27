@@ -112,14 +112,18 @@ function sbBotoes(opcoes){
     btn.onclick=()=>{
       row.remove();
       sbAddMsg('user',op.label);
-      sbResetInatividade();
+      sbResetInatividade(); // só reseta no clique real do usuário, não na renderização
       op.onClick();
     };
     row.appendChild(btn);
   });
   msgs.appendChild(row);
   msgs.scrollTop=msgs.scrollHeight;
-  sbResetInatividade();
+  // NÃO chama sbResetInatividade() aqui — renderizar botões não é atividade do usuário.
+  // Chamar aqui criava um loop infinito: o próprio timer de inatividade disparava
+  // sbMenuPrincipal → sbBotoes → sbResetInatividade → timer reiniciava → e repetia
+  // indefinidamente. O timer só é reiniciado por gestos reais (clique acima, sbInputSubmit)
+  // ou pela abertura do painel (abrirStatusBot).
 }
 function sbLimparBotoes(){
   document.querySelectorAll('#status-bot-msgs .sb-botoes').forEach(el=>el.remove());
