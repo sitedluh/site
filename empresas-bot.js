@@ -384,14 +384,16 @@ async function sbChecarStatusPedido(){
       _sbPollLinkPagamento=atual.linkPagamento;
       _sbPollEntradaValor=entradaNum;
       sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
-      // Só marca como "já avisado" DEPOIS que a mensagem entrou no DOM — se sbAddMsg
+      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
+      // Só marca como "já avisado" DEPOIS que as mensagens entraram no DOM — se sbAddMsg
       // lançar por qualquer razão, o próximo ciclo do poll tenta novamente.
+      // Os botões vêm por último para que sbBotoes() (que chama scrollTop=scrollHeight)
+      // não deixe o botão de pagamento acima da área visível do painel.
       _sbPollUltimoStatus=atual.status;
       sbBotoes([
         {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
         {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
       ]);
-      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
     }else if(atual.status==='Pago — Em produção'){
       _sbPollUltimoStatus=atual.status;
       sbAddMsg('bot','Pagamento confirmado! 🎉 Seu pedido está confirmado e já entrou em produção.\nMuito obrigado pela preferência! 💛 Qualquer coisa, é só chamar a gente por aqui.');
@@ -447,11 +449,11 @@ async function sbAtualizarStatusManual(){
       _sbPollEntradaValor=entradaNum;
       _sbPollUltimoStatus=atual.status;
       sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
+      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
       sbBotoes([
         {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
         {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
       ]);
-      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
       sbSalvarSessao();
     }else if(atual.status==='Pago — Em produção'){
       _sbPollUltimoStatus=atual.status;
@@ -531,6 +533,7 @@ async function sbStatusConsultar(tel){
       ]);
       return;
     }
+    const _sbConsultaMsgs=document.getElementById('status-bot-msgs');
     pedidosAtivos.forEach(p=>{
       const explicacao=STATUS_BOT_EXPLICACAO[p.status]||'';
       let txt=`Pedido de ${p.data||'data a confirmar'} — status: ${p.status}`;
@@ -541,19 +544,25 @@ async function sbStatusConsultar(tel){
         if(p.restante>0)txt+=` · Falta: ${fmtBRL(p.restante)}`;
       }
       sbAddMsg('bot',txt);
+      // Botão de pagamento fica dentro da própria bolha do pedido — não em
+      // um bloco separado abaixo — para que a associação visual seja imediata.
+      // Usa appendChild direto (não sbBotoes) para que sbLimparBotoes() não
+      // remova esses botões quando os controles de navegação aparecerem depois.
+      if(p.status==='Confirmado — Esperando pagamento'&&p.linkPagamento){
+        const pagarBtn=document.createElement('button');
+        pagarBtn.className='sb-btn-opcao';
+        pagarBtn.style.cssText='margin-top:8px;display:block;width:100%';
+        pagarBtn.textContent='💳 Pagar agora';
+        pagarBtn.onclick=()=>window.open(p.linkPagamento,'_blank');
+        _sbConsultaMsgs.lastElementChild.appendChild(pagarBtn);
+      }
     });
     sbAddMsg('bot','Posso ajudar em mais alguma coisa?');
-    const pagaveis=pedidosAtivos.filter(p=>p.status==='Confirmado — Esperando pagamento'&&p.linkPagamento);
-    const botoesConsulta=[];
-    pagaveis.forEach(p=>{
-      botoesConsulta.push({label:pagaveis.length>1?`💳 Pagar pedido de ${p.data||'data a confirmar'}`:'💳 Pagar agora',onClick:()=>window.open(p.linkPagamento,'_blank')});
-    });
-    botoesConsulta.push(
+    sbBotoes([
       {label:'🛒 Quero fazer um pedido',onClick:()=>sbNovoPedido()},
       {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
       {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
-    );
-    sbBotoes(botoesConsulta);
+    ]);
   }catch(e){
     console.warn('Erro ao consultar status:',e);
     sbWhatsappFallback('Tive um probleminha pra consultar agora.');
