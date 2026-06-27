@@ -59,7 +59,7 @@ async function loadProducts(){
       if(row.nome!==undefined){
         const valorUnit=Number(row.valor)||0;
         const qtdMin=Number(row.qtdMin)||1;
-        return{id:row.id,nome:row.nome||'',ingredientes:row.ingredientes||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.tipo||'Outros',mostrar:true};
+        return{id:row.id,nome:row.nome||'',ingredientes:row.ingredientes||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.tipo||'Outros',mostrar:true,imagem:row.imagem||null};
       }
       const valorUnit=parseBRL(row.values[CONFIG.COLS.valor]);
       const qtdMin=parseInt(row.values[CONFIG.COLS.qtdMin])||1;

@@ -60,7 +60,7 @@ async function loadProducts(){
         const valorUnit=Number(row.valorEmpresa!==undefined?row.valorEmpresa:row.valor)||0;
         const qtdMin=Number(row.qtdMinEmpresa!==undefined?row.qtdMinEmpresa:row.qtdMin)||1;
         const mostrarEmpresa=row.mostrarEmpresa!==undefined?row.mostrarEmpresa:true;
-        return{id:row.id,nome:row.nome||'',ingredientes:row.ingredientes||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.tipo||'Outros',mostrar:true,mostrarEmpresa};
+        return{id:row.id,nome:row.nome||'',ingredientes:row.ingredientes||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.tipo||'Outros',mostrar:true,mostrarEmpresa,imagem:row.imagem||null};
       }
       const valorUnit=parseBRL(row.values[CONFIG.COLS.valor]);
       const qtdMin=parseInt(row.values[CONFIG.COLS.qtdMin])||1;
