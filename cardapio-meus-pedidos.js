@@ -143,7 +143,7 @@ function mpCardHtml(p){
       <span class="mp-badge ${cls}">${esc(p.status)}</span>
       ${mudou?'<span class="mp-novo">🔔 Atualizado</span>':''}
     </div>
-    <div class="mp-card-data">${esc(p.data||'')}</div>
+    <div class="mp-card-data">${esc(p.data?(p.horario?p.data+' às '+p.horario:p.data):'')}</div>
     <div class="mp-card-itens">${esc(itensResumo)}</div>
     <div class="mp-card-valores">${p.total?`Total: ${fmtBRL(p.total)}`:''}${p.valorPago?` · Pago: ${fmtBRL(p.valorPago)}`:''}${p.restante>0?` · Falta: ${fmtBRL(p.restante)}`:''}</div>
     <div class="mp-card-actions">

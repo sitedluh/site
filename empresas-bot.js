@@ -42,6 +42,9 @@ function abrirStatusBot(mensagemInicial,fullscreen,semAutoPopular){
       sbAddMsg('bot',mensagemInicial);
       sbAddMsg('bot','Posso ajudar em mais alguma coisa?');
       sbFimOpcoes();
+    }else if(sbRestaurarHistorico()){
+      // Histórico restaurado do localStorage — sbRestaurarHistorico já populou as
+      // bolhas e adicionou os botões de navegação. Nada mais a fazer aqui.
     }else{
       sbMenuPrincipal('Oi! 👋 Aqui é o assistente da D\'Luh Festas. Pra te ajudar rapidinho, me conta o que você precisa:');
     }
@@ -65,6 +68,9 @@ function sbAddMsg(quem,texto){
   // Enquanto há um pedido sendo acompanhado (_sbPollTel ativo), mantém a sessão salva
   // a cada mensagem nova — é o que permite a conversa sobreviver a um F5 ou ao X.
   if(_sbPollTel)sbSalvarSessao();
+  // Persiste sempre o histórico de mensagens (independente de poll ativo) pra sobreviver
+  // a F5 — restaurado por sbRestaurarHistorico() na próxima abertura do painel.
+  sbSalvarHistorico();
   // Avisa o cliente quando chega mensagem de atualização e o painel não está aberto
   // (toast sempre; notificação do navegador quando a aba está em segundo plano).
   if(quem==='bot')sbAvisarNovaMensagem(texto);
@@ -274,8 +280,50 @@ function sbSalvarSessao(){
     }));
   }catch(_){}
 }
+// ── Persistência do histórico de mensagens (independente do poll ativo) ──────
+// sbSalvarHistorico() é chamada em todo sbAddMsg() — persiste as últimas 40 bolhas
+// no localStorage pra sobreviver a F5 mesmo sem pedido ativo sendo acompanhado.
+// sbRestaurarHistorico() é chamada por abrirStatusBot() antes de mostrar o menu
+// de boas-vindas; se achar mensagens, re-popula o painel e oferece os botões de
+// navegação (sem disparar sbAvisarNovaMensagem para mensagens antigas).
+const SB_HISTORICO_KEY='dluh_sb_historico';
+function sbSalvarHistorico(){
+  try{
+    const msgsEls=document.querySelectorAll('#status-bot-msgs .sb-msg');
+    const mensagens=Array.from(msgsEls).slice(-40).map(el=>({
+      quem:el.classList.contains('user')?'user':'bot',
+      texto:el.textContent,
+    }));
+    localStorage.setItem(SB_HISTORICO_KEY,JSON.stringify(mensagens));
+  }catch(_){}
+}
+function sbLimparHistorico(){
+  try{localStorage.removeItem(SB_HISTORICO_KEY);}catch(_){}
+}
+function sbRestaurarHistorico(){
+  // Popula diretamente (sem sbAddMsg) pra não disparar sbAvisarNovaMensagem
+  // nem re-salvar o historico durante a restauração.
+  try{
+    const saved=localStorage.getItem(SB_HISTORICO_KEY);
+    if(!saved)return false;
+    const mensagens=JSON.parse(saved);
+    if(!Array.isArray(mensagens)||!mensagens.length)return false;
+    const msgs=document.getElementById('status-bot-msgs');
+    if(!msgs)return false;
+    mensagens.forEach(m=>{
+      const div=document.createElement('div');
+      div.className='sb-msg '+m.quem;
+      div.textContent=m.texto;
+      msgs.appendChild(div);
+    });
+    msgs.scrollTop=msgs.scrollHeight;
+    sbFimOpcoes(); // garante botões de navegação sempre disponíveis após restaurar
+    return true;
+  }catch(_){return false;}
+}
 function sbLimparSessao(){
   try{localStorage.removeItem(SB_SESSAO_KEY);}catch(_){}
+  sbLimparHistorico();
   _sbPollTel=null;_sbPollPaiId=null;_sbPollWaUrl=null;_sbPollUltimoStatus=null;_sbPollLinkPagamento=null;_sbPollEntradaValor=null;
 }
 function sbRestaurarSessao(){
@@ -536,7 +584,8 @@ async function sbStatusConsultar(tel){
     const _sbConsultaMsgs=document.getElementById('status-bot-msgs');
     pedidosAtivos.forEach(p=>{
       const explicacao=STATUS_BOT_EXPLICACAO[p.status]||'';
-      let txt=`Pedido de ${p.data||'data a confirmar'} — status: ${p.status}`;
+      const dataHora=p.data?(p.horario?`${p.data} às ${p.horario}`:p.data):'data a confirmar';
+      let txt=`Pedido de ${dataHora} — status: ${p.status}`;
       if(explicacao)txt+=`\n${explicacao}`;
       if(p.itens&&p.itens.length)txt+='\n\nItens: '+p.itens.map(i=>`${i.quantidade}x ${i.produto}`).join(', ');
       if(p.total>0){
