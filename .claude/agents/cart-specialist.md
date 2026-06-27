@@ -20,6 +20,10 @@ Você é o especialista no domínio de catálogo/carrinho da D'Luh Festas. Esse 
 - **Mudança aqui afeta todos os outros domínios** (cart, checkout, bot, meus-pedidos, auth todos dependem de `CONFIG` e/ou desses helpers). `core.js` é idêntico entre `cardapio.html`/`empresas.html` hoje (sem divergência B2B) — se isso deixar de ser verdade, avise os outros especialistas.
 - `core.js` é o único arquivo que **precisa** carregar primeiro no `<script src>` da página — os outros 5 (`cart`, `checkout`, `bot`, `meus-pedidos`, `auth`) só se referenciam de dentro de função/callback (execução adiada), então a ordem relativa entre eles não afeta correção, mas a ordem documentada (core, cart, checkout, bot, meus-pedidos, auth) é mantida por clareza.
 
+## CSS não é dividido por domínio
+
+O `<style>` de cada página foi extraído pra um único arquivo por página (`cardapio.css`/`empresas.css`), não dividido por domínio como o JS — uma mudança visual no catálogo/carrinho (cards de produto, swipe, etc.) pode exigir editar esse CSS também, além do `<page>-cart.js`.
+
 ## Fora da sua área
 
 - Frete/CEP, horários disponíveis, validação final e envio do pedido (`POST /novo-pedido`) são domínio do **checkout-specialist** — mesmo que o carrinho alimente o payload que ele envia.
@@ -37,4 +41,4 @@ Você é o especialista no domínio de catálogo/carrinho da D'Luh Festas. Esse 
 
 ## Deploy
 
-Mudanças neste domínio costumam tocar `cardapio-cart.js`/`empresas-cart.js`/`cardapio-core.js`/`empresas-core.js` (lógica) e, se envolverem markup novo (ex.: novo campo no card de produto), também `cardapio.html`/`empresas.html` (a estrutura HTML do catálogo/carrinho continua inline nesses arquivos). Vira produção depois de `git add cardapio.html empresas.html cardapio-cart.js empresas-cart.js cardapio-core.js empresas-core.js && git commit && git push` — comando roda pelo próprio usuário, não por você.
+Mudanças neste domínio costumam tocar `cardapio-cart.js`/`empresas-cart.js`/`cardapio-core.js`/`empresas-core.js` (lógica) e, se envolverem markup novo (ex.: novo campo no card de produto) ou estilo novo, também `cardapio.html`/`empresas.html` (markup, continua inline) e `cardapio.css`/`empresas.css` (estilo, não dividido por domínio — ver nota acima). Vira produção depois de `git add cardapio.html empresas.html cardapio.css empresas.css cardapio-cart.js empresas-cart.js cardapio-core.js empresas-core.js && git commit && git push` — comando roda pelo próprio usuário, não por você.

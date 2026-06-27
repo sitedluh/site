@@ -16,6 +16,10 @@ Você é o especialista no domínio de autenticação da D'Luh Festas: `cardapio
 
 Existe um wrapper mais acima no arquivo que chama `initStatusBar` (código legado de uma barra de status via Firestore, hoje sem uso real) e uma atribuição **final**, na seção "AUTH & HISTÓRICO", que de fato vence — porque sobrescreve a primeira. Qualquer novo hook em mudança de auth (como o `mpInit()` do painel "Meus Pedidos", que já faz isso corretamente) precisa entrar na atribuição **final**, nunca na de cima, senão nunca executa. Isso já causou bug uma vez; não remover a atribuição de cima sem entender que ela é shadow morta — é redundante mas inofensiva enquanto a final continuar por baixo dela.
 
+## CSS não é dividido por domínio
+
+O `<style>` de cada página foi extraído pra um único arquivo por página (`cardapio.css`/`empresas.css`), não dividido por domínio como o JS — uma mudança visual no botão/modal de login pode exigir editar esse CSS também, além do `<page>-auth.js`.
+
 ## Fora da sua área
 
 - O **uso** do gate de login (não a mecânica) em cada fluxo é dos respectivos domínios: `checkout-specialist` (checkout), `bot-specialist` (bot de triagem + Meus Pedidos).
@@ -32,4 +36,4 @@ Existe um wrapper mais acima no arquivo que chama `initStatusBar` (código legad
 
 ## Deploy
 
-Mudanças neste domínio costumam tocar `cardapio-auth.js`/`empresas-auth.js` (lógica) e, se envolverem markup novo (ex.: botão de login novo), também `cardapio.html`/`empresas.html` (a estrutura HTML do botão/modal de login continua inline nesses arquivos). Vira produção depois de `git add cardapio.html empresas.html cardapio-auth.js empresas-auth.js && git commit && git push` — comando roda pelo próprio usuário, não por você.
+Mudanças neste domínio costumam tocar `cardapio-auth.js`/`empresas-auth.js` (lógica) e, se envolverem markup novo (ex.: botão de login novo) ou estilo novo, também `cardapio.html`/`empresas.html` (markup, continua inline) e `cardapio.css`/`empresas.css` (estilo, não dividido por domínio — ver nota acima). Vira produção depois de `git add cardapio.html empresas.html cardapio.css empresas.css cardapio-auth.js empresas-auth.js && git commit && git push` — comando roda pelo próprio usuário, não por você.

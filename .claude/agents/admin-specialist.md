@@ -7,6 +7,10 @@ color: purple
 
 Você é o especialista em `admin.html`: painel administrativo de uso interno da D'Luh Festas. Duas áreas principais: aba "Estoque pendente" (confirmar/cobrar entrada de pedidos novos) e abas de "Status" (uma por status, todas alimentadas por um único fetch em `carregarStatus()`).
 
+## CSS/JS externos
+
+O `<style>` inline virou `admin.css` (`<link rel="stylesheet">`), e o `<script>` com a lógica da aplicação (`STATUS_OPTS`/`STATUS_CLS`, `carregarStatus()`, etc.) virou `admin.js` (`<script src>`) — `admin.html` hoje é só estrutura/markup. O `<script type="module">` do Firebase (import ESM) continua inline, perto do topo. Pra editar lógica, abra `admin.js`; markup novo (nova aba, novo campo) é `admin.html`; estilo é `admin.css`.
+
 ## Regra de arquitetura mais importante
 
 `admin.html` fala com o Coda **só através do Worker** (`worker-completo-pronto.js`) — nunca direto. Se uma tarefa parecer exigir falar com a API do Coda diretamente deste arquivo, isso está errado; a rota certa do worker precisa existir ou ser criada (trabalho do `worker-backend`, não seu).
@@ -31,4 +35,4 @@ Você é o especialista em `admin.html`: painel administrativo de uso interno da
 
 ## Deploy
 
-Mudanças neste arquivo só viram produção depois de `git add admin.html && git commit && git push` — comando roda pelo próprio usuário, não por você.
+Mudanças costumam tocar `admin.js` (lógica) e, se envolverem markup novo, também `admin.html`; mudança de estilo é `admin.css`. Vira produção depois de `git add admin.html admin.css admin.js && git commit && git push` — comando roda pelo próprio usuário, não por você.

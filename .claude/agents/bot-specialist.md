@@ -40,6 +40,10 @@ A bolha própria do Tawk fica **escondida** (`hideWidget()` no `onLoad`/`onChatM
 
 `cardapio.html` e `empresas.html` não compartilham nenhum código — o bot e o Meus Pedidos foram duplicados manualmente nos dois. Toda mudança feita num arquivo precisa ser replicada manualmente no outro, ou justificada explicitamente como divergência intencional (ver seção acima). Ao terminar uma mudança, **sempre diga** se ela deveria ser espelhada no outro arquivo.
 
+## CSS não é dividido por domínio
+
+O `<style>` de cada página foi extraído pra um único arquivo por página (`cardapio.css`/`empresas.css`), não dividido por domínio como o JS — uma mudança visual no FAB/painel/modal do bot ou do painel "Meus Pedidos" pode exigir editar esse CSS também, além do `<page>-bot.js`/`<page>-meus-pedidos.js`.
+
 ## Fronteira com outros especialistas
 
 - O **worker-backend** implementa as rotas que esse bot consome (`/status-pedido`, `/horarios-disponiveis`, `/cancelar-pedido`, `/produtos`, `/recheios`, `/novo-pedido`) — mudança de regra de negócio (taxa de cancelamento, critério de busca por telefone, etc.) é trabalho dele, não seu.
@@ -51,4 +55,4 @@ A bolha própria do Tawk fica **escondida** (`hideWidget()` no `onLoad`/`onChatM
 
 ## Deploy
 
-Mudanças neste domínio costumam tocar `cardapio-bot.js`/`empresas-bot.js`/`cardapio-meus-pedidos.js`/`empresas-meus-pedidos.js` (lógica) e, se a mudança envolver markup novo (ex.: novo botão no painel), também `cardapio.html`/`empresas.html` (a estrutura HTML do FAB/painel/modal continua inline nesses arquivos, só a lógica `sb*`/`mp*` foi extraída). Vira produção depois de `git add cardapio.html empresas.html cardapio-bot.js empresas-bot.js cardapio-meus-pedidos.js empresas-meus-pedidos.js && git commit && git push` — comando roda pelo próprio usuário, não por você.
+Mudanças neste domínio costumam tocar `cardapio-bot.js`/`empresas-bot.js`/`cardapio-meus-pedidos.js`/`empresas-meus-pedidos.js` (lógica) e, se a mudança envolver markup novo (ex.: novo botão no painel) ou estilo novo, também `cardapio.html`/`empresas.html` (markup, continua inline) e `cardapio.css`/`empresas.css` (estilo, não dividido por domínio — ver nota acima). Vira produção depois de `git add cardapio.html empresas.html cardapio.css empresas.css cardapio-bot.js empresas-bot.js cardapio-meus-pedidos.js empresas-meus-pedidos.js && git commit && git push` — comando roda pelo próprio usuário, não por você.

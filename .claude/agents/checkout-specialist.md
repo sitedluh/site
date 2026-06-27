@@ -16,6 +16,10 @@ Você é o especialista no domínio de checkout da D'Luh Festas: `cardapio-check
 - Em `empresas.html`: ao enviar o pedido, grava `{column:'Tipo Cliente', value:'Empresa'}` no row pai (tabela Orçamentos) — `cardapio.html` não grava nada nessa coluna. Não há campos de CNPJ/razão social; mesmo formulário do cardápio normal.
 - `goCheckout()` exige login antes de chegar no checkout — mas a mecânica de login (Firebase/Google, `window._fbUser`/`window._fbSignIn()`) é domínio do **auth-specialist**; aqui você só consome esse gate, não o implementa.
 
+## CSS não é dividido por domínio
+
+O `<style>` de cada página foi extraído pra um único arquivo por página (`cardapio.css`/`empresas.css`), não dividido por domínio como o JS — uma mudança visual no formulário de checkout (campos, frete, horários) pode exigir editar esse CSS também, além do `<page>-checkout.js`.
+
 ## Fora da sua área
 
 - Catálogo/carrinho/recheios/topper (o que alimenta o payload que você envia) são domínio do **cart-specialist**.
@@ -34,4 +38,4 @@ Você é o especialista no domínio de checkout da D'Luh Festas: `cardapio-check
 
 ## Deploy
 
-Mudanças neste domínio costumam tocar `cardapio-checkout.js`/`empresas-checkout.js` (lógica) e, se envolverem markup novo (ex.: novo campo no formulário de entrega), também `cardapio.html`/`empresas.html` (a estrutura HTML do formulário continua inline nesses arquivos). Vira produção depois de `git add cardapio.html empresas.html cardapio-checkout.js empresas-checkout.js && git commit && git push` — comando roda pelo próprio usuário, não por você.
+Mudanças neste domínio costumam tocar `cardapio-checkout.js`/`empresas-checkout.js` (lógica) e, se envolverem markup novo (ex.: novo campo no formulário de entrega) ou estilo novo, também `cardapio.html`/`empresas.html` (markup, continua inline) e `cardapio.css`/`empresas.css` (estilo, não dividido por domínio — ver nota acima). Vira produção depois de `git add cardapio.html empresas.html cardapio.css empresas.css cardapio-checkout.js empresas-checkout.js && git commit && git push` — comando roda pelo próprio usuário, não por você.
