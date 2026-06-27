@@ -510,3 +510,139 @@ body.checkout-active .cat-mobile{display:none!important}
 /* Elementos escondidos na landing */
 .landing-hidden{display:none!important}
 
+/* === CHIPS DE CATEGORIA === */
+#cat-desktop {
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px 8px;
+}
+#cat-desktop::-webkit-scrollbar,
+#cat-mobile-chips::-webkit-scrollbar { display: none; }
+#cat-mobile-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px 8px;
+}
+@media(min-width:768px){
+  #cat-desktop { display: flex; }
+}
+.cat-chip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.cat-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cat-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* === BADGE MAIS PEDIDO === */
+.badge-popular {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
+}
+
+/* === MICRO-ANIMACAO ADICIONAR === */
+@keyframes addPulse {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.13); }
+}
+.qty-plus.adding {
+  animation: addPulse 0.35s ease;
+}
+
+/* === BARRA DE PROGRESSO DO CHECKOUT === */
+#checkout-steps-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 0;
+}
+.cstep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.cstep-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text3);
+  background: var(--surface);
+  transition: all 0.2s;
+}
+.cstep-label {
+  font-size: 10px;
+  color: var(--text3);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.cstep-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin: 0 4px;
+  margin-bottom: 14px;
+  min-width: 20px;
+  max-width: 48px;
+  transition: background 0.2s;
+}
+.cstep.active .cstep-num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.cstep.active .cstep-label {
+  color: var(--accent);
+  font-weight: 700;
+}
+.cstep.done .cstep-num {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cstep.done .cstep-label {
+  color: var(--accent);
+}
+

@@ -34,6 +34,25 @@ function goCheckout(){
   </div>`;
   document.getElementById('catalog-page').classList.add('hidden');
   document.getElementById('checkout-page').classList.add('active');
+  // Injeta/atualiza barra de steps
+  let bar = document.getElementById('checkout-steps-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'checkout-steps-bar';
+    bar.innerHTML = `
+    <div class="cstep" data-step="0"><span class="cstep-num">1</span><span class="cstep-label">Resumo</span></div>
+    <div class="cstep-line"></div>
+    <div class="cstep" data-step="1"><span class="cstep-num">2</span><span class="cstep-label">Dados</span></div>
+    <div class="cstep-line"></div>
+    <div class="cstep" data-step="2"><span class="cstep-num">3</span><span class="cstep-label">Entrega</span></div>
+    <div class="cstep-line"></div>
+    <div class="cstep" data-step="3"><span class="cstep-num">4</span><span class="cstep-label">Pagamento</span></div>
+  `;
+    const checkoutPage = document.getElementById('checkout-page');
+    if (checkoutPage) checkoutPage.insertBefore(bar, checkoutPage.firstChild);
+  }
+  setCheckoutStep(0);
+  initCheckoutStepObserver();
   document.body.classList.add('checkout-active');
   window.scrollTo(0,0);
   // Reseta slider de entrada para 50% e recalcula
@@ -48,6 +67,10 @@ function goCheckout(){
 }
 
 function showCatalog(){
+  if (window._checkoutStepObserver) {
+    window._checkoutStepObserver.disconnect();
+    window._checkoutStepObserver = null;
+  }
   document.getElementById('checkout-page').classList.remove('active');
   document.getElementById('catalog-page').classList.remove('hidden');
   document.body.classList.remove('checkout-active');
@@ -55,6 +78,31 @@ function showCatalog(){
   const profile=document.querySelector('.profile');
   if(profile)profile.style.display='';
   renderDrawer();
+}
+
+function setCheckoutStep(idx) {
+  document.querySelectorAll('.cstep').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+    el.classList.toggle('done', i < idx);
+  });
+}
+
+function initCheckoutStepObserver() {
+  if (window._checkoutStepObserver) window._checkoutStepObserver.disconnect();
+  requestAnimationFrame(() => {
+    const sections = Array.from(document.querySelectorAll('#checkout-page .ck-section'));
+    if (!sections.length) return;
+    window._checkoutStepObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (visible.length) {
+        const idx = sections.indexOf(visible[0].target);
+        if (idx >= 0) setCheckoutStep(idx);
+      }
+    }, { threshold: 0.3 });
+    sections.forEach(el => window._checkoutStepObserver.observe(el));
+  });
 }
 
 // ── BOTÃO VOLTAR DO CELULAR ──
