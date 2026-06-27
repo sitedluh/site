@@ -282,6 +282,8 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 #sb-tawk-fab.visible{display:flex}
 /* Ponto vermelho de mensagem não lida no botão do atendente */
 #sb-tawk-fab.sb-tawk-unread::after{content:'';position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:#e63946;border:2px solid var(--surface)}
+/* Oculta FAB e botão de atendente enquanto o carrinho ou checkout estão abertos (JS adiciona a classe via MutationObserver) */
+.sb-nav-hide{display:none!important}
 .status-bot-panel{position:fixed;right:16px;bottom:16px;z-index:591;width:min(340px,calc(100vw - 32px));max-height:min(420px,calc(100vh - 250px));background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 10px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden}
 .status-bot-panel.open{display:flex}
 .status-bot-panel.fullscreen{left:0;right:0;top:0;bottom:0;width:100vw;height:100vh;max-height:100vh;border-radius:0;z-index:650}

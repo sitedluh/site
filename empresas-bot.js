@@ -227,7 +227,8 @@ function abrirStatusBotPosPedido(p){
   // textContent não renderiza o *negrito* do WhatsApp, então tiramos os asteriscos.
   if(p.msg)sbAddMsg('user',p.msg.replace(/\*/g,''));
   sbAddMsg('bot','Pedido recebido! ✅ Já tô verificando o estoque dos itens com a cozinha. Assim que confirmar, mando o link de pagamento aqui mesmo. 🙂');
-  sbBotoes([{label:'💬 Falar com atendente',onClick:()=>sbAtendente()}]);
+  sbAddMsg('bot','⏳ Seu pedido está sendo verificado pela nossa equipe.');
+  sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
   sbIniciarAcompanhamento(_statusBotTel,p.waUrl,p.paiId);
   sbPedirPermissaoNotificacao();
 }
@@ -297,6 +298,8 @@ function sbRestaurarSessao(){
       {label:'💳 Pagar agora',onClick:()=>window.open(sessao.linkPagamento,'_blank')},
       {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
     ]);
+  }else if(sessao.status==='Aguardando confirmação'||!sessao.status){
+    sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
   }else{
     sbFimOpcoes();
   }
@@ -420,6 +423,59 @@ async function sbChecarStatusPedido(){
   }
 }
 
+// Atualização manual: disparada pelo botão "Atualizar status" no fluxo pós-pedido.
+// Faz uma consulta avulsa ao worker e exibe o estado atual sem alterar o polling automático,
+// exceto quando o status já mudou — nesse caso trata o resultado diretamente para não
+// depender do próximo ciclo de 12s (e evita race condition de dupla-exibição ao resetar
+// _sbPollUltimoStatus e chamar sbChecarStatusPedido de fora).
+async function sbAtualizarStatusManual(){
+  if(!_sbPollTel&&!sbTelSalvo())return;
+  sbLimparBotoes();
+  sbAddMsg('bot','Verificando... ⏳');
+  try{
+    const tel=(_sbPollTel||sbTelSalvo()).replace(/\D/g,'');
+    const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(tel)}`);
+    const d=await res.json().catch(()=>({}));
+    const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    const atual=pedidos.length?((_sbPollPaiId&&pedidos.find(pd=>pd.idPedido===_sbPollPaiId))||pedidos[0]):null;
+    if(!atual||atual.status==='Aguardando confirmação'){
+      sbAddMsg('bot','⏳ Seu pedido ainda está sendo verificado pela nossa equipe. Assim que houver novidade, te aviso aqui!');
+      sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
+    }else if(atual.status==='Confirmado — Esperando pagamento'&&atual.linkPagamento){
+      const entradaNum=parseFloat(atual.entrada)||parseFloat(atual.total)||0;
+      _sbPollLinkPagamento=atual.linkPagamento;
+      _sbPollEntradaValor=entradaNum;
+      _sbPollUltimoStatus=atual.status;
+      sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
+      sbBotoes([
+        {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
+        {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+      ]);
+      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
+      sbSalvarSessao();
+    }else if(atual.status==='Pago — Em produção'){
+      _sbPollUltimoStatus=atual.status;
+      sbAddMsg('bot','Pagamento confirmado! 🎉 Seu pedido está confirmado e já entrou em produção.\nMuito obrigado pela preferência! 💛 Qualquer coisa, é só chamar a gente por aqui.');
+      sbBotoes([
+        {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+        {label:'💬 Falar com a gente',onClick:()=>sbAtendente()},
+      ]);
+      sbPararAcompanhamento();
+      sbLimparSessao();
+    }else{
+      _sbPollUltimoStatus=atual.status;
+      const explicacao=STATUS_BOT_EXPLICACAO[atual.status];
+      sbAddMsg('bot',explicacao?`Atualização do seu pedido: ${explicacao}`:`Status atualizado: ${atual.status}`);
+      sbFimOpcoes();
+      sbPararAcompanhamento();
+      sbLimparSessao();
+    }
+  }catch(e){
+    sbAddMsg('bot','Não consegui verificar agora. Tente novamente em alguns instantes.');
+    sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
+  }
+}
+
 // ── 2.1 — Status do pedido ──
 const STATUS_BOT_EXPLICACAO={
   'Aguardando confirmação':'sua equipe ainda vai confirmar o estoque dos itens. Assim que confirmar, te aviso por aqui e pelo WhatsApp.',
@@ -463,8 +519,11 @@ async function sbStatusConsultar(tel){
     const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(telDigits)}`);
     const d=await res.json().catch(()=>({}));
     const pedidos=(d&&d.encontrado&&d.pedidos)||[];
-    if(!res.ok||!pedidos.length){
-      sbAddMsg('bot','Hmm, não achei nenhum pedido com esse telefone. 🤔 Quer:');
+    const STATUS_INATIVO=['Finalizado','Cancelado'];
+    const pedidosAtivos=pedidos.filter(p=>!STATUS_INATIVO.includes(p.status));
+    if(!res.ok||!pedidosAtivos.length){
+      const semAtivo=res.ok&&pedidos.length&&!pedidosAtivos.length;
+      sbAddMsg('bot',semAtivo?'Não encontrei pedidos ativos com esse número. Pedidos finalizados ou cancelados não aparecem aqui. Quer:':'Hmm, não achei nenhum pedido com esse telefone. 🤔 Quer:');
       sbBotoes([
         {label:'📱 Tentar outro número',onClick:()=>sbStatusPedirTelefoneInput()},
         {label:'🛒 Fazer um pedido',onClick:()=>sbNovoPedido()},
@@ -472,7 +531,7 @@ async function sbStatusConsultar(tel){
       ]);
       return;
     }
-    pedidos.forEach(p=>{
+    pedidosAtivos.forEach(p=>{
       const explicacao=STATUS_BOT_EXPLICACAO[p.status]||'';
       let txt=`Pedido de ${p.data||'data a confirmar'} — status: ${p.status}`;
       if(explicacao)txt+=`\n${explicacao}`;
@@ -484,7 +543,17 @@ async function sbStatusConsultar(tel){
       sbAddMsg('bot',txt);
     });
     sbAddMsg('bot','Posso ajudar em mais alguma coisa?');
-    sbFimOpcoes();
+    const pagaveis=pedidosAtivos.filter(p=>p.status==='Confirmado — Esperando pagamento'&&p.linkPagamento);
+    const botoesConsulta=[];
+    pagaveis.forEach(p=>{
+      botoesConsulta.push({label:pagaveis.length>1?`💳 Pagar pedido de ${p.data||'data a confirmar'}`:'💳 Pagar agora',onClick:()=>window.open(p.linkPagamento,'_blank')});
+    });
+    botoesConsulta.push(
+      {label:'🛒 Quero fazer um pedido',onClick:()=>sbNovoPedido()},
+      {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+      {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+    );
+    sbBotoes(botoesConsulta);
   }catch(e){
     console.warn('Erro ao consultar status:',e);
     sbWhatsappFallback('Tive um probleminha pra consultar agora.');
@@ -684,4 +753,25 @@ function sbPedirPermissaoNotificacao(){
     if(window.Notification&&Notification.permission==='default')Notification.requestPermission();
   }catch(_){}
 }
+
+// ── 4 — Oculta FAB 📦 e botão de atendente enquanto carrinho ou checkout estão abertos ──
+// MutationObserver no #drawer (classe 'open') e #checkout-page (classe 'active').
+// Adiciona .sb-nav-hide (display:none!important definido no CSS) em ambos os elementos;
+// remove quando as duas condições deixam de ser verdadeiras.
+(function sbIniciarObservadorNavegacao(){
+  function _sbAtualizarVisibilidadeFab(){
+    const drawer=document.getElementById('drawer');
+    const checkout=document.getElementById('checkout-page');
+    const ocultar=!!(drawer&&drawer.classList.contains('open'))||(checkout&&checkout.classList.contains('active'));
+    const fab=document.getElementById('status-bot-fab');
+    const tawkFab=document.getElementById('sb-tawk-fab');
+    if(fab)fab.classList.toggle('sb-nav-hide',!!ocultar);
+    if(tawkFab)tawkFab.classList.toggle('sb-nav-hide',!!ocultar);
+  }
+  const obs=new MutationObserver(_sbAtualizarVisibilidadeFab);
+  const drawer=document.getElementById('drawer');
+  const checkout=document.getElementById('checkout-page');
+  if(drawer)obs.observe(drawer,{attributes:true,attributeFilter:['class']});
+  if(checkout)obs.observe(checkout,{attributes:true,attributeFilter:['class']});
+})();
 
