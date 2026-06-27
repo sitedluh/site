@@ -11,6 +11,7 @@
 <meta property="og:url" content="https://sitedluh.github.io/site">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -62,11 +63,33 @@ html,body{height:100%;overflow:hidden}body{font-family:'DM Sans',sans-serif;back
 .ticker-item-price{font-size:14px;color:#f5c89a;font-weight:600}
 </style>
 <link rel="stylesheet" href="animations.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Bakery",
+  "name": "D'Luh Festas",
+  "description": "Brigadeiros, bolos personalizados, salgados artesanais e muito mais. Feitos com amor em Montes Claros.",
+  "url": "https://sitedluh.github.io/site",
+  "image": "https://sitedluh.github.io/site/logo.png",
+  "servesCuisine": ["Confeitaria Artesanal", "Doces", "Salgados"],
+  "priceRange": "$$",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Montes Claros",
+    "addressRegion": "MG",
+    "addressCountry": "BR"
+  },
+  "hasMenu": "https://sitedluh.github.io/site/cardapio.html",
+  "sameAs": [
+    "https://sitedluh.github.io/site"
+  ]
+}
+</script>
 </head>
 <body>
 
 <div class="hero">
-  <img class="hero-img" src="hero.jpg" alt="D'Luh Festas">
+  <img class="hero-img" src="hero.jpg" alt="D'Luh Festas" fetchpriority="high">
   <div class="hero-overlay">
     <div class="hero-content">
       <span class="hero-tag">🎀 Encomendas especiais</span>
