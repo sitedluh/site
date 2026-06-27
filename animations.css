@@ -1,0 +1,258 @@
+/* ════════════════════════════════════════
+   D'LUH ANIMATIONS — moderno e fluido
+   Carregado depois do CSS de cada página.
+════════════════════════════════════════ */
+
+:root {
+  --anim-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --anim-spring: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --anim-dur: 340ms;
+  --anim-fast: 180ms;
+}
+
+/* ── Keyframes ─────────────────────────── */
+@keyframes dluh-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes dluh-fadeInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dluh-slideUp {
+  from { opacity: 0; transform: translateY(22px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dluh-scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes dluh-slideRight {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Scroll reveal ─────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity  var(--anim-dur) var(--anim-ease),
+    transform var(--anim-dur) var(--anim-ease);
+  will-change: opacity, transform;
+}
+.revealed {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ── Modais — fade + slide-up ──────────── */
+.modal-overlay.open {
+  animation: dluh-fadeIn var(--anim-fast) var(--anim-ease) both;
+}
+.modal-overlay.open .modal,
+.modal-overlay.open .login-modal,
+.modal-overlay.open [class*="cancel-modal"],
+.modal-overlay.open [class*="-modal"] {
+  animation: dluh-slideUp var(--anim-dur) var(--anim-spring) both;
+}
+
+/* ── "Meus Pedidos" modal ──────────────── */
+#mp-modal-pedidos.open,
+#mp-modal-cancelar.open {
+  animation: dluh-fadeIn var(--anim-fast) var(--anim-ease) both;
+}
+#mp-modal-pedidos.open > *,
+#mp-modal-cancelar.open > * {
+  animation: dluh-slideUp var(--anim-dur) var(--anim-spring) both;
+}
+
+/* ── Bot panel — slide-up ao abrir ─────── */
+.status-bot-panel.open:not(.fullscreen) {
+  animation: dluh-slideUp var(--anim-dur) var(--anim-spring) both;
+}
+.status-bot-panel.open.fullscreen {
+  animation: dluh-scaleIn var(--anim-dur) var(--anim-ease) both;
+}
+
+/* ── Mensagens do bot — fade sequencial ── */
+.sb-msg {
+  animation: dluh-fadeInUp 220ms var(--anim-ease) both;
+}
+.sb-botoes {
+  animation: dluh-fadeInUp 260ms var(--anim-ease) 60ms both;
+}
+
+/* ── Drawer / carrinho lateral ─────────── */
+.drawer {
+  transition: transform 320ms var(--anim-ease) !important;
+}
+
+/* ── Produto card — hover mais expressivo ─ */
+.prod-card {
+  transition:
+    box-shadow 260ms var(--anim-ease),
+    transform  260ms var(--anim-ease) !important;
+}
+.prod-card:hover {
+  box-shadow: 0 10px 30px rgba(200, 112, 58, 0.15) !important;
+  transform: translateY(-4px) !important;
+}
+.prod-card:active {
+  transform: scale(0.985) translateY(0) !important;
+  transition-duration: 80ms !important;
+}
+
+/* ── Categoria icon-btn ─────────────────── */
+.cat-icon-btn {
+  transition: all 220ms var(--anim-ease) !important;
+}
+.cat-icon-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent, #c8703a);
+  box-shadow: 0 4px 12px rgba(200, 112, 58, 0.12);
+}
+.cat-icon-btn:active {
+  transform: scale(0.94);
+  transition-duration: 80ms !important;
+}
+
+/* ── Indicador de aba ───────────────────── */
+.cat-indicator {
+  transition: left 260ms var(--anim-ease), width 260ms var(--anim-ease) !important;
+}
+
+/* ── Botões primários — feedback tátil ─── */
+.btn-checkout:active,
+.btn-wpp:active,
+.hero-btn:active,
+.mp-btn-pagar:active,
+.btn-confirmar:active,
+.modal-btn-next:active {
+  transform: scale(0.96);
+  transition: transform 80ms;
+}
+
+/* ── FAB carrinho ───────────────────────── */
+.cart-float {
+  transition:
+    transform  200ms var(--anim-spring),
+    box-shadow 200ms var(--anim-ease),
+    opacity    180ms var(--anim-ease) !important;
+}
+.cart-float:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 28px rgba(200, 112, 58, 0.5);
+}
+.cart-float:active {
+  transform: scale(0.94) !important;
+  transition-duration: 80ms !important;
+}
+
+/* ── Recheio buttons ───────────────────── */
+.recheio-btn {
+  transition: all 180ms var(--anim-ease) !important;
+}
+.recheio-btn:hover {
+  border-color: var(--accent, #c8703a);
+  background: var(--accent-light, #f5ede6);
+  transform: translateX(4px);
+}
+
+/* ── Cart qty buttons ──────────────────── */
+.cart-qty-btn {
+  transition: all 160ms var(--anim-spring) !important;
+}
+.cart-qty-btn:hover {
+  transform: scale(1.15);
+}
+.cart-qty-btn:active {
+  transform: scale(0.88);
+}
+
+/* ── Topper option hover ───────────────── */
+.topper-opcao {
+  transition: all 180ms var(--anim-ease) !important;
+}
+.topper-opcao:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ── sb options buttons ────────────────── */
+.sb-btn-opcao {
+  transition: background 160ms var(--anim-ease),
+              color     160ms var(--anim-ease),
+              transform 160ms var(--anim-spring) !important;
+}
+.sb-btn-opcao:hover {
+  transform: scale(1.04);
+}
+.sb-btn-opcao:active {
+  transform: scale(0.96);
+}
+
+/* ── Auth / header buttons ─────────────── */
+.auth-btn, .mp-trigger-btn {
+  transition: all 180ms var(--anim-ease) !important;
+}
+.auth-btn:hover, .mp-trigger-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* ── Hero content (landing) ────────────── */
+.hero-tag {
+  animation: dluh-fadeInUp 380ms var(--anim-ease) 80ms both;
+}
+.hero-title {
+  animation: dluh-fadeInUp 420ms var(--anim-ease) 160ms both;
+}
+.hero-sub {
+  animation: dluh-fadeInUp 420ms var(--anim-ease) 240ms both;
+}
+.hero-btn {
+  animation: dluh-fadeInUp 400ms var(--anim-spring) 320ms both;
+}
+
+/* ── Admin: linhas de pedido ───────────── */
+.ped-row {
+  transition: background 160ms var(--anim-ease) !important;
+}
+
+/* ── Painel pedidos: cards ─────────────── */
+.pp-card, .pedido-card {
+  transition:
+    box-shadow 240ms var(--anim-ease),
+    transform  240ms var(--anim-ease) !important;
+}
+.pp-card:hover, .pedido-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* ── Toast — melhora o ease ───────────── */
+.toast {
+  transition:
+    transform 280ms var(--anim-ease),
+    opacity   280ms var(--anim-ease) !important;
+}
+
+/* ── mp-card hover ─────────────────────── */
+.mp-card {
+  transition:
+    border-color 180ms var(--anim-ease),
+    box-shadow   180ms var(--anim-ease),
+    transform    180ms var(--anim-ease) !important;
+}
+.mp-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(200, 112, 58, 0.1);
+}
+
+/* ── Login modal ───────────────────────── */
+.login-modal {
+  animation: dluh-slideUp var(--anim-dur) var(--anim-spring) both;
+}
