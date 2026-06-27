@@ -160,9 +160,8 @@ function renderProducts(){
     const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
     const recheioInfo=isBolo(p.tipo)&&qty>0?`<div class="prod-item-sub" style="color:#888;margin-top:2px">🎂 ${qty} bolo${qty>1?'s':''} — recheios definidos</div>`:'';
     return`<div class="prod-item">
-      ${p.imagem?`<img class="produto-img" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px 8px 0 0;display:block;">`:''}
       <div class="prod-item-top">
-        ${!p.imagem?`<div class="prod-item-icon">${getIcon(p.tipo)}${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`:''}
+        ${p.imagem?`<div style="position:relative;flex-shrink:0"><img class="produto-img-thumb" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy">${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`:`<div class="prod-item-icon">${getIcon(p.tipo)}${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`}
         <div class="prod-item-body">
           ${p.popular?'<span class="badge-popular">⭐ Mais pedido</span>':''}
           <div class="prod-item-name">${p.nome}</div>
