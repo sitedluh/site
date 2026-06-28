@@ -40,6 +40,7 @@ function clearCart(){
   cart={};
   try{localStorage.removeItem('dluh_cart');}catch(e){}
   renderProducts();
+  renderMaisVendidos();
   renderDrawer();
 }
 
@@ -85,8 +86,8 @@ async function loadProducts(){
       recheios=recList.map(r=>typeof r==='string'?r:(r.nome||r.values?.['Recheios']||r.name||'')).filter(Boolean);
     }
 
-    renderCats();
-    renderCategoryChips();
+    renderFilters();
+    renderMaisVendidos();
     loadCart();
     renderProducts();
     renderDrawer();
@@ -99,31 +100,95 @@ async function loadProducts(){
   }
 }
 
-function renderCats(){
-  // Mobile pills
-  const bar=document.getElementById('cat-bar');
-  let indicator=document.getElementById('cat-indicator');
-  bar.innerHTML=categories.map(cat=>`<button class="cat-pill ${cat===activeCategory?'active':''}" onclick="selectCategory('${cat.replace(/'/g,"\\'")}')">${cat==='Todos'?'Todos':cat}</button>`).join('');
-  if(!indicator){indicator=document.createElement('div');indicator.id='cat-indicator';indicator.className='cat-indicator';}
-  bar.appendChild(indicator);
+function renderFilters(){
+  const bar=document.getElementById('cats-row');
+  if(!bar)return;
+  bar.innerHTML=categories.map(cat=>
+    `<button class="cat-pill2${activeCategory===cat?' active':''}" onclick="selectCategory('${cat.replace(/'/g,"\\'")}'">${cat}</button>`
+  ).join('');
   const active=bar.querySelector('.active');
   if(active)active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
-  setTimeout(()=>positionIndicator(activeCategory),50);
 }
 
-function renderCategoryChips(){
-  const tipos=['Todos',...new Set(allProducts.map(p=>p.tipo).filter(Boolean))];
-  const html=tipos.map(t=>
-    `<button class="cat-chip${activeCategory===t?' active':''}" onclick="setCategoryFilter('${t.replace(/'/g,"\\'")}'">${t}</button>`
-  ).join('');
-  const d=document.getElementById('cat-desktop');
-  const m=document.getElementById('cat-mobile-chips');
-  if(d)d.innerHTML=html;
-  if(m)m.innerHTML=html;
+function renderMaisVendidos(){
+  const popular=allProducts.filter(p=>p.popular);
+  const sec=document.getElementById('mv-section');
+  if(!sec)return;
+  if(!popular.length){sec.style.display='none';return;}
+  sec.style.display='';
+  const strip=document.getElementById('mv-strip');
+  if(!strip)return;
+  strip.innerHTML=popular.map(p=>{
+    const qty=cart[p.id]?.qty||0;
+    return`<div class="mv-card" data-id="${p.id}" onclick="scrollToProduct('${p.id}')">
+      ${p.imagem?`<img class="mv-img" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy">`:`<div class="mv-icon">${getIcon(p.tipo)}</div>`}
+      ${qty>0?`<span class="mv-badge">${qty}</span>`:''}
+      <div class="mv-name">${p.nome}</div>
+      <div class="mv-price">${fmtBRL(p.valor)}</div>
+    </div>`;
+  }).join('');
 }
 
-function setCategoryFilter(tipo){
-  selectCategory(tipo);
+function scrollToProduct(id){
+  if(activeCategory!=='Todos')selectCategory('Todos');
+  setTimeout(()=>{
+    const el=document.getElementById(`add-${id}`)||document.getElementById(`dadd-${id}`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+  },80);
+}
+
+function refreshCardQty(id){
+  const p=allProducts.find(x=>x.id===id);
+  if(!p)return;
+  const qty=cart[id]?.qty||0;
+  const isEmpty=qty===0;
+  // Mobile
+  const mAdd=document.getElementById(`add-${id}`);
+  if(mAdd){
+    mAdd.classList.toggle('empty',isEmpty);
+    const plus=mAdd.querySelector('.qty-plus');
+    if(plus)plus.textContent=isEmpty?'+ Adicionar ao pedido':'+';
+    const inp=mAdd.querySelector('.qty-input');
+    if(inp)inp.value=qty;
+    const item=mAdd.closest('.prod-item');
+    if(item){
+      let badge=item.querySelector('.prod-item-badge');
+      if(qty>0){
+        if(!badge){badge=document.createElement('span');badge.className='prod-item-badge';const wrap=item.querySelector('.produto-img-thumb')?.parentElement||item.querySelector('.prod-item-icon');if(wrap)wrap.appendChild(badge);}
+        badge.textContent=qty;badge.style.display='flex';
+      }else if(badge){badge.style.display='none';}
+    }
+  }
+  // Desktop
+  const dAdd=document.getElementById(`dadd-${id}`);
+  if(dAdd){
+    dAdd.classList.toggle('empty',isEmpty);
+    const plus=dAdd.querySelector('.dc-plus');
+    if(plus)plus.textContent=isEmpty?'+ Adicionar ao pedido':'+';
+    const inp=dAdd.querySelector('.qty-input');
+    if(inp)inp.value=qty;
+    if(!p.imagem){
+      const card=dAdd.closest('.prod-card');
+      if(card){
+        let badge=card.querySelector('.prod-card-badge');
+        if(qty>0){
+          if(!badge){badge=document.createElement('span');badge.className='prod-card-badge';const thumb=card.querySelector('.prod-card-thumb');if(thumb)thumb.appendChild(badge);}
+          badge.textContent=qty+' no pedido';badge.style.background='#fff';badge.style.color='#0f0f0f';badge.style.display='';
+        }else if(badge){
+          if(p.qtdMin>1){badge.textContent=`Mín. ${p.qtdMin} un.`;badge.style.background='';badge.style.color='';}
+          else badge.style.display='none';
+        }
+      }
+    }
+  }
+  // Mais vendidos badge
+  const mvCard=document.querySelector(`.mv-card[data-id="${id}"]`);
+  if(mvCard){
+    let mvBadge=mvCard.querySelector('.mv-badge');
+    if(qty>0){if(!mvBadge){mvBadge=document.createElement('span');mvBadge.className='mv-badge';mvCard.insertBefore(mvBadge,mvCard.firstChild);}mvBadge.textContent=qty;}
+    else if(mvBadge)mvBadge.remove();
+  }
+  renderDrawer();
 }
 
 function positionIndicator(cat,progress,nextCat){
@@ -399,12 +464,12 @@ function changeQty(id,delta){
     if(isBolo(p.tipo)&&recheios.length>0){
       const novasUnidades=[];
       for(let i=oldQty;i<newQty;i++)novasUnidades.push(i);
-      renderProducts();renderDrawer();
+      saveCart();refreshCardQty(id);
       abrirModalRecheios(id,novasUnidades);
       return;
     }
 
-    saveCart();renderProducts();renderDrawer();
+    saveCart();refreshCardQty(id);
     if(navigator.vibrate)navigator.vibrate(50);
     const btn=document.querySelector(`#add-${id} .qty-plus`)||document.querySelector(`#dadd-${id} .qty-plus`);
     if(btn){btn.classList.add('adding');setTimeout(()=>btn.classList.remove('adding'),350);}
@@ -416,7 +481,7 @@ function changeQty(id,delta){
       cart[id].qty=current-1;
       if(isBolo(p.tipo)&&cart[id].recheios)cart[id].recheios.splice(cart[id].qty);
     }
-    saveCart();renderProducts();renderDrawer();
+    saveCart();refreshCardQty(id);
   }
 }
 
@@ -425,29 +490,39 @@ function setQtyInput(id,value,qtdMin){
   const n=parseInt(value,10);
   if(isNaN(n)||n<=0){
     delete cart[id];
+  }else if(n<qtdMin){
+    showToast('Você digitou um valor menor que o mínimo');
+    const curQty=cart[id]?.qty||0;
+    const inp=document.querySelector(`#add-${id} .qty-input`)||document.querySelector(`#dadd-${id} .qty-input`);
+    if(inp)inp.value=curQty>0?curQty:qtdMin;
+    return;
   }else{
-    const newQty=Math.max(n,qtdMin);
-    if(!cart[id])cart[id]={...p,qty:newQty,recheios:[]};
-    else cart[id].qty=newQty;
+    if(!cart[id])cart[id]={...p,qty:n,recheios:[]};
+    else cart[id].qty=n;
   }
-  saveCart();renderProducts();renderDrawer();
+  saveCart();refreshCardQty(id);
 }
 
-function removeItem(id){delete cart[id];renderProducts();renderDrawer();saveCart();}
-function selectCategory(cat){activeCategory=cat;searchQuery='';document.getElementById('search-input').value='';renderCats();renderCategoryChips();renderProducts();}
+function removeItem(id){delete cart[id];refreshCardQty(id);saveCart();}
+function selectCategory(cat){
+  activeCategory=cat;searchQuery='';
+  const si=document.getElementById('search-input');if(si)si.value='';
+  const clr=document.getElementById('search-clear');if(clr)clr.style.display='none';
+  renderFilters();renderProducts();
+}
 function handleSearch(){
   searchQuery=document.getElementById('search-input').value.trim();
   if(searchQuery)activeCategory='Todos';
   const clr=document.getElementById('search-clear');
   if(clr)clr.style.display=searchQuery?'block':'none';
-  renderCats();renderCategoryChips();renderProducts();
+  renderFilters();renderProducts();
 }
 function clearSearch(){
   document.getElementById('search-input').value='';
   searchQuery='';
   const clr=document.getElementById('search-clear');
   if(clr)clr.style.display='none';
-  renderCats();renderProducts();
+  renderFilters();renderProducts();
 }
 function openDrawer(){document.getElementById('drawer').classList.add('open');document.getElementById('overlay').classList.add('open');}
 function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
@@ -488,22 +563,6 @@ function initSwipe(){
     e.preventDefault();
     const t=document.getElementById('prod-list-track');
     if(t)t.style.transform=`translateX(${dx}px)`;
-    // Move indicador e bar
-    if(nextCat){
-      const ratio=Math.min(Math.abs(dx)/wrap.offsetWidth,1);
-      positionIndicator(activeCategory,ratio,nextCat);
-      const bar=document.getElementById('cat-bar');
-      if(bar){
-        const pills=bar.querySelectorAll('.cat-pill');
-        const curIdx=categories.indexOf(activeCategory);
-        const nextIdx=categories.indexOf(nextCat);
-        pills.forEach((p,i)=>{
-          if(i===curIdx)p.style.color=`rgba(31,20,16,${1-ratio*0.6})`;
-          else if(i===nextIdx)p.style.color=`rgba(31,20,16,${0.4+ratio*0.6})`;
-          else p.style.color='';
-        });
-      }
-    }
   },{passive:false});
 
   wrap.addEventListener('touchend',e=>{
@@ -512,8 +571,6 @@ function initSwipe(){
     const dt=Date.now()-touchStartTime;
     const velocity=Math.abs(dx)/dt;
     const t=document.getElementById('prod-list-track');
-    const bar=document.getElementById('cat-bar');
-    if(bar)bar.querySelectorAll('.cat-pill').forEach(p=>p.style.color='');
 
     if(nextCat&&(Math.abs(dx)>60||velocity>0.4)){
       // Anima saída
@@ -531,7 +588,6 @@ function initSwipe(){
         t.style.transition='transform .2s cubic-bezier(.4,0,.2,1)';
         t.style.transform='translateX(0)';
       }
-      positionIndicator(activeCategory);
       nextCat=null;
     }
     isSwiping=false;

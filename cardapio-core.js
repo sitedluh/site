@@ -48,13 +48,13 @@ function verCardapio() {
   const heroBtn = document.querySelector('.hero-btn');
   if (heroBtn) heroBtn.style.display = 'none';
   // Mostra elementos do catálogo
-  ['search-section','cat-desktop','cat-mobile','page-wrap'].forEach(id => {
+  ['search-section','mv-section','cats-row','page-wrap'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('landing-hidden');
   });
   // Rola suavemente para o catálogo
   setTimeout(() => {
-    const cat = document.getElementById('cat-desktop') || document.getElementById('cat-bar');
+    const cat = document.getElementById('cats-row') || document.getElementById('mv-section');
     if (cat) cat.scrollIntoView({behavior:'smooth'});
   }, 100);
 }
