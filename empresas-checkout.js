@@ -14,10 +14,10 @@ function goCheckout(){
   const topperCount=items.filter(i=>topperPorProduto[i.id]?.quero).length;
   const topperExtra=topperCount*20;
   const taxaEntrega=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0);
-  const total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperExtra+taxaEntrega;
+  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperExtra+taxaEntrega;
   document.getElementById('order-review').innerHTML=`<div class="order-review">
     ${items.map(i=>{
-      let linhas=`<div class="order-review-item"><span>${i.nome} · ${i.qty*i.qtdMin} unid.</span><span>${fmtBRL(i.valor*i.qty)}</span></div>`;
+      let linhas=`<div class="order-review-item"><span>${i.nome} · ${i.qty} unid.</span><span>${fmtBRL(i.valorUnit*i.qty)}</span></div>`;
       if(isBolo(i.tipo)&&i.recheios){
         i.recheios.forEach((r,idx)=>{
           linhas+=`<div style="font-size:12px;color:#666;padding:2px 0 2px 12px">Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}</div>`;
@@ -122,7 +122,7 @@ function atualizarEntrada(){
   const items=Object.values(cart).filter(i=>i.qty>0);
   const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
   const taxaFrete=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
-  const total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperBonus+taxaFrete;
+  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
   const slider=document.getElementById('f-entrada-pct');
   const pct=parseInt(slider?.value||50)/100;
   const entrada=Math.round(total*pct*100)/100;
@@ -337,7 +337,7 @@ async function _doFinalizar(){
     const pagamento=getRadio('rg-pgto'),data=document.getElementById('f-data').value,obs=document.getElementById('f-obs').value.trim();
     const topperBonus=Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length*20;
     const taxaFrete=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0);
-    const total=items.reduce((s,i)=>s+i.valor*i.qty,0)+topperBonus+taxaFrete;
+    const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
     const entradaPct=parseInt(document.getElementById('f-entrada-pct')?.value||50)/100;
     const entradaVal=Math.round(total*entradaPct*100)/100;
     const restoVal=Math.round((total-entradaVal)*100)/100;
@@ -348,7 +348,7 @@ async function _doFinalizar(){
     if(data)msg+=`📅 *Data:* ${data.split('-').reverse().join('/')}${horaVal?' às '+horaVal:''}\n`;
     msg+=`\n📋 *Itens:*\n`;
     items.forEach(i=>{
-      msg+=`  • ${i.nome} — ${i.qty*i.qtdMin} unid. = ${fmtBRL(i.valor*i.qty)}\n`;
+      msg+=`  • ${i.nome} — ${i.qty} unid. = ${fmtBRL(i.valorUnit*i.qty)}\n`;
       if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{msg+=`    Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}\n`;});
     });
     if(topperBonus>0)msg+=`\n  • Topper personalizado (${Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length}x) = ${fmtBRL(topperBonus)}`;
@@ -394,7 +394,7 @@ async function _doFinalizar(){
       return [
         {column:'Produto',value:i.nome},
         {column:'Row ID Produto',value:i.id},
-        {column:'Quantidade',value:i.qty*i.qtdMin},
+        {column:'Quantidade',value:i.qty},
         {column:'Valor Unit',value:i.valorUnit},
         {column:'Recheios',value:recheiosTxt},
         {column:'Cliente',value:nome},
@@ -434,7 +434,7 @@ async function _doFinalizar(){
     });
 
     const itensTexto=items.map(i=>{
-      let txt=`${i.nome} · ${i.qty*i.qtdMin} unid. = R$ ${(i.valor*i.qty).toFixed(2)}`;
+      let txt=`${i.nome} · ${i.qty} unid. = R$ ${(i.valorUnit*i.qty).toFixed(2)}`;
       if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{txt+=`\n  Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}`;});
       return txt;
     }).join('\n');

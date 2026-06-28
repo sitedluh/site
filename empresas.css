@@ -146,12 +146,14 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 
 /* BOTÃO ADICIONAR mobile */
 .add-area{display:flex;align-items:center;gap:8px}
-.add-area.empty .qty-minus,.add-area.empty .qty-val{display:none}
+.add-area.empty .qty-minus,.add-area.empty .qty-input{display:none}
 .add-area.empty .qty-plus{flex:1;height:44px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;background:var(--accent);color:#fff;border:none}
 .add-area:not(.empty) .qty-minus,.add-area:not(.empty) .qty-plus{width:48px;height:44px;border-radius:var(--radius-sm);font-size:22px;background:var(--accent);color:#fff;border:none}
 .qty-minus,.qty-plus{display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:opacity .1s;flex-shrink:0}
 .qty-minus:active,.qty-plus:active{opacity:.75}
-.qty-val{flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--accent);height:44px;display:flex;align-items:center;justify-content:center;background:var(--accent-light);border-radius:var(--radius-sm);border:1px solid var(--border)}
+.qty-input{width:52px;text-align:center;border:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);-moz-appearance:textfield;outline:none;padding:0 2px}
+.qty-input::-webkit-outer-spin-button,.qty-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.qty-input:focus{background:var(--surface2);border-radius:4px}
 
 /* ══════════════════════════════════════
    DESKTOP: grid de cards
@@ -169,12 +171,12 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .prod-card-unit{font-size:10px;color:var(--text3);font-weight:400;margin-left:4px}
 .prod-card-pkg{font-size:10px;color:var(--text3);margin-top:2px}
 .prod-card-add{margin:10px 14px 14px;display:flex;align-items:center;gap:6px}
-.prod-card-add.empty .dc-minus,.prod-card-add.empty .dc-val{display:none}
+.prod-card-add.empty .dc-minus,.prod-card-add.empty .qty-input{display:none}
 .prod-card-add.empty .dc-plus{flex:1;height:40px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none}
 .prod-card-add:not(.empty) .dc-minus,.prod-card-add:not(.empty) .dc-plus{width:40px;height:40px;border-radius:var(--radius-sm);font-size:20px;background:var(--accent);color:#fff;border:none}
 .dc-minus,.dc-plus{display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .1s;flex-shrink:0}
 .dc-minus:active,.dc-plus:active{opacity:.75}
-.dc-val{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--accent);height:40px;display:flex;align-items:center;justify-content:center;background:var(--accent-light);border-radius:var(--radius-sm);border:1px solid var(--border)}
+/* .dc-val removido — substituído por .qty-input (compartilhado com mobile) */
 
 /* ══════════════════════════════════════
    CARRINHO FLUTUANTE

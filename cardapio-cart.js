@@ -186,7 +186,7 @@ function renderProducts(){
       </div>
       <div class="add-area ${isEmpty?'empty':''}" id="add-${p.id}">
         <button class="qty-minus" onclick="changeQty('${p.id}',-1)">−</button>
-        <div class="qty-val">${qty>0?qty*p.qtdMin:0}</div>
+        <input class="qty-input" type="number" min="${p.qtdMin}" value="${qty}" onchange="setQtyInput('${p.id}',this.value,${p.qtdMin})" onblur="(function(el){if(!cart['${p.id}'])return;const n=parseInt(el.value,10);if(isNaN(n)||n<${p.qtdMin}){el.value=${p.qtdMin};setQtyInput('${p.id}',${p.qtdMin},${p.qtdMin})}})(this)">
         <button class="qty-plus" onclick="changeQty('${p.id}',1)">${isEmpty?'+ Adicionar ao pedido':'+'}</button>
       </div>
     </div>`;
@@ -208,7 +208,7 @@ function renderProducts(){
       </div>
       <div class="prod-card-add ${isEmpty?'empty':''}" id="dadd-${p.id}">
         <button class="dc-minus" onclick="changeQty('${p.id}',-1)">−</button>
-        <div class="dc-val">${qty>0?qty*p.qtdMin:0}</div>
+        <input class="qty-input" type="number" min="${p.qtdMin}" value="${qty}" onchange="setQtyInput('${p.id}',this.value,${p.qtdMin})" onblur="(function(el){if(!cart['${p.id}'])return;const n=parseInt(el.value,10);if(isNaN(n)||n<${p.qtdMin}){el.value=${p.qtdMin};setQtyInput('${p.id}',${p.qtdMin},${p.qtdMin})}})(this)">
         <button class="dc-plus" onclick="changeQty('${p.id}',1)">${isEmpty?'+ Adicionar ao pedido':'+'}</button>
       </div>
     </div>`;
@@ -217,7 +217,7 @@ function renderProducts(){
 
 function renderDrawer(){
   const items=Object.values(cart).filter(i=>i.qty>0);
-  const total=items.reduce((s,i)=>s+i.valor*i.qty,0);
+  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0);
   const totalQty=items.reduce((s,i)=>s+i.qty,0);
   document.getElementById('cart-badge').textContent=totalQty;
   const floatBtn=document.getElementById('cart-float');
@@ -234,16 +234,16 @@ function renderDrawer(){
       <div class="cart-item-icon">${getIcon(i.tipo)}</div>
       <div class="cart-item-info">
         <div class="cart-item-name">${i.nome}</div>
-        <div class="cart-item-price">${fmtBRL(i.valorUnit)}/un. · ${i.qty*i.qtdMin} unid.</div>
+        <div class="cart-item-price">${fmtBRL(i.valorUnit)}/un. · ${i.qty} unid.</div>
         ${recheioLines}
         <div class="cart-qty-ctrl">
           <button class="cart-qty-btn" onclick="changeQty('${i.id}',-1)">−</button>
-          <span class="cart-qty-num">${i.qty*i.qtdMin}</span>
+          <span class="cart-qty-num">${i.qty}</span>
           <button class="cart-qty-btn" onclick="changeQty('${i.id}',1)">+</button>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <div class="cart-subtotal">${fmtBRL(i.valor*i.qty)}</div>
+        <div class="cart-subtotal">${fmtBRL(i.valorUnit*i.qty)}</div>
         <button class="remove-btn" onclick="removeItem('${i.id}')">🗑</button>
       </div>
     </div>`;
@@ -387,31 +387,50 @@ function handleTopperPreview(input){
 
 function changeQty(id,delta){
   const p=allProducts.find(x=>x.id===id);if(!p)return;
-  if(!cart[id])cart[id]={...p,qty:0,recheios:[]};
-  const oldQty=cart[id].qty;
-  cart[id].qty=Math.max(0,cart[id].qty+delta);
-  if(cart[id].qty===0){delete cart[id];renderProducts();renderDrawer();return;}
+  const qtdMin=p.qtdMin||1;
+  const current=cart[id]?.qty||0;
 
-  if(delta>0&&isBolo(p.tipo)&&recheios.length>0){
-    // abre modal para cada unidade nova adicionada
-    const novasUnidades=[];
-    for(let i=oldQty;i<cart[id].qty;i++)novasUnidades.push(i);
-    renderProducts();renderDrawer();
-    abrirModalRecheios(id,novasUnidades);
-    return;
-  }
-
-  if(delta<0&&isBolo(p.tipo)){
-    // remove o último recheio
-    if(cart[id].recheios)cart[id].recheios.splice(cart[id].qty);
-  }
-
-  renderProducts();renderDrawer();saveCart();
   if(delta>0){
+    const newQty=current===0?qtdMin:current+1;
+    if(!cart[id])cart[id]={...p,qty:0,recheios:[]};
+    const oldQty=cart[id].qty;
+    cart[id].qty=newQty;
+
+    if(isBolo(p.tipo)&&recheios.length>0){
+      const novasUnidades=[];
+      for(let i=oldQty;i<newQty;i++)novasUnidades.push(i);
+      renderProducts();renderDrawer();
+      abrirModalRecheios(id,novasUnidades);
+      return;
+    }
+
+    saveCart();renderProducts();renderDrawer();
+    if(navigator.vibrate)navigator.vibrate(50);
     const btn=document.querySelector(`#add-${id} .qty-plus`)||document.querySelector(`#dadd-${id} .qty-plus`);
-    if(btn){if(navigator.vibrate)navigator.vibrate(50);btn.classList.add('adding');setTimeout(()=>btn.classList.remove('adding'),350);}
+    if(btn){btn.classList.add('adding');setTimeout(()=>btn.classList.remove('adding'),350);}
+    if(current===0)showToast(`${p.nome} adicionado!`);
+  }else{
+    if(current<=qtdMin){
+      delete cart[id];
+    }else{
+      cart[id].qty=current-1;
+      if(isBolo(p.tipo)&&cart[id].recheios)cart[id].recheios.splice(cart[id].qty);
+    }
+    saveCart();renderProducts();renderDrawer();
   }
-  if(delta>0&&oldQty===0)showToast(`${p.nome} adicionado!`);
+}
+
+function setQtyInput(id,value,qtdMin){
+  const p=allProducts.find(x=>x.id===id);if(!p)return;
+  const n=parseInt(value,10);
+  if(isNaN(n)||n<=0){
+    delete cart[id];
+  }else{
+    const newQty=Math.max(n,qtdMin);
+    if(!cart[id])cart[id]={...p,qty:newQty,recheios:[]};
+    else cart[id].qty=newQty;
+  }
+  saveCart();renderProducts();renderDrawer();
 }
 
 function removeItem(id){delete cart[id];renderProducts();renderDrawer();saveCart();}
