@@ -442,7 +442,10 @@ async function _doFinalizar(){
     // Guarda os dados montados — usados pela confirmação (e por retry/skip se algo falhar)
     // 'msg' (resumo formatado p/ WhatsApp) é reaproveitado pelo bot pra postar o mesmo
     // resumo dentro do próprio chat, ver abrirStatusBotPosPedido() (seção 2.5).
-    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,msg,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items};
+    // '_editData' existe quando o cliente está editando um pedido já existente
+    // (chave 'dluh_edit_pedido' no localStorage, gravada pelo painel "Meus Pedidos").
+    const _editData=(()=>{try{const s=localStorage.getItem('dluh_edit_pedido');return s?JSON.parse(s):null;}catch(_){return null;}})();
+    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,msg,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items,_editData};
 
     // Só passa para o WhatsApp depois que o pedido for registrado no Coda
     await _confirmarESeguirWhats();
@@ -455,42 +458,67 @@ async function _doFinalizar(){
   }
 }
 
-// Envia o pedido para o Coda (worker /novo-pedido) e só então segue para o WhatsApp.
+// Envia o pedido para o Coda e só então segue para o fluxo pós-pedido.
+// Em modo edição usa /editar-pedido; no fluxo normal usa /novo-pedido.
 // Pode ser chamada de novo pelo botão "Tentar novamente" no overlay de erro.
 async function _confirmarESeguirWhats(){
   const p=_pedidoPendente;
   if(!p||_confirmandoPedido)return;
   _confirmandoPedido=true;
   setPedidoLoadingState('loading');
+  const isEdit=!!(p._editData&&p._editData.paiId);
   try{
     const ctrl=new AbortController();
     const timeoutId=setTimeout(()=>ctrl.abort(),15000);
     let res,d;
     try{
-      res=await fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({pai:p.paiCells,subrows:p.subrowInputs,taxaFrete:p.taxaFrete}),
-        signal:ctrl.signal
-      });
+      if(isEdit){
+        res=await fetch(`${CONFIG.WORKER_URL}/editar-pedido`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({paiId:p._editData.paiId,pai:p.paiCells,subrows:p.subrowInputs,taxaFrete:p.taxaFrete}),
+          signal:ctrl.signal
+        });
+      }else{
+        res=await fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({pai:p.paiCells,subrows:p.subrowInputs,taxaFrete:p.taxaFrete}),
+          signal:ctrl.signal
+        });
+      }
     }finally{ clearTimeout(timeoutId); }
     d=await res.json().catch(()=>({}));
     if(!res.ok||!d||d.ok===false) throw new Error((d&&d.error)?d.error:'Falha ao registrar pedido no Coda');
-    p.paiId=d.paiId||null; // ID (Coda) do pedido recém-criado — usado pra rastrear ESSE pedido no acompanhamento pós-pedido
 
-    try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}
-
-    // Extras não-críticos: não atrasam a abertura do chat, só disparam depois que o essencial confirmou
-    salvarPedidoFirebase({nome:p.nome,tel:p.tel,entrega:p.entrega,endereco:p.endereco,pagamento:p.pagamento,data:p.data,hora:p.horaVal,obs:p.obs,total:p.total,entradaVal:p.entradaVal,restoVal:p.restoVal,itensTexto:p.itensTexto});
-    // (a foto de referência do topper, se houver, já foi enviada ao Drive antes
-    // de montar as subrows — o link está em topperPorProduto[id].refUrl / na subrow)
-
-    setPedidoLoadingState('success');
-    clearCart();topperPorProduto={};
-    _pedidoPendente=null;
-    // Em vez de ir direto pro WhatsApp, abre o bot de status (chat próprio) —
-    // ele já mostra a situação atual e pode ser consultado de novo a qualquer momento.
-    setTimeout(()=>abrirStatusBotPosPedido(p),700);
+    if(isEdit){
+      // ── Modo edição ──
+      localStorage.removeItem('dluh_edit_pedido');
+      try{document.getElementById('coda-note').textContent='✅ Pedido atualizado!';}catch(_){}
+      setPedidoLoadingState('success');
+      clearCart();topperPorProduto={};
+      _pedidoPendente=null;
+      if((d.reembolso||0)>0){
+        // Novo total ficou menor que o valor já pago — exibe modal de reembolso
+        setTimeout(()=>abrirModalReembolso(d),700);
+      }else{
+        setTimeout(()=>{ fecharPedidoLoading(); showToast('Pedido editado com sucesso! ✅'); },700);
+      }
+    }else{
+      // ── Fluxo normal (novo pedido) ──
+      p.paiId=d.paiId||null; // ID (Coda) do pedido recém-criado — usado pra rastrear ESSE pedido no acompanhamento pós-pedido
+      try{document.getElementById('coda-note').textContent='✅ Pedido registrado!';}catch(_){}
+      // Extras não-críticos: não atrasam a abertura do chat, só disparam depois que o essencial confirmou
+      salvarPedidoFirebase({nome:p.nome,tel:p.tel,entrega:p.entrega,endereco:p.endereco,pagamento:p.pagamento,data:p.data,hora:p.horaVal,obs:p.obs,total:p.total,entradaVal:p.entradaVal,restoVal:p.restoVal,itensTexto:p.itensTexto});
+      // (a foto de referência do topper, se houver, já foi enviada ao Drive antes
+      // de montar as subrows — o link está em topperPorProduto[id].refUrl / na subrow)
+      setPedidoLoadingState('success');
+      clearCart();topperPorProduto={};
+      _pedidoPendente=null;
+      // Em vez de ir direto pro WhatsApp, abre o bot de status (chat próprio) —
+      // ele já mostra a situação atual e pode ser consultado de novo a qualquer momento.
+      setTimeout(()=>abrirStatusBotPosPedido(p),700);
+    }
   }catch(e){
     console.warn('Erro ao confirmar pedido no Coda:',e);
     setPedidoLoadingState('error');
@@ -513,6 +541,40 @@ function _skipParaWhatsapp(){
   clearCart();topperPorProduto={};
   _pedidoPendente=null;
   irParaWhatsapp(waUrl);
+}
+
+// ── Modal de reembolso (edição de pedido com novo total menor que o pago) ──
+function abrirModalReembolso(d){
+  fecharPedidoLoading();
+  const valorPago=d.valorPago||0;
+  const novoTotal=d.novoTotal||0;
+  const reembolso=d.reembolso||0;
+  const txt=encodeURIComponent(`Olá! Editei meu pedido e o novo total ficou ${fmtBRL(novoTotal)}. Como já paguei ${fmtBRL(valorPago)}, tenho um reembolso de ${fmtBRL(reembolso)}. Pode me reembolsar? 😊`);
+  const waUrl=`https://wa.me/${CONFIG.WHATSAPP}?text=${txt}`;
+  const existing=document.getElementById('reembolso-modal-overlay');
+  if(existing)existing.remove();
+  const el=document.createElement('div');
+  el.id='reembolso-modal-overlay';
+  el.className='reembolso-modal-overlay open';
+  el.innerHTML=`
+    <div class="reembolso-modal-box">
+      <div class="reembolso-modal-icon">🎉</div>
+      <div class="reembolso-modal-title">Pedido atualizado!</div>
+      <div class="reembolso-modal-sub">Seu novo total ficou menor que o valor já pago.</div>
+      <div class="reembolso-modal-rows">
+        <div class="reembolso-modal-row"><span>Valor pago anteriormente</span><span>${fmtBRL(valorPago)}</span></div>
+        <div class="reembolso-modal-row"><span>Novo total</span><span>${fmtBRL(novoTotal)}</span></div>
+        <div class="reembolso-modal-row reembolso-modal-row--destaque"><span>Reembolso</span><span>${fmtBRL(reembolso)}</span></div>
+      </div>
+      <p class="reembolso-modal-info">Clique abaixo para avisar a D'Luh e solicitar o reembolso pelo WhatsApp</p>
+      <a href="${waUrl}" target="_blank" rel="noopener" class="reembolso-btn-wpp">💰 Solicitar Reembolso pelo WhatsApp</a>
+      <button class="reembolso-btn-fechar" onclick="fecharModalReembolso()">Fechar</button>
+    </div>`;
+  document.body.appendChild(el);
+}
+function fecharModalReembolso(){
+  const el=document.getElementById('reembolso-modal-overlay');
+  if(el)el.remove();
 }
 
 // ── Overlay de carregamento do pedido ──

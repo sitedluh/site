@@ -138,6 +138,7 @@ function mpCardHtml(p){
   // novo status, mostra o botão desabilitado ("⏳ Cancelando...") para evitar duplo envio.
   // _mpCancelandoId é limpo pelo mpCarregar() assim que o status deixar de permitir cancelamento.
   const estaCancelando=p.idPedido===_mpCancelandoId;
+  const podeEditar=p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento';
   return `<div class="mp-card" data-idpedido="${esc(p.idPedido)}" onclick="mpMarcarVisto('${esc(p.idPedido)}')">
     <div class="mp-card-top">
       <span class="mp-badge ${cls}">${esc(p.status)}</span>
@@ -148,6 +149,7 @@ function mpCardHtml(p){
     <div class="mp-card-valores">${p.total?`Total: ${fmtBRL(p.total)}`:''}${p.valorPago?` · Pago: ${fmtBRL(p.valorPago)}`:''}${p.restante>0?` · Falta: ${fmtBRL(p.restante)}`:''}</div>
     <div class="mp-card-actions">
       ${podePagar?`<button class="mp-btn-pagar" onclick="event.stopPropagation();window.open('${esc(p.linkPagamento)}','_blank')">💳 Pagar ${fmtBRL(valorPagar)}</button>`:''}
+      ${podeEditar?`<button class="mp-btn-editar" onclick="event.stopPropagation();mpEditarPedido('${esc(p.idPedido)}',${Number(p.valorPago||0)},'${esc(p.idPedido)}')">✏️ Editar</button>`:''}
       ${estaCancelando?'<button class="mp-btn-cancelar" disabled>⏳ Cancelando...</button>':podeCancelar?`<button class="mp-btn-cancelar" onclick="event.stopPropagation();mpIniciarCancelamento('${esc(p.idPedido)}')">❌ Cancelar</button>`:''}
     </div>
   </div>`;
@@ -237,4 +239,10 @@ async function mpConfirmarCancelamento(){
     btn.disabled=false;
     btn.textContent='Confirmar cancelamento';
   }
+}
+function mpEditarPedido(paiId,valorPago,pedidoNum){
+  try{localStorage.setItem('dluh_edit_pedido',JSON.stringify({paiId,valorPago:Number(valorPago)||0,pedidoNum:pedidoNum||paiId}));}catch(_){}
+  if(typeof clearCart==='function')clearCart();
+  mpFecharModal();
+  showToast('Carrinho pronto para edição ✏️');
 }

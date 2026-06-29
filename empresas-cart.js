@@ -216,6 +216,11 @@ function renderProducts(){
   }).join('');
 }
 
+function cancelarEdicao(){
+  try{localStorage.removeItem('dluh_edit_pedido');}catch(e){}
+  renderDrawer();
+}
+
 function renderDrawer(){
   const items=Object.values(cart).filter(i=>i.qty>0);
   const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0);
@@ -227,9 +232,18 @@ function renderDrawer(){
   if(floatBtn){if(totalQty>0){floatBtn.classList.remove('cart-float-zero');}else{floatBtn.classList.add('cart-float-zero');}}
   document.getElementById('drawer-total').textContent=fmtBRL(total);
   const footer=document.getElementById('drawer-footer');
-  if(!items.length){document.getElementById('drawer-body').innerHTML=`<div class="empty-cart-msg"><div class="empty-icon">🛍️</div><p>Seu carrinho está vazio.</p></div>`;footer.style.display='none';return;}
+  // Banner de modo edição
+  let bannerHtml='';
+  try{
+    const _editRaw=localStorage.getItem('dluh_edit_pedido');
+    if(_editRaw){
+      const _ed=JSON.parse(_editRaw);
+      bannerHtml=`<div class="edit-mode-banner"><div class="edit-mode-banner-top"><span class="edit-mode-icon">✏️</span><span class="edit-mode-title">Editando pedido ${_ed.pedidoNum||''}</span></div><div class="edit-mode-pago">Valor já pago: <strong>${fmtBRL(_ed.valorPago||0)}</strong></div><button class="edit-mode-cancel" onclick="cancelarEdicao()">Cancelar edição</button></div>`;
+    }
+  }catch(e){}
+  if(!items.length){document.getElementById('drawer-body').innerHTML=bannerHtml+`<div class="empty-cart-msg"><div class="empty-icon">🛍️</div><p>Seu carrinho está vazio.</p></div>`;footer.style.display='none';return;}
   footer.style.display='block';
-  document.getElementById('drawer-body').innerHTML=items.map(i=>{
+  document.getElementById('drawer-body').innerHTML=bannerHtml+items.map(i=>{
     const recheioLines=isBolo(i.tipo)&&i.recheios?i.recheios.map((r,idx)=>`<div style="font-size:11px;color:#666;margin-top:1px">Bolo ${idx+1}: ${r.join(' + ')||'sem recheio'}</div>`).join(''):'';
     return`<div class="cart-item">
       <div class="cart-item-icon">${getIcon(i.tipo)}</div>

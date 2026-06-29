@@ -559,6 +559,12 @@ function sbStatusPedirTelefoneInput(){
   sbAddMsg('bot','Beleza! Me passa o telefone (com DDD) que você usou no pedido que eu já verifico. 📱');
   sbMostrarInput('telefone','Seu WhatsApp (com DDD)','Ver status');
 }
+function sbEditarPedido(paiId,valorPago,pedidoNum){
+  try{localStorage.setItem('dluh_edit_pedido',JSON.stringify({paiId,valorPago:Number(valorPago)||0,pedidoNum:pedidoNum||paiId}));}catch(_){}
+  if(typeof clearCart==='function')clearCart();
+  fecharStatusBot();
+  showToast('Carrinho pronto para edição ✏️');
+}
 async function sbStatusConsultar(tel){
   const telDigits=(tel||'').replace(/\D/g,'');
   if(telDigits.length<8){
@@ -608,6 +614,14 @@ async function sbStatusConsultar(tel){
         pagarBtn.textContent='💳 Pagar agora';
         pagarBtn.onclick=()=>window.open(p.linkPagamento,'_blank');
         _sbConsultaMsgs.lastElementChild.appendChild(pagarBtn);
+      }
+      if(p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento'){
+        const editarBtn=document.createElement('button');
+        editarBtn.className='sb-btn-opcao';
+        editarBtn.style.cssText='margin-top:8px;display:block;width:100%';
+        editarBtn.textContent='✏️ Editar Pedido';
+        editarBtn.onclick=()=>sbEditarPedido(p.idPedido,p.valorPago,p.idPedido);
+        _sbConsultaMsgs.lastElementChild.appendChild(editarBtn);
       }
     });
     sbAddMsg('bot','Posso ajudar em mais alguma coisa?');
