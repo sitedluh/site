@@ -562,11 +562,8 @@ function sbStatusPedirTelefoneInput(){
 }
 function sbEditarPedido(paiId,valorPago,pedidoNum){
   const pedido=_sbUltimosPedidos.find(p=>p.idPedido===paiId);
-  if(pedido&&pedido.itens&&pedido.itens.length){
-    abrirEditPedidoModal(pedido);
-  }else{
-    sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum);
-  }
+  if(pedido){abrirEditPedidoModal(pedido);}
+  else{sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum);}
 }
 async function sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum){
   showToast('Carregando itens...');
@@ -592,7 +589,7 @@ function abrirEditPedidoModal(pedido){
     valor:Number(i.valor||i.valorUnit||i.preco||0),
     recheio:i.recheio||i.sabores||''
   }));
-  _dluhEditPedido={paiId:pedido.idPedido||pedido.paiId,valorPago:Number(pedido.pago||pedido.valorPago||0),pedidoNum:pedido.idPedido||pedido.pedidoNum||''};
+  _dluhEditPedido={paiId:pedido.rowId||pedido.idPedido||pedido.paiId,valorPago:Number(pedido.pago||pedido.valorPago||0),pedidoNum:pedido.idPedido||pedido.pedidoNum||''};
   let modal=document.getElementById('dluh-edit-modal');
   if(!modal){
     modal=document.createElement('div');
@@ -720,7 +717,7 @@ async function sbStatusConsultar(tel){
         pagarBtn.onclick=()=>window.open(p.linkPagamento,'_blank');
         _sbConsultaMsgs.lastElementChild.appendChild(pagarBtn);
       }
-      if(p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento'){
+      if(p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento'||p.status==='Verificando Estoque'){
         const editarBtn=document.createElement('button');
         editarBtn.className='sb-btn-opcao';
         editarBtn.style.cssText='margin-top:8px;display:block;width:100%';

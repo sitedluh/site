@@ -140,7 +140,7 @@ function mpCardHtml(p){
   // novo status, mostra o botão desabilitado ("⏳ Cancelando...") para evitar duplo envio.
   // _mpCancelandoId é limpo pelo mpCarregar() assim que o status deixar de permitir cancelamento.
   const estaCancelando=p.idPedido===_mpCancelandoId;
-  const podeEditar=p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento';
+  const podeEditar=p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento'||p.status==='Verificando Estoque';
   return `<div class="mp-card" data-idpedido="${esc(p.idPedido)}" onclick="mpMarcarVisto('${esc(p.idPedido)}')">
     <div class="mp-card-top">
       <span class="mp-badge ${cls}">${esc(p.status)}</span>
@@ -244,10 +244,7 @@ async function mpConfirmarCancelamento(){
 }
 async function mpEditarPedido(paiId,valorPago,pedidoNum){
   const pedido=_mpUltimosPedidos.find(p=>p.idPedido===paiId);
-  if(pedido&&pedido.itens&&pedido.itens.length){
-    abrirEditPedidoModal(pedido);
-    return;
-  }
+  if(pedido){abrirEditPedidoModal(pedido);return;}
   showToast('Carregando itens...');
   try{
     const tel=_mpTel.replace(/\D/g,'');
