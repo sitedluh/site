@@ -130,7 +130,9 @@ function mpCardHtml(p){
   const cls=MP_STATUS_CLS[p.status]||'mp-st-aguardando';
   const ultimoVisto=localStorage.getItem(mpUltimoStatusKey(p.idPedido));
   const mudou=ultimoVisto&&ultimoVisto!==p.status;
-  const itensResumo=(p.itens||[]).slice(0,3).map(i=>`${i.quantidade}x ${i.produto}`).join(', ');
+  const itensHtml=(p.itens&&p.itens.length)
+    ?'<div class="mp-card-itens-lista">'+p.itens.map(i=>{const nome=i.produto||i.nome||'';const qtd=i.qtd||i.quantidade||1;const recheio=i.recheio||i.sabores||'';return '<span class="mp-card-item">'+qtd+'× '+esc(nome)+(recheio?' <em>('+esc(recheio)+')</em>':'')+' </span>';}).join('')+'</div>'
+    :'';
   const podePagar=!!p.linkPagamento&&(p.status==='Confirmado — Esperando pagamento'||p.status==='Entregue — Esperando restante');
   const valorPagar=p.status==='Entregue — Esperando restante'?p.restante:(p.entrada||p.total);
   const podeCancelar=MP_PODE_CANCELAR.includes(p.status);
@@ -145,7 +147,7 @@ function mpCardHtml(p){
       ${mudou?'<span class="mp-novo">🔔 Atualizado</span>':''}
     </div>
     <div class="mp-card-data">${esc(p.data?(p.horario?p.data+' às '+p.horario:p.data):'')}</div>
-    <div class="mp-card-itens">${esc(itensResumo)}</div>
+    ${itensHtml}
     <div class="mp-card-valores">${p.total?`Total: ${fmtBRL(p.total)}`:''}${p.valorPago?` · Pago: ${fmtBRL(p.valorPago)}`:''}${p.restante>0?` · Falta: ${fmtBRL(p.restante)}`:''}</div>
     <div class="mp-card-actions">
       ${podePagar?`<button class="mp-btn-pagar" onclick="event.stopPropagation();window.open('${esc(p.linkPagamento)}','_blank')">💳 Pagar ${fmtBRL(valorPagar)}</button>`:''}
@@ -241,25 +243,19 @@ async function mpConfirmarCancelamento(){
   }
 }
 async function mpEditarPedido(paiId,valorPago,pedidoNum){
-  // Tenta achar o pedido completo (com itens) no array já em memória.
   const pedido=_mpUltimosPedidos.find(p=>p.idPedido===paiId);
   if(pedido&&pedido.itens&&pedido.itens.length){
-    mpFecharModal();
-    if(typeof sbAbrirEmModoEdicao==='function')sbAbrirEmModoEdicao(pedido);
+    abrirEditPedidoModal(pedido);
     return;
   }
-  // Não encontrou em memória (ou itens ausentes): faz fetch antes de abrir o bot.
+  showToast('Carregando itens...');
   try{
     const tel=_mpTel.replace(/\D/g,'');
     const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(tel)}`);
     const d=await res.json().catch(()=>({}));
     const pedidos=(d&&d.encontrado&&d.pedidos)||[];
-    const pd=pedidos.find(p=>p.idPedido===paiId)||pedidos[0]||null;
-    mpFecharModal();
-    if(typeof sbAbrirEmModoEdicao==='function'){
-      sbAbrirEmModoEdicao(pd||{idPedido:paiId,itens:[]});
-    }
-  }catch(e){
-    showToast('Erro ao carregar itens do pedido. Tente novamente.');
-  }
+    const pd=pedidos.find(p=>p.idPedido===paiId)||pedidos[0];
+    if(pd){_mpUltimosPedidos=pedidos;abrirEditPedidoModal(pd);}
+    else showToast('Pedido não encontrado.');
+  }catch(e){showToast('Erro ao carregar itens do pedido.');}
 }

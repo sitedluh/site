@@ -9,8 +9,6 @@ let _sbEtapa=null; // null | 'telefone' | 'data' — o que o campo de texto livr
 let _sbInactivityTimer=null;
 let _sbTawkAtivo=false;       // true enquanto uma conversa com atendente foi iniciada via sbAtendente()
 let _sbContextoAtendente=''; // último contexto do fluxo do bot antes de chamar sbAtendente()
-let _sbEditItens=[];            // itens do pedido em edição — array de {nome,qtd,valor,recheio}
-let _sbEditPedidoPendente=null; // {paiId,valorPago,pedidoNum} — só vai pro localStorage ao confirmar
 let _sbUltimosPedidos=[];       // pedidos da última consulta de status, pra evitar re-fetch ao editar
 
 function sbTelSalvo(){
@@ -563,108 +561,112 @@ function sbStatusPedirTelefoneInput(){
   sbMostrarInput('telefone','Seu WhatsApp (com DDD)','Ver status');
 }
 function sbEditarPedido(paiId,valorPago,pedidoNum){
-  _sbEditPedidoPendente={paiId,valorPago:Number(valorPago)||0,pedidoNum:pedidoNum||paiId};
   const pedido=_sbUltimosPedidos.find(p=>p.idPedido===paiId);
-  if(pedido&&pedido.itens){sbMostrarEditarItens(pedido);}
-  else{sbBuscarEMostrarEditarItens(paiId);}
+  if(pedido&&pedido.itens&&pedido.itens.length){
+    abrirEditPedidoModal(pedido);
+  }else{
+    sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum);
+  }
 }
-async function sbBuscarEMostrarEditarItens(paiId){
-  sbLimparBotoes();
-  sbAddMsg('bot','Buscando dados do pedido... ⏳');
+async function sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum){
+  showToast('Carregando itens...');
+  const tel=(_sbPollTel||_statusBotTel||sbTelSalvo()).replace(/\D/g,'');
+  if(!tel){showToast('Não foi possível carregar os itens.');return;}
   try{
-    const tel=(_sbPollTel||_statusBotTel||sbTelSalvo()).replace(/\D/g,'');
     const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(tel)}`);
     const d=await res.json().catch(()=>({}));
     const pedidos=(d&&d.encontrado&&d.pedidos)||[];
-    _sbUltimosPedidos=pedidos;
     const pedido=pedidos.find(p=>p.idPedido===paiId)||pedidos[0];
-    if(!pedido){sbWhatsappFallback('Não consegui carregar os itens do pedido.');return;}
-    sbMostrarEditarItens(pedido);
-  }catch(e){sbWhatsappFallback('Tive um problema ao carregar os itens do pedido.');}
+    if(pedido){_sbUltimosPedidos=pedidos;abrirEditPedidoModal(pedido);}
+    else showToast('Pedido não encontrado.');
+  }catch(e){showToast('Erro ao carregar itens do pedido.');}
 }
-// Abre o bot em modo edição a partir de uma chamada externa (ex.: painel Meus Pedidos).
-// Reseta o painel antes de abrir para não acumular histórico anterior.
-function sbAbrirEmModoEdicao(pedido){
-  const msgs=document.getElementById('status-bot-msgs');
-  if(msgs){msgs.innerHTML='';delete msgs.dataset.iniciado;}
-  abrirStatusBot(null,false,true);
-  sbMostrarEditarItens(pedido);
-}
-function sbMostrarEditarItens(pedido){
-  sbEsconderInput();
-  sbLimparBotoes();
-  // Registra o contexto do pedido — só vai pro localStorage quando o usuário confirmar.
-  _sbEditPedidoPendente={paiId:pedido.idPedido,valorPago:Number(pedido.valorPago)||0,pedidoNum:pedido.idPedido};
-  _sbEditItens=(pedido.itens||[]).map(i=>({
+// ── Modal de edição de pedido (overlay de página, independente do bot) ──
+let _dluhEditItens=[];
+let _dluhEditPedido=null;
+function _dluhEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function abrirEditPedidoModal(pedido){
+  _dluhEditItens=(pedido.itens||[]).map(i=>({
     nome:i.produto||i.nome||'',
-    qtd:Number(i.quantidade)||1,
-    valor:Number(i.valor||i.valorUnit||0),
+    qtd:Number(i.qtd||i.quantidade)||1,
+    valor:Number(i.valor||i.valorUnit||i.preco||0),
     recheio:i.recheio||i.sabores||''
   }));
-  const msgs=document.getElementById('status-bot-msgs');
-  sbAddMsg('bot','Veja os itens do seu pedido. Ajuste as quantidades ou remova o que não quiser:');
-  const painel=document.createElement('div');
-  painel.className='sb-edit-itens-panel';
-  painel.innerHTML=
-    '<div class="sb-edit-title">Editando pedido</div>'+
-    '<div class="sb-edit-list" id="sb-edit-list"></div>'+
-    '<div class="sb-edit-footer">'+
-      '<button class="sb-btn-opcao" onclick="sbEditAdicionarMais()">Adicionar mais itens</button>'+
-      '<button class="sb-btn-opcao sb-edit-concluir" onclick="sbEditConcluir()">Concluir pedido</button>'+
-    '</div>';
-  msgs.appendChild(painel);
-  msgs.scrollTop=msgs.scrollHeight;
-  sbRenderEditList();
+  _dluhEditPedido={paiId:pedido.idPedido||pedido.paiId,valorPago:Number(pedido.pago||pedido.valorPago||0),pedidoNum:pedido.idPedido||pedido.pedidoNum||''};
+  let modal=document.getElementById('dluh-edit-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='dluh-edit-modal';
+    modal.className='dluh-edit-overlay';
+    modal.innerHTML=
+      '<div class="dluh-edit-box">'+
+        '<div class="dluh-edit-header">'+
+          '<span>✏️ Editando pedido</span>'+
+          '<button class="dluh-edit-close" onclick="fecharEditPedidoModal()">✕</button>'+
+        '</div>'+
+        '<div class="dluh-edit-list" id="dluh-edit-list"></div>'+
+        '<div class="dluh-edit-footer">'+
+          '<button class="dluh-edit-btn-mais" onclick="dluhEditAdicionarMais()">➕ Adicionar mais itens</button>'+
+          '<button class="dluh-edit-btn-concluir" onclick="dluhEditConcluir()">✓ Concluir pedido</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+  }
+  dluhRenderEditList();
+  modal.style.display='flex';
 }
-function _sbEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function sbRenderEditList(){
-  const el=document.getElementById('sb-edit-list');
+function fecharEditPedidoModal(){
+  const modal=document.getElementById('dluh-edit-modal');
+  if(modal)modal.style.display='none';
+}
+function dluhRenderEditList(){
+  const el=document.getElementById('dluh-edit-list');
   if(!el)return;
-  if(!_sbEditItens.length){el.innerHTML='<div class="sb-edit-vazio">Nenhum item. Adicione abaixo.</div>';return;}
-  el.innerHTML=_sbEditItens.map((it,idx)=>
-    '<div class="sb-edit-item" data-idx="'+idx+'">'+
-      '<div class="sb-edit-item-info">'+
-        '<span class="sb-edit-item-nome">'+_sbEsc(it.nome)+'</span>'+
-        (it.recheio?'<span class="sb-edit-item-recheio">'+_sbEsc(it.recheio)+'</span>':'')+
+  if(!_dluhEditItens.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">Nenhum item. Use \'Adicionar mais itens\'.</div>';return;}
+  el.innerHTML=_dluhEditItens.map((it,idx)=>
+    '<div class="dluh-edit-item" data-idx="'+idx+'">'+
+      '<div class="dluh-edit-item-info">'+
+        '<div class="dluh-edit-item-nome">'+_dluhEsc(it.nome)+'</div>'+
+        (it.recheio?'<div class="dluh-edit-item-recheio">'+_dluhEsc(it.recheio)+'</div>':'')+
       '</div>'+
-      '<div class="sb-edit-item-controls">'+
-        '<button onclick="sbEditQtd('+idx+',-1)">−</button>'+
-        '<span class="sb-edit-item-qtd">'+it.qtd+'</span>'+
-        '<button onclick="sbEditQtd('+idx+',+1)">+</button>'+
-        '<button class="sb-edit-item-del" onclick="sbEditRemover('+idx+')">×</button>'+
+      '<div class="dluh-edit-item-ctrl">'+
+        '<button onclick="dluhEditQtd('+idx+',-1)">−</button>'+
+        '<span>'+it.qtd+'</span>'+
+        '<button onclick="dluhEditQtd('+idx+',1)">+</button>'+
+        '<button class="dluh-edit-item-del" onclick="dluhEditRemover('+idx+')">×</button>'+
       '</div>'+
     '</div>').join('');
 }
-function sbEditQtd(idx,delta){
-  if(!_sbEditItens[idx])return;
-  _sbEditItens[idx].qtd=Math.max(0,_sbEditItens[idx].qtd+delta);
-  if(_sbEditItens[idx].qtd===0)_sbEditItens.splice(idx,1);
-  sbRenderEditList();
+function dluhEditQtd(idx,delta){
+  if(!_dluhEditItens[idx])return;
+  _dluhEditItens[idx].qtd=Math.max(0,_dluhEditItens[idx].qtd+delta);
+  if(_dluhEditItens[idx].qtd===0)_dluhEditItens.splice(idx,1);
+  dluhRenderEditList();
 }
-function sbEditRemover(idx){
-  _sbEditItens.splice(idx,1);
-  sbRenderEditList();
+function dluhEditRemover(idx){
+  _dluhEditItens.splice(idx,1);
+  dluhRenderEditList();
 }
-function sbEditAdicionarMais(){
-  if(!_sbEditItens.length){sbAddMsg('bot','Adicione pelo menos 1 item antes de continuar.');return;}
-  if(_sbEditPedidoPendente){try{localStorage.setItem('dluh_edit_pedido',JSON.stringify(_sbEditPedidoPendente));}catch(_){}}
+function dluhEditAdicionarMais(){
+  if(!_dluhEditItens.length){showToast('Adicione pelo menos 1 item.');return;}
+  if(_dluhEditPedido){try{localStorage.setItem('dluh_edit_pedido',JSON.stringify(_dluhEditPedido));}catch(_){}}
   if(typeof window.editarCarrinhoComItens==='function'){
-    window.editarCarrinhoComItens(_sbEditItens);
+    window.editarCarrinhoComItens(_dluhEditItens);
   }else{
-    // Fallback: salva os itens no localStorage para o cart-specialist ler quando implementar a função
-    try{const ed=JSON.parse(localStorage.getItem('dluh_edit_pedido')||'{}');ed.itens=_sbEditItens;localStorage.setItem('dluh_edit_pedido',JSON.stringify(ed));}catch(_){}
+    try{const ed=JSON.parse(localStorage.getItem('dluh_edit_pedido')||'{}');ed.itens=_dluhEditItens;localStorage.setItem('dluh_edit_pedido',JSON.stringify(ed));}catch(_){}
   }
-  fecharStatusBot();
-  showToast('Catálogo aberto — adicione itens e clique Concluir');
+  fecharEditPedidoModal();
+  showToast('Adicione os itens extras e clique em Concluir ✏️');
 }
-function sbEditConcluir(){
-  if(!_sbEditItens.length){sbAddMsg('bot','Adicione pelo menos 1 item antes de concluir.');return;}
-  if(_sbEditPedidoPendente){try{localStorage.setItem('dluh_edit_pedido',JSON.stringify(_sbEditPedidoPendente));}catch(_){}}
+function dluhEditConcluir(){
+  if(!_dluhEditItens.length){showToast('Adicione pelo menos 1 item.');return;}
+  if(_dluhEditPedido){try{localStorage.setItem('dluh_edit_pedido',JSON.stringify(_dluhEditPedido));}catch(_){}}
   if(typeof window.editarCarrinhoComItens==='function'){
-    window.editarCarrinhoComItens(_sbEditItens);
+    window.editarCarrinhoComItens(_dluhEditItens);
   }else{
-    try{const ed=JSON.parse(localStorage.getItem('dluh_edit_pedido')||'{}');ed.itens=_sbEditItens;localStorage.setItem('dluh_edit_pedido',JSON.stringify(ed));}catch(_){}
+    try{const ed=JSON.parse(localStorage.getItem('dluh_edit_pedido')||'{}');ed.itens=_dluhEditItens;localStorage.setItem('dluh_edit_pedido',JSON.stringify(ed));}catch(_){}
   }
+  fecharEditPedidoModal();
   if(typeof window.goCheckout==='function')window.goCheckout();
 }
 async function sbStatusConsultar(tel){
