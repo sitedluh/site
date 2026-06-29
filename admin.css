@@ -101,6 +101,8 @@
   .btn-apagar{background:var(--surface);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
   .btn-apagar:hover{background:#c0392b;color:#fff}
   .btn-cobrar-restante{margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+  .btn-pagar-retirada{margin-top:8px;background:#2e7d32;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+  .btn-pagar-retirada:hover{background:#1b5e20}
   .itens-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
   /* Modal de confirmação */
@@ -136,4 +138,5 @@
     .status-select{min-width:0;flex:1}
     .btn-finalizar,.btn-apagar{flex:1}
     .btn-cobrar-restante{width:100%;justify-content:center}
+    .btn-pagar-retirada{width:100%;justify-content:center}
   }

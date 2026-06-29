@@ -373,6 +373,7 @@ function statusCardHtml(p,status){
   const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
   const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
+  const podePagarRetirada=status==='Confirmado — Esperando pagamento';
   return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
     <div class="sc-info">
       <div class="sc-nome">${esc(p.cliente||'—')}${p.tipoCliente==='Empresa'?' <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dbeafe;color:#1e40af;vertical-align:middle">🏢 Empresa</span>':''}</div>
@@ -384,6 +385,7 @@ function statusCardHtml(p,status){
         ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
       </div>
       ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
+      ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
     </div>
     <div class="sc-actions">
       <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
@@ -465,7 +467,7 @@ async function atualizarStatus(rowId,sel){
 }
 
 // ── FINALIZAR / APAGAR PEDIDO — modal de confirmação compartilhado ──────────
-let _pendingAction=null,_actionRowId=null,_actionBtnEl=null;
+let _pendingAction=null,_actionRowId=null,_actionBtnEl=null,_actionTelefone=null;
 
 function abrirConfirmFinalizar(rowId,nomeCliente,btnEl){
   _pendingAction='finalizar';_actionRowId=rowId;_actionBtnEl=btnEl;
@@ -491,6 +493,7 @@ function closeConfirm(){
 function _confirmOk(){
   if(_pendingAction==='finalizar')return _confirmFinalizarOk();
   if(_pendingAction==='apagar')return _confirmApagarOk();
+  if(_pendingAction==='pagar-retirada')return _confirmPagarRetiradaOk();
 }
 async function _confirmFinalizarOk(){
   if(!_actionRowId)return;
@@ -532,6 +535,43 @@ async function _confirmApagarOk(){
     carregarPedidos();
   }catch(e){
     showToast('Erro ao apagar: '+e.message);
+  }finally{
+    okBtn.disabled=false;
+    closeConfirm();
+  }
+}
+
+function abrirConfirmPagarRetirada(rowId,nomeCliente,telefone,btnEl){
+  _pendingAction='pagar-retirada';_actionRowId=rowId;_actionBtnEl=btnEl;_actionTelefone=telefone;
+  document.getElementById('confirm-icon').textContent='💵';
+  document.getElementById('confirm-title').textContent='Pagar na retirada?';
+  document.getElementById('confirm-msg').innerHTML=`Confirmar para <b>${esc(nomeCliente||'cliente')}</b> que o pagamento será feito na hora da retirada?<br>Um aviso será enviado pelo WhatsApp.`;
+  document.getElementById('confirm-ok-btn').textContent='Sim, confirmar';
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+async function _confirmPagarRetiradaOk(){
+  if(!_actionRowId)return;
+  const okBtn=document.getElementById('confirm-ok-btn');
+  okBtn.disabled=true;okBtn.textContent='Processando...';
+  const rowId=_actionRowId;
+  const telefone=_actionTelefone||'';
+  try{
+    const res=await fetch(`${WORKER}/pagar-na-retirada`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rowId})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.ok===false)throw new Error(data.error||'Falha ao processar');
+    const nome=data.nome||'cliente';
+    const whatsapp=String(data.whatsapp||telefone).replace(/\D/g,'');
+    const fone=whatsapp.startsWith('55')?whatsapp:'55'+whatsapp;
+    const msg=`Olá ${nome}! Confirmamos seu pedido. Pode pagar na hora da retirada. 🎉`;
+    window.open(`https://wa.me/${fone}?text=${encodeURIComponent(msg)}`,'_blank');
+    showToast('Confirmado! WhatsApp aberto 💵');
+    carregarStatus();
+  }catch(e){
+    showToast('Erro: '+e.message);
   }finally{
     okBtn.disabled=false;
     closeConfirm();
