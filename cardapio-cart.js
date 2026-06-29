@@ -107,7 +107,7 @@ function renderFilters(){
     `<button class="cat-pill2${activeCategory===cat?' active':''}" onclick="selectCategory('${cat.replace(/'/g,"\\'")}'">${cat}</button>`
   ).join('');
   const active=bar.querySelector('.active');
-  if(active)active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  if(active)bar.scrollLeft=active.offsetLeft-bar.offsetWidth/2+active.offsetWidth/2;
 }
 
 function renderMaisVendidos(){

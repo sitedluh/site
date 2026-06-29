@@ -108,7 +108,7 @@ function renderCats(){
   if(!indicator){indicator=document.createElement('div');indicator.id='cat-indicator';indicator.className='cat-indicator';}
   bar.appendChild(indicator);
   const active=bar.querySelector('.active');
-  if(active)active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  if(active)bar.scrollLeft=active.offsetLeft-bar.offsetWidth/2+active.offsetWidth/2;
   setTimeout(()=>positionIndicator(activeCategory),50);
 }
 
