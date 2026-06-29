@@ -240,9 +240,26 @@ async function mpConfirmarCancelamento(){
     btn.textContent='Confirmar cancelamento';
   }
 }
-function mpEditarPedido(paiId,valorPago,pedidoNum){
-  try{localStorage.setItem('dluh_edit_pedido',JSON.stringify({paiId,valorPago:Number(valorPago)||0,pedidoNum:pedidoNum||paiId}));}catch(_){}
-  if(typeof clearCart==='function')clearCart();
-  mpFecharModal();
-  showToast('Carrinho pronto para edição ✏️');
+async function mpEditarPedido(paiId,valorPago,pedidoNum){
+  // Tenta achar o pedido completo (com itens) no array já em memória.
+  const pedido=_mpUltimosPedidos.find(p=>p.idPedido===paiId);
+  if(pedido&&pedido.itens&&pedido.itens.length){
+    mpFecharModal();
+    if(typeof sbAbrirEmModoEdicao==='function')sbAbrirEmModoEdicao(pedido);
+    return;
+  }
+  // Não encontrou em memória (ou itens ausentes): faz fetch antes de abrir o bot.
+  try{
+    const tel=_mpTel.replace(/\D/g,'');
+    const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(tel)}`);
+    const d=await res.json().catch(()=>({}));
+    const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    const pd=pedidos.find(p=>p.idPedido===paiId)||pedidos[0]||null;
+    mpFecharModal();
+    if(typeof sbAbrirEmModoEdicao==='function'){
+      sbAbrirEmModoEdicao(pd||{idPedido:paiId,itens:[]});
+    }
+  }catch(e){
+    showToast('Erro ao carregar itens do pedido. Tente novamente.');
+  }
 }

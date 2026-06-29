@@ -41,6 +41,7 @@ function clearCart(){
   try{localStorage.removeItem('dluh_cart');}catch(e){}
   renderProducts();
   renderDrawer();
+  _syncEditFooter();
 }
 
 function showSkeletons(n=4){
@@ -219,6 +220,7 @@ function renderProducts(){
 function cancelarEdicao(){
   try{localStorage.removeItem('dluh_edit_pedido');}catch(e){}
   renderDrawer();
+  _syncEditFooter();
 }
 
 function renderDrawer(){
@@ -557,6 +559,46 @@ function initSwipe(){
 const _origRenderProducts=renderProducts;
 renderProducts=function(){_origRenderProducts.apply(this,arguments);initSwipe();};
 
+// ── MODO EDIÇÃO: footer fixo e preenchimento do carrinho ──
+function _syncEditFooter(){
+  let el=document.getElementById('edit-concluir-footer');
+  const hasEdit=!!localStorage.getItem('dluh_edit_pedido');
+  if(hasEdit){
+    if(!el){
+      el=document.createElement('div');
+      el.id='edit-concluir-footer';
+      el.innerHTML='<span class="ecf-label">✏️ Editando pedido</span><button class="ecf-btn" onclick="goCheckout()">✓ Concluir edição</button>';
+      document.body.appendChild(el);
+    }
+    el.style.display='flex';
+  }else{
+    if(el)el.style.display='none';
+  }
+}
+
+window.editarCarrinhoComItens=function(itens){
+  clearCart();
+  if(!Array.isArray(itens))itens=[];
+  itens.forEach(function(item){
+    const nomeLower=(item.nome||'').trim().toLowerCase();
+    const prod=allProducts.find(function(p){return p.nome.trim().toLowerCase()===nomeLower;});
+    if(prod){
+      cart[prod.id]={...prod,qty:item.qtd,recheios:[]};
+      if(item.recheio&&isBolo(prod.tipo)){
+        const recheioArr=Array.isArray(item.recheio)?item.recheio:[item.recheio];
+        cart[prod.id].recheios=Array.from({length:item.qtd},function(){return recheioArr.slice(0,2);});
+      }
+    }else{
+      const fakeId='_edit_'+item.nome;
+      const valorUnit=Number(item.valor)||0;
+      cart[fakeId]={id:fakeId,nome:item.nome,ingredientes:'',valorUnit:valorUnit,qtdMin:1,valor:valorUnit,tipo:'Outros',qty:item.qtd,recheios:[]};
+    }
+  });
+  saveCart();renderProducts();renderDrawer();
+  _syncEditFooter();
+};
+
+document.addEventListener('DOMContentLoaded',_syncEditFooter);
 
 loadProducts();
 
