@@ -104,7 +104,7 @@ function renderFilters(){
   const bar=document.getElementById('cats-row');
   if(!bar)return;
   bar.innerHTML=categories.map(cat=>
-    `<button class="cat-pill2${activeCategory===cat?' active':''}" onclick="selectCategory('${cat.replace(/'/g,"\\'")}'">${cat}</button>`
+    `<button class="cat-pill2${activeCategory===cat?' active':''}" onclick="selectCategory('${cat.replace(/'/g,"\\'")}')">` + cat + `</button>`
   ).join('');
   const active=bar.querySelector('.active');
   if(active)bar.scrollLeft=active.offsetLeft-bar.offsetWidth/2+active.offsetWidth/2;

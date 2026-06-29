@@ -115,7 +115,7 @@ function renderCats(){
 function renderCategoryChips(){
   const tipos=['Todos',...new Set(allProducts.map(p=>p.tipo).filter(Boolean))];
   const html=tipos.map(t=>
-    `<button class="cat-chip${activeCategory===t?' active':''}" onclick="setCategoryFilter('${t.replace(/'/g,"\\'")}'">${t}</button>`
+    `<button class="cat-chip${activeCategory===t?' active':''}" onclick="setCategoryFilter('${t.replace(/'/g,"\\'")}')">` + t + `</button>`
   ).join('');
   const d=document.getElementById('cat-desktop');
   const m=document.getElementById('cat-mobile-chips');
