@@ -84,7 +84,7 @@ Regra de negócio (D'Luh): o cliente cancela o próprio pedido antes da entrega,
 
 ## Subagentes (Claude Code)
 
-7 subagentes ativos em `.claude/agents/`, organizados **por domínio** (não por arquivo/camada). A própria sessão principal é o **mediador**: delega automaticamente pelo campo `description` de cada um. Pra forçar um, nomeie-o na mensagem ("use o subagente cart-specialist pra...") ou use `@`. Cada subagente roda em contexto **isolado** (não vê o histórico da conversa nem os arquivos já lidos por ela, mas carrega este CLAUDE.md inteiro) e devolve só um resumo — evita floodar a conversa principal e ajuda com os arquivos grandes (`cardapio.html`/`empresas.html`).
+9 subagentes ativos em `.claude/agents/`, organizados **por domínio** (não por arquivo/camada). A própria sessão principal é o **mediador**: delega automaticamente pelo campo `description` de cada um. Pra forçar um, nomeie-o na mensagem ("use o subagente cart-specialist pra...") ou use `@`. Cada subagente roda em contexto **isolado** (não vê o histórico da conversa nem os arquivos já lidos por ela, mas carrega este CLAUDE.md inteiro) e devolve só um resumo — evita floodar a conversa principal e ajuda com os arquivos grandes (`cardapio.html`/`empresas.html`).
 
 Três cobrem arquivos que nunca foram divididos:
 
@@ -98,6 +98,11 @@ Quatro cruzam `cardapio.html` **e** `empresas.html`, cada um num domínio de JS 
 - **`checkout-specialist`** — frete/CEP/horários/validação/envio (`<page>-checkout.js`).
 - **`bot-specialist`** — bot de triagem + "Meus Pedidos" (`<page>-bot.js`/`-meus-pedidos.js`).
 - **`auth-specialist`** — login Firebase/Google + histórico (`<page>-auth.js`).
+
+Dois transversais:
+
+- **`ux-researcher`** — pesquisa de UX/benchmark (read-only, web + contexto D'Luh); pesquisa e recomenda, não implementa.
+- **`festas-specialist`** — domínio "Festas" (futura `festas.html` de orçamento de festas completas). Fonte de verdade: `FESTAS-PLANO.md` na raiz — a feature ainda não foi implementada; esse agente é quem implementa e mantém.
 
 As regras dentro dos subagentes são **reforços** das deste arquivo, não fonte de verdade paralela — se uma regra mudar aqui, atualize o `.md` do subagente correspondente. **Gotcha:** editar `.claude/agents/*.md` direto no disco só vale em sessão nova (precisa reiniciar); via o comando `/agents` dentro do Claude Code, vale na hora.
 

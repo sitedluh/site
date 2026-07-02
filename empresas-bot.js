@@ -565,7 +565,6 @@ function sbEditarPedido(paiId,valorPago,pedidoNum){
   if(pedido){abrirEditPedidoModal(pedido);}
   else{sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum);}
 }
-}
 async function sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum){
   showToast('Carregando itens...');
   const tel=(_sbPollTel||_statusBotTel||sbTelSalvo()).replace(/\D/g,'');
