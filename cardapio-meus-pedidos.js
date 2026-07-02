@@ -102,13 +102,14 @@ async function mpCarregar(){
 
 const MP_STATUS_CLS={
   'Aguardando confirmação':'mp-st-aguardando',
+  'Verificando Estoque':'mp-st-aguardando',
   'Confirmado — Esperando pagamento':'mp-st-confirmado',
   'Pago — Em produção':'mp-st-preparo',
   'Entregue — Esperando restante':'mp-st-entregue',
   'Finalizado':'mp-st-final',
   'Cancelado':'mp-st-cancelado',
 };
-const MP_PODE_CANCELAR=['Aguardando confirmação','Confirmado — Esperando pagamento','Pago — Em produção'];
+const MP_PODE_CANCELAR=['Aguardando confirmação','Verificando Estoque','Confirmado — Esperando pagamento','Pago — Em produção'];
 // Acende o ponto vermelho (.mp-unread) no botão "Pedidos" do header quando há
 // algum pedido cujo status ainda não foi marcado como visto pelo cliente (mpMarcarVisto).
 function mpRenderTriggerBadge(pedidos){

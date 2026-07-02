@@ -362,7 +362,7 @@ function sbRestaurarSessao(){
       {label:'🛵 Pagar tudo na entrega',onClick:()=>sbPagarNaEntrega()},
       {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
     ]);
-  }else if(sessao.status==='Aguardando confirmação'||!sessao.status){
+  }else if(sessao.status==='Aguardando confirmação'||sessao.status==='Verificando Estoque'||!sessao.status){
     sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
   }else{
     sbFimOpcoes();
@@ -535,17 +535,29 @@ async function sbChecarStatusPedido(){
       ]);
       sbPararAcompanhamento();
       sbLimparSessao(); // fim do que o acompanhamento automático cobre — não há mais o que persistir
-    }else if(atual.status==='Aguardando confirmação'){
+    }else if(atual.status==='Aguardando confirmação'||atual.status==='Verificando Estoque'){
+      // Pré-confirmação — segue acompanhando. "Verificando Estoque" é o status
+      // intermediário gravado no Coda quando a cozinha começa a conferência; antes
+      // ele caía no else genérico abaixo, que postava "Status atualizado: ..." cru
+      // e MATAVA o polling — o cliente nunca recebia a cobrança da entrada depois.
+      if(atual.status==='Verificando Estoque'&&_sbPollUltimoStatus!=='Verificando Estoque'){
+        sbAddMsg('bot','A cozinha está conferindo o estoque dos seus itens agora. 🔎 Assim que confirmar, te aviso aqui!');
+      }
       _sbPollUltimoStatus=atual.status;
     }else{
-      // Foge do que essa seção cobre (ex.: já foi direto pra Entregue/Finalizado) —
-      // avisa com a explicação padrão e encerra o acompanhamento automático.
+      // Status fora do fluxo pré-pagamento. Só ENCERRA o acompanhamento se for um
+      // desfecho real (entregue/finalizado/cancelado); status desconhecido (ex.: valor
+      // novo criado no Coda) é avisado mas o polling CONTINUA — nunca matar o
+      // acompanhamento por não reconhecer uma string.
       _sbPollUltimoStatus=atual.status;
       const explicacao=STATUS_BOT_EXPLICACAO[atual.status];
       sbAddMsg('bot',explicacao?`Atualização do seu pedido: ${explicacao}`:`Status atualizado: ${atual.status}`);
-      sbFimOpcoes();
-      sbPararAcompanhamento();
-      sbLimparSessao();
+      const FINAIS=['Entregue — Esperando restante','Finalizado','Cancelado'];
+      if(FINAIS.includes(atual.status)){
+        sbFimOpcoes();
+        sbPararAcompanhamento();
+        sbLimparSessao();
+      }
     }
   }catch(e){
     _sbPollFalhas++;
@@ -572,7 +584,7 @@ async function sbAtualizarStatusManual(){
     const d=await res.json().catch(()=>({}));
     const pedidos=(d&&d.encontrado&&d.pedidos)||[];
     const atual=pedidos.length?((_sbPollPaiId&&pedidos.find(pd=>pd.idPedido===_sbPollPaiId))||pedidos[0]):null;
-    if(!atual||atual.status==='Aguardando confirmação'){
+    if(!atual||atual.status==='Aguardando confirmação'||atual.status==='Verificando Estoque'){
       sbAddMsg('bot','⏳ Seu pedido ainda está sendo verificado pela nossa equipe. Assim que houver novidade, te aviso aqui!');
       sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
     }else if(atual.status==='Confirmado — Esperando pagamento'&&atual.linkPagamento){
@@ -613,6 +625,7 @@ async function sbAtualizarStatusManual(){
 // ── 2.1 — Status do pedido ──
 const STATUS_BOT_EXPLICACAO={
   'Aguardando confirmação':'sua equipe ainda vai confirmar o estoque dos itens. Assim que confirmar, te aviso por aqui e pelo WhatsApp.',
+  'Verificando Estoque':'a cozinha está conferindo o estoque dos seus itens agora. 🔎 Assim que confirmar, te aviso por aqui!',
   'Confirmado — Esperando pagamento':'o estoque já foi confirmado! Falta só o pagamento da entrada pra entrar em produção.',
   'Pago — Em produção':'a entrada foi paga e seu pedido já está sendo produzido com todo cuidado. 🎂',
   'Entregue — Esperando restante':'seu pedido já foi entregue! Falta só o pagamento do restante pra finalizar.',
