@@ -281,6 +281,7 @@ function sbSalvarSessao(){
       status:_sbPollUltimoStatus,
       linkPagamento:_sbPollLinkPagamento,
       entrada:_sbPollEntradaValor,
+      ts:Date.now(),
       mensagens,
     }));
   }catch(_){}
@@ -338,6 +339,10 @@ function sbRestaurarSessao(){
     if(saved)sessao=JSON.parse(saved);
   }catch(_){}
   if(!sessao||!sessao.tel||!sessao.mensagens||!sessao.mensagens.length)return;
+  // Sessão expirada (>24h desde o último salvamento — sbSalvarSessao roda a cada
+  // ciclo do poll, então ts só envelhece com a aba fechada/sem atividade) ou sem
+  // ts (formato antigo, pré-expiração): dados provavelmente obsoletos, limpa.
+  if(!sessao.ts||Date.now()-sessao.ts>24*60*60*1000){sbLimparSessao();return;}
   // Status terminal — não há mais nada a acompanhar, não vale a pena restaurar.
   if(['Pago — Em produção','Finalizado','Cancelado'].includes(sessao.status)){sbLimparSessao();return;}
   const msgs=document.getElementById('status-bot-msgs');
@@ -668,7 +673,7 @@ function dluhEditConcluir(){
 }
 async function sbStatusConsultar(tel){
   const telDigits=(tel||'').replace(/\D/g,'');
-  if(telDigits.length<8){
+  if(telDigits.length<10||telDigits.length>11){
     sbAddMsg('bot','Esse número não parece completo — digite o WhatsApp com DDD que você usou no pedido (ex: 11999998888).');
     sbMostrarInput('telefone','Seu WhatsApp (com DDD)','Ver status');
     return;
