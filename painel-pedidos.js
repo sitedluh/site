@@ -226,6 +226,8 @@ async function fetchOrders() {
     // então buscamos os mesmos registros com useColumnNames=true para pegar os valores certos.
     const valorTotalMap = {};
     const valorPagoMap = {};
+    const valorEntregaMap = {};
+    const pagoStatusMap = {};
     try {
       let vItems = [];
       let vToken = null;
@@ -241,10 +243,13 @@ async function fetchOrders() {
         const vv = row.values || {};
         valorTotalMap[row.id] = vv['Valor Total'];
         valorPagoMap[row.id] = (vv['Valor Pago'] !== undefined ? vv['Valor Pago'] : vv['Valor pago']);
+        // "Valor da Entrega" (campo do pai) e "Pago?" (Não pago / Só entrada / Totalmente pago)
+        valorEntregaMap[row.id] = vv['Valor da Entrega'];
+        pagoStatusMap[row.id] = vv['Pago?'] || '';
       });
     } catch(e) { /* se falhar, parseRows cai no fallback pelo ID antigo / sem valor pago */ }
 
-    const newAllOrders = parseRows(allItems, valorTotalMap, valorPagoMap);
+    const newAllOrders = parseRows(allItems, valorTotalMap, valorPagoMap, valorEntregaMap, pagoStatusMap);
 
     // Detecta pedidos novos (que não existiam antes)
     if (allOrders.length > 0) {
@@ -263,10 +268,12 @@ async function fetchOrders() {
   }
 }
 
-function parseRows(rows, valorTotalMap, valorPagoMap) {
+function parseRows(rows, valorTotalMap, valorPagoMap, valorEntregaMap, pagoStatusMap) {
   const c = CFG.cols;
   valorTotalMap = valorTotalMap || {};
   valorPagoMap = valorPagoMap || {};
+  valorEntregaMap = valorEntregaMap || {};
+  pagoStatusMap = pagoStatusMap || {};
   return rows
     .filter(row => !row.parent) // ignora linhas filho (subpáginas)
     .map((row, i) => {
@@ -317,6 +324,8 @@ function parseRows(rows, valorTotalMap, valorPagoMap) {
         : (v[c.valor] || ''),
       // "Valor Pago" pelo nome da coluna — usado para calcular o que falta cobrar na entrega.
       valorPago: (valorPagoMap[row.id] !== undefined && valorPagoMap[row.id] !== null) ? valorPagoMap[row.id] : 0,
+      valorEntrega: valorEntregaMap[row.id] || '',
+      pago: pagoStatusMap[row.id] || '',
       entregue: String(v[c.status] || '').toLowerCase() === String(c.statusValor).toLowerCase()
     };
   }).filter(Boolean).sort((a,b) => a.datetime - b.datetime);
@@ -375,10 +384,13 @@ function entregaConfirmResposta(cobrar) {
   document.getElementById('entrega-confirm-overlay').classList.remove('open');
   _entregaPendingId = null;
   if (!id) return;
+  // 'feito-nao-pago' = novo botão: marca o pedido como feito/entregue SEM cobrar,
+  // e registra explicitamente "Pago?" = 'Não pago' na Pedidos Base.
+  if (cobrar === 'feito-nao-pago') { markDelivered(id, false, 'Não pago'); return; }
   markDelivered(id, cobrar);
 }
 
-async function markDelivered(id, cobrar = true) {
+async function markDelivered(id, cobrar = true, pagoStatus = null) {
   const btn = document.getElementById('db-' + id);
   const originalText = btn ? btn.textContent : '✓ Marcar como Entregue';
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando...'; }
@@ -386,10 +398,14 @@ async function markDelivered(id, cobrar = true) {
   if (o) o.entregue = true;
   try {
     const url = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows/${id}`;
+    // Além do status "Entregue", grava "Pago?" quando informado (botão "Feito, não pago").
+    // A API do Coda aceita nome de coluna; a Option precisa existir EXATA no Coda.
+    const cells = [{ column: 'c-SpdhR0ZMGd', value: CFG.cols.statusValor }];
+    if (pagoStatus) cells.push({ column: 'Pago?', value: pagoStatus });
     const res = await fetch(url, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${CFG.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ row: { cells: [{ column: 'c-SpdhR0ZMGd', value: CFG.cols.statusValor }] } })
+      body: JSON.stringify({ row: { cells } })
     });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
@@ -398,8 +414,9 @@ async function markDelivered(id, cobrar = true) {
       if (btn) { btn.disabled = false; btn.textContent = originalText; }
       return;
     }
-    showToast(cobrar ? '✅ Entregue! Gerando cobrança...' : '✅ Entregue!', o ? o.nome : '');
-    speak('Pedido marcado como entregue!');
+    if (pagoStatus) { if (o) o.pago = pagoStatus; }
+    showToast(cobrar ? '✅ Entregue! Gerando cobrança...' : (pagoStatus ? '✅ Feito — marcado como NÃO PAGO' : '✅ Entregue!'), o ? o.nome : '');
+    speak(pagoStatus ? 'Pedido feito, marcado como não pago!' : 'Pedido marcado como entregue!');
     // Gera link InfinitePay e abre WhatsApp com a mensagem — só se o usuário pediu para cobrar.
     if (cobrar && o) {
       const { totalNum, pagoNum, restanteNum } = calcRestante(o);
@@ -562,11 +579,38 @@ function setFilter(f, btn) {
   renderAll();
 }
 
+// ── Destaque "Fazer agora" ──
+// Até 2 pedidos no destaque central: atrasados + os que vencem na próxima 1h
+// (fallback: o próximo da fila). Com 2, alternam sozinhos a cada 10s, com setas
+// e indicador pra trocar manualmente (featNav).
+let _featList = [];
+let _featIdx = 0;
+
+function featNav(dir) {
+  if (_featList.length < 2) return;
+  _featIdx = (_featIdx + dir + _featList.length) % _featList.length;
+  _featRotDelay = 3; // segura a rotação automática por ~30s depois de um toque manual
+  renderAll();
+}
+let _featRotDelay = 0;
+setInterval(() => {
+  if (_featList.length > 1) {
+    if (_featRotDelay > 0) { _featRotDelay--; return; }
+    _featIdx = (_featIdx + 1) % _featList.length;
+    renderAll();
+  }
+}, 10000);
+
 function renderAll() {
   const now = new Date();
-  const upcoming = orders.filter(o => !o.entregue && o.datetime >= now);
-  const lateUndel = orders.filter(o => !o.entregue && o.datetime < now).sort((a,b) => b.datetime - a.datetime);
-  const featured = upcoming[0] || lateUndel[0] || null;
+  const pend = orders.filter(o => !o.entregue);
+  const atrasados = pend.filter(o => o.datetime < now).sort((a,b) => a.datetime - b.datetime);
+  const proximos = pend.filter(o => o.datetime >= now).sort((a,b) => a.datetime - b.datetime);
+  let agora = atrasados.concat(proximos.filter(o => (o.datetime - now) / 60000 <= 60));
+  if (!agora.length) agora = proximos.slice(0, 1); // nada urgente: mostra o próximo da fila
+  _featList = agora.slice(0, 2);
+  if (_featIdx >= _featList.length) _featIdx = 0;
+  const featured = _featList[_featIdx] || null;
   renderFeatured(featured, now);
   const filtered = orders.filter(o => {
     if (filter === 'retirada') return o.tipo.toLowerCase().includes('retirada');
@@ -580,8 +624,19 @@ function renderAll() {
     if (!a.entregue && b.entregue) return -1;
     return a.datetime - b.datetime;
   });
-  renderQueue(filtered.filter(o => !featured || o.id !== featured.id), featured, now);
+  // Fila embaixo = tudo que não está no destaque (os 2 do "fazer agora" saem da lista)
+  renderQueue(filtered.filter(o => !_featList.some(f => f.id === o.id)), featured, now);
   renderMobile(); // atualiza versão mobile também
+}
+
+// Badge da coluna "Pago?" da Pedidos Base (Não pago / Só entrada / Totalmente pago)
+function pagoBadge(o) {
+  const p = String(o.pago || '').toLowerCase();
+  if (!p) return '';
+  if (p.includes('não') || p.includes('nao')) return '<span class="pago-badge nao-pago">💰 Não pago</span>';
+  if (p.includes('entrada')) return '<span class="pago-badge so-entrada">💰 Só entrada</span>';
+  if (p.includes('total')) return '<span class="pago-badge total">💰 Totalmente pago</span>';
+  return `<span class="pago-badge so-entrada">💰 ${esc(o.pago)}</span>`;
 }
 
 function renderFeatured(order, now) {
@@ -596,10 +651,18 @@ function renderFeatured(order, now) {
     : `${mins} min`;
   const timerCls = (isLate || mins <= 15) ? 'fc-timer-val urg' : 'fc-timer-val';
   const items = parseItems(order.pedido);
-  el.innerHTML = `
+  // Com 2 pedidos "pra agora": setas + bolinhas pra alternar (também troca sozinho a cada 10s)
+  const nav = _featList.length > 1 ? `
+    <div class="fc-nav">
+      <button class="fc-nav-btn" onclick="featNav(-1)">‹</button>
+      <div class="fc-dots">${_featList.map((_,i)=>`<span class="fc-dot${i===_featIdx?' on':''}"></span>`).join('')}</div>
+      <span class="fc-nav-lbl">${_featIdx+1}/${_featList.length}</span>
+      <button class="fc-nav-btn" onclick="featNav(1)">›</button>
+    </div>` : '';
+  el.innerHTML = `${nav}
     <div class="fc">
       <div class="fc-hdr">
-        <span class="fc-badge">PRÓXIMO</span>
+        <span class="fc-badge">${isLate?'ATRASADO':'AGORA'}</span>
         <span class="fc-name">${esc(order.nome)}</span>
         <span class="fc-tipo">${isEntrega?'🛵 Entrega':'🛍️ Retirada'}</span>
       </div>
@@ -620,6 +683,8 @@ function renderFeatured(order, now) {
       <div class="items-list" id="fitems">${items}</div>
       <div class="fc-foot">
         <div class="fc-phone">📞 ${esc(order.telefone||'—')}</div>
+        ${pagoBadge(order)}
+        ${order.valorEntrega?`<span style="font-size:.85rem;color:var(--text2)">🛵 ${esc(fmtMoney(order.valorEntrega))}</span>`:''}
         <div class="fc-total">${esc(fmtMoney(order.valor))}</div>
       </div>
       ${!order.entregue
@@ -675,6 +740,7 @@ function renderQueue(list, featured, now) {
         <div class="qcard-bot">
           <span class="tag ${tc}">${isEntrega?'🛵 Entrega':'🛍️ Retirada'}</span>
           ${isLate&&!o.entregue?'<span class="tag urgente">⚠️ Atrasado</span>':isUrg&&!o.entregue?'<span class="tag urgente">🔥 Urgente</span>':''}
+          ${pagoBadge(o)}
           <span class="qdate">${fmtDate(o.datetime)}</span>
           <span class="qcd ${cdcls}">${cd}</span>
         </div>

@@ -43,15 +43,40 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 }
 @keyframes pg { 0%,100%{box-shadow:0 0 20px rgba(249,115,22,.3)} 50%{box-shadow:0 0 40px rgba(249,115,22,.6)} }
 
-/* MAIN */
-.main { display: flex; flex: 1; }
-.col-featured { width: 100%; padding: 14px; }
+/* MAIN — destaque grande no centro/topo, fila embaixo */
+.main { display: flex; flex: 1; flex-direction: column; }
+.col-featured { width: 100%; max-width: 860px; margin: 0 auto; padding: 14px; }
 .col-queue { flex: 1; padding: 14px; border-top: 1px solid var(--border); }
 @media(min-width:900px) {
-  .col-queue { width: 400px; flex-shrink: 0; border-right: 1px solid var(--border); border-top: none; }
-  .col-featured { border-top: none; }
-  .main { flex-direction: row; }
+  .col-featured { padding: 20px 24px 10px; }
+  /* Fila em grade abaixo do destaque — vários cards por linha */
+  #queue { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; align-items: start; }
+  .qcard { margin-bottom: 0; }
+  /* Destaque maior (modo TV) */
+  .fc-name { font-size: 1.8rem; }
+  .fc-timer-val { font-size: 2.6rem; }
+  .fc-box-val { font-size: 1.3rem; }
+  .fc-box-val.hl { font-size: 1.6rem; }
 }
+
+/* Navegação do destaque (2 pedidos "pra agora" alternando) */
+.fc-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
+.fc-nav-btn {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 50%;
+  width: 38px; height: 38px; color: var(--text); font-size: 1.3rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all .2s;
+}
+.fc-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.fc-dots { display: flex; gap: 8px; align-items: center; }
+.fc-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); transition: all .2s; }
+.fc-dot.on { background: var(--accent); box-shadow: 0 0 8px rgba(249,115,22,.6); }
+.fc-nav-lbl { font-size: .8rem; color: var(--text3); font-weight: 600; }
+
+/* Badge de pagamento (coluna "Pago?" da Pedidos Base) */
+.pago-badge { border-radius: 20px; padding: 3px 10px; font-size: .78rem; font-weight: 700; }
+.pago-badge.nao-pago { background: var(--red-soft); color: var(--red); border: 1px solid var(--red); }
+.pago-badge.so-entrada { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+.pago-badge.total { background: var(--green-soft); color: var(--green); border: 1px solid var(--green); }
 
 .slabel {
   font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
@@ -376,6 +401,8 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .pp-confirm-btn.yes:hover { background:var(--green); color:#0e0c0a; }
 .pp-confirm-btn.no { background:var(--surface2); border:1px solid var(--border); color:var(--text2); }
 .pp-confirm-btn.no:hover { border-color:var(--text2); color:var(--text); }
+.pp-confirm-btn.feito { background:var(--red-soft); border:1px solid var(--red); color:var(--red); }
+.pp-confirm-btn.feito:hover { background:var(--red); color:#fff; }
 .pp-confirm-btn.cancel { background:none; border:none; color:var(--text3); font-weight:500; padding:8px; }
 .pp-confirm-btn.cancel:hover { color:var(--text); }
 .pp-confirm-btn:disabled { opacity:.5; cursor:default; }

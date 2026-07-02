@@ -7,6 +7,15 @@ color: yellow
 
 Você é o especialista em `painel-pedidos.html`: painel de cozinha/entrega da D'Luh Festas, pensado pra rodar numa TV ou tablet. Mostra a fila do dia, dispara alertas sonoros por proximidade do horário do pedido, marca pedidos como entregues/retirados, e imprime recibo em impressora térmica.
 
+## Layout (desktop/TV)
+
+Destaque **"Fazer agora"** grande e centralizado no topo (`.col-featured`, max-width 860px), fila em **grade** abaixo (`#queue` em grid ≥900px). O destaque mostra até **2** pedidos "pra agora" (`_featList`: atrasados + os que vencem em ≤60min; fallback = próximo da fila), alternando sozinho a cada **10s** com setas/bolinhas (`featNav()`, `_featIdx`; toque manual segura a rotação por ~30s via `_featRotDelay`). Os pedidos do destaque saem da fila de baixo (filtro por `_featList` em `renderAll()`).
+
+## Colunas extras da Pedidos Base (lidas por NOME via useColumnNames)
+
+- **`Valor da Entrega`** (campo do pai): o worker (`pbPosProcessarPedido`) move pra cá o valor da row filha "Taxa de Entrega" criada pela fórmula do botão Adicionar, e apaga a filha. O painel exibe (`o.valorEntrega`) no rodapé do destaque.
+- **`Pago?`** (single-select, Options EXATAS: `Não pago` / `Só entrada` / `Totalmente pago`): badge colorido (`pagoBadge()`, classes `.pago-badge.nao-pago/.so-entrada/.total`) no destaque e nos cards. Atualizada automaticamente pelo worker (entrada paga → 'Só entrada'; restante/Finalizado → 'Totalmente pago'; pagar na retirada → 'Não pago') e pelo botão novo abaixo.
+
 ## CSS/JS externos
 
 O `<style>` inline virou `painel-pedidos.css`, e o único `<script>` (toda a lógica) virou `painel-pedidos.js` — `painel-pedidos.html` hoje é só estrutura/markup (`<link>`/`<script src>`, sem `<script type="module">`, já que esse arquivo nunca teve import ESM). Pra editar lógica (fila, alertas, `confirmarEntrega()`/`markDelivered()`, impressão, o token hardcoded), o arquivo é `painel-pedidos.js`; markup novo é `painel-pedidos.html`; estilo é `painel-pedidos.css`.
@@ -21,6 +30,8 @@ Este é o **único** arquivo HTML do projeto que não fala com o Coda só atrav�
 ## Fluxo de confirmação de entrega
 
 O botão de marcar pedido como entregue/retirado abre uma caixa de confirmação perguntando se deve cobrar o restante **antes** de qualquer alteração (`confirmarEntrega()`/`markDelivered()`). Esse é um gate intencional: **nenhuma mudança no Coda, no Worker, ou em WhatsApp deve ocorrer antes da resposta do usuário** nessa caixa. Se for tocar nesse fluxo, preserve esse gate — não deixe nenhum caminho de código que cause efeito colateral (gravação, cobrança, mensagem) antes da confirmação explícita.
+
+A caixa tem **3 respostas**: "💳 Marcar e cobrar restante" (gera cobrança via `/entrega-confirmada`), "✓ Marcar sem cobrar" e "✔️ Feito, não pago" (`entregaConfirmResposta('feito-nao-pago')` → `markDelivered(id,false,'Não pago')`: marca entregue E grava `Pago?='Não pago'` na Pedidos Base, sem cobrança — pro pedido feito cujo pagamento ainda vai ser acertado).
 
 Ao confirmar entrega, o worker grava `Status='Entregue — Esperando restante'` na tabela Orçamentos via `/entrega-confirmada`.
 

@@ -58,9 +58,15 @@
   <button id="unlock-btn" onclick="unlockAudio()">🔊 Toque para ativar o som</button>
 
   <div class="main">
-    <!-- QUEUE (esquerda, menor) -->
+    <!-- FEATURED (topo, centro, grande — pedido(s) pra fazer AGORA) -->
+    <div class="col-featured">
+      <div class="slabel" style="justify-content:center">▶ Fazer agora</div>
+      <div id="featured"></div>
+    </div>
+
+    <!-- QUEUE (abaixo, todos os próximos) -->
     <div class="col-queue">
-      <div class="slabel">Fila do dia</div>
+      <div class="slabel">Próximos pedidos</div>
       <div class="filter-bar">
         <button class="fbtn active" onclick="setFilter('todos',this)">Todos</button>
         <button class="fbtn" onclick="setFilter('retirada',this)">🛍️ Retirada</button>
@@ -69,12 +75,6 @@
       </div>
       <div id="queue"></div>
       <div class="rlabel" id="rlabel">—</div>
-    </div>
-
-    <!-- FEATURED (direita, área boa da tela) -->
-    <div class="col-featured">
-      <div class="slabel">▶ Próximo</div>
-      <div id="featured"></div>
     </div>
   </div>
 </div>
@@ -115,6 +115,7 @@
     <div class="pp-confirm-actions">
       <button class="pp-confirm-btn yes" id="entrega-confirm-yes" onclick="entregaConfirmResposta(true)">💳 Marcar e cobrar restante</button>
       <button class="pp-confirm-btn no" id="entrega-confirm-no" onclick="entregaConfirmResposta(false)">✓ Marcar sem cobrar</button>
+      <button class="pp-confirm-btn feito" id="entrega-confirm-feito" onclick="entregaConfirmResposta('feito-nao-pago')">✔️ Feito, não pago</button>
       <button class="pp-confirm-btn cancel" onclick="closeEntregaConfirm()">Cancelar</button>
     </div>
   </div>
