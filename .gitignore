@@ -5,3 +5,7 @@ worker-completo-pronto.js
 
 # Equipe de marketing (projeto Claude interno, não vai pro deploy)
 marketing/
+
+# Dependências e config local — nunca vão pro deploy (GitHub Pages serviria tudo público)
+node_modules/
+.vscode/
