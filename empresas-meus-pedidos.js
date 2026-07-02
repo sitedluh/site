@@ -141,6 +141,9 @@ function mpCardHtml(p){
   // _mpCancelandoId é limpo pelo mpCarregar() assim que o status deixar de permitir cancelamento.
   const estaCancelando=p.idPedido===_mpCancelandoId;
   const podeEditar=p.status==='Aguardando confirmação'||p.status==='Confirmado — Esperando pagamento'||p.status==='Verificando Estoque';
+  // "Pagar na entrega" aparece sempre que o pedido está confirmado esperando a entrada —
+  // inclusive quando o link de pagamento ainda não existe (confirmação por caminho sem cobrança).
+  const podeNaEntrega=p.status==='Confirmado — Esperando pagamento';
   return `<div class="mp-card" data-idpedido="${esc(p.idPedido)}" onclick="mpMarcarVisto('${esc(p.idPedido)}')">
     <div class="mp-card-top">
       <span class="mp-badge ${cls}">${esc(p.status)}</span>
@@ -151,6 +154,7 @@ function mpCardHtml(p){
     <div class="mp-card-valores">${p.total?`Total: ${fmtBRL(p.total)}`:''}${p.valorPago?` · Pago: ${fmtBRL(p.valorPago)}`:''}${p.restante>0?` · Falta: ${fmtBRL(p.restante)}`:''}</div>
     <div class="mp-card-actions">
       ${podePagar?`<button class="mp-btn-pagar" onclick="event.stopPropagation();window.open('${esc(p.linkPagamento)}','_blank')">💳 Pagar ${fmtBRL(valorPagar)}</button>`:''}
+      ${podeNaEntrega?`<button class="mp-btn-naentrega" onclick="event.stopPropagation();mpPagarNaEntrega('${esc(p.idPedido)}')">🛵 Pagar na entrega</button>`:''}
       ${podeEditar?`<button class="mp-btn-editar" onclick="event.stopPropagation();mpEditarPedido('${esc(p.idPedido)}',${Number(p.valorPago||0)},'${esc(p.idPedido)}')">✏️ Editar</button>`:''}
       ${estaCancelando?'<button class="mp-btn-cancelar" disabled>⏳ Cancelando...</button>':podeCancelar?`<button class="mp-btn-cancelar" onclick="event.stopPropagation();mpIniciarCancelamento('${esc(p.idPedido)}')">❌ Cancelar</button>`:''}
     </div>
@@ -161,6 +165,27 @@ function mpMarcarVisto(idPedido){
   const p=_mpUltimosPedidos.find(x=>x.idPedido===idPedido);
   if(p)localStorage.setItem(mpUltimoStatusKey(idPedido),p.status);
   mpRenderLista(_mpUltimosPedidos);
+}
+
+// "Pagar na entrega": abre o WhatsApp DA LOJA com uma mensagem pronta identificando o
+// pedido (nº, itens, valores) pra combinar o pagamento na entrega/retirada. Nada muda
+// no Coda — o atendente confirma a combinação por lá. window.open direto no clique
+// (gesto síncrono), sem fetch antes, senão o navegador bloqueia o popup.
+function mpPagarNaEntrega(idPedido){
+  const p=_mpUltimosPedidos.find(x=>x.idPedido===idPedido);
+  if(!p)return;
+  let m='Olá! Quero combinar o pagamento do meu pedido na entrega/retirada. 🛵\n\n';
+  m+=`📦 Pedido: ${p.idPedido||''}\n`;
+  if(p.data)m+=`📅 Data: ${p.data}${p.horario?' às '+p.horario:''}\n`;
+  if(p.itens&&p.itens.length){
+    m+='\n📋 Itens:\n';
+    p.itens.forEach(i=>{const q=Number(i.quantidade||i.qtd)||1;const v=Number(i.valorUnit)||0;m+=`  • ${q}x ${i.produto||i.nome||''}${v?` = ${fmtBRL(q*v)}`:''}\n`;});
+  }
+  if(p.total)m+=`\n💰 Total: ${fmtBRL(p.total)}`;
+  if(p.valorPago)m+=`\n✅ Já pago: ${fmtBRL(p.valorPago)}`;
+  if(p.restante>0)m+=`\n⏳ Restante: ${fmtBRL(p.restante)}`;
+  m+='\n\nPode confirmar pra mim? Obrigado(a)! 🩷';
+  window.open(`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(m)}`,'_blank');
 }
 
 async function mpIniciarCancelamento(idPedido){

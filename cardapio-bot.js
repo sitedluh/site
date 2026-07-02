@@ -191,20 +191,22 @@ function sbMenuPrincipal(saudacao){
   sbBotoes([
     {label:'📦 Status do meu pedido',onClick:()=>{sbExigeLogin(sbStatusPedirTelefone);}},
     {label:'🛒 Fazer um pedido',onClick:()=>{sbNovoPedido();}},
-    {label:'❓ Tirar uma dúvida',onClick:()=>{sbExigeLogin(sbDuvidas);}},
+    {label:'❓ Tirar uma dúvida',onClick:()=>{sbDuvidas();}},
     {label:'💬 Falar com um atendente',onClick:()=>{sbAtendente();}},
   ]);
 }
 
-// ── 2.0.1 — Login obrigatório (Status, Dúvidas e acompanhamento pós-pedido) ──
-// "Fazer um pedido" e "Falar com atendente" continuam abertos, sem login.
+// ── 2.0.1 — Login obrigatório (só Status e acompanhamento pós-pedido) ──
+// "Fazer um pedido", "Tirar uma dúvida" e "Falar com atendente" são abertos, sem login.
+// Dúvidas (sabores/preços/prazos) é informação PÚBLICA — a mesma que está na página —
+// então exigir login aqui era só fricção; o gate fica onde há dado pessoal (status).
 function sbExigeLogin(continuarCom){
   if(window._fbUser){ continuarCom(); return; }
   sbEsconderInput();
   sbAddMsg('bot','Pra te mostrar isso com segurança, preciso te identificar. É rapidinho: entra com sua conta Google. 🔒');
   sbBotoes([
     {label:'🔵 Entrar com Google',onClick:()=>sbFazerLogin(continuarCom)},
-    {label:'🔙 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+    {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
   ]);
 }
 async function sbFazerLogin(continuarCom){
@@ -217,7 +219,7 @@ async function sbFazerLogin(continuarCom){
     sbBotoes([
       {label:'🔵 Entrar com Google',onClick:()=>sbFazerLogin(continuarCom)},
       {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
-      {label:'🔙 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+      {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
     ]);
   }
 }
@@ -258,6 +260,8 @@ let _sbPollPaiId=null; // ID (Coda) do pedido recém-criado — rastreia ESSE pe
 let _sbPollNaoAchou=0; // tentativas seguidas sem achar _sbPollPaiId na listagem (consistência eventual do Coda)
 let _sbPollLinkPagamento=null; // link de cobrança já avisado ao cliente (persistido pra reconstruir o botão "Pagar agora" após reload)
 let _sbPollEntradaValor=null; // valor cobrado já avisado ao cliente (idem)
+let _sbPollSemLink=0; // ciclos seguidos em "Confirmado" sem Link de Pagamento (espera o link ser gerado)
+let _sbPollAvisoSemLink=false; // já avisou a confirmação sem link (persistido pra não repetir após reload)
 
 // ── Persistência da sessão de acompanhamento (localStorage) ──────────
 // Sem isso, um F5 (ou às vezes até fechar/reabrir o painel) zerava _sbPollTimer e todo
@@ -281,6 +285,7 @@ function sbSalvarSessao(){
       status:_sbPollUltimoStatus,
       linkPagamento:_sbPollLinkPagamento,
       entrada:_sbPollEntradaValor,
+      avisoSemLink:_sbPollAvisoSemLink,
       ts:Date.now(),
       mensagens,
     }));
@@ -354,6 +359,7 @@ function sbRestaurarSessao(){
   if(sessao.status==='Confirmado — Esperando pagamento'&&sessao.linkPagamento){
     sbBotoes([
       {label:'💳 Pagar agora',onClick:()=>window.open(sessao.linkPagamento,'_blank')},
+      {label:'🛵 Pagar tudo na entrega',onClick:()=>sbPagarNaEntrega()},
       {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
     ]);
   }else if(sessao.status==='Aguardando confirmação'||!sessao.status){
@@ -375,6 +381,8 @@ function sbRestaurarSessao(){
     :(sessao.status||'Aguardando confirmação');
   _sbPollLinkPagamento=sessao.linkPagamento||null;
   _sbPollEntradaValor=sessao.entrada||null;
+  _sbPollAvisoSemLink=!!sessao.avisoSemLink;
+  _sbPollSemLink=0;
   _sbPollFalhas=0;
   _sbPollNaoAchou=0;
   sbChecarStatusPedido();
@@ -392,6 +400,8 @@ function sbIniciarAcompanhamento(tel,waUrl,paiId){
   _sbPollNaoAchou=0;
   _sbPollLinkPagamento=null;
   _sbPollEntradaValor=null;
+  _sbPollSemLink=0;
+  _sbPollAvisoSemLink=false;
   sbSalvarSessao(); // grava já de início, pra um reload logo após o pedido não perder o resumo
   // 1ª checagem já dispara na hora (em vez de esperar os 12s do 1º tick do
   // interval) — evita que uma falha transiente bem no começo (ex.: Coda ainda
@@ -401,6 +411,48 @@ function sbIniciarAcompanhamento(tel,waUrl,paiId){
 }
 function sbPararAcompanhamento(){
   if(_sbPollTimer){clearInterval(_sbPollTimer);_sbPollTimer=null;}
+}
+// ── "Pagar tudo na entrega" ──────────────────────────────────────────────────
+// O cliente pode preferir acertar o valor todo na entrega/retirada em vez de pagar
+// a entrada pelo link. Nesse caso o bot monta uma mensagem de WhatsApp PRA LOJA
+// identificando o pedido (nº, itens, valores) e o cliente só envia. Nada muda no
+// Coda — a combinação é confirmada pelo atendente por lá.
+function sbMsgPagarNaEntrega(p){
+  let m='Olá! Quero combinar o pagamento do meu pedido na entrega/retirada. 🛵\n\n';
+  m+=`📦 Pedido: ${p.idPedido||''}\n`;
+  if(p.data)m+=`📅 Data: ${p.data}${p.horario?' às '+p.horario:''}\n`;
+  if(p.itens&&p.itens.length){
+    m+='\n📋 Itens:\n';
+    p.itens.forEach(i=>{const q=Number(i.quantidade)||1;const v=Number(i.valorUnit)||0;m+=`  • ${q}x ${i.produto||''}${v?` = ${fmtBRL(q*v)}`:''}\n`;});
+  }
+  if(p.total)m+=`\n💰 Total: ${fmtBRL(p.total)}`;
+  if(p.valorPago)m+=`\n✅ Já pago: ${fmtBRL(p.valorPago)}`;
+  if(p.restante>0)m+=`\n⏳ Restante: ${fmtBRL(p.restante)}`;
+  m+='\n\nPode confirmar pra mim? Obrigado(a)! 🩷';
+  return m;
+}
+// Busca os dados frescos do pedido (funciona tanto no poll quanto após restaurar
+// sessão, quando os itens não estão em memória) e oferece o botão de envio — o
+// window.open fica no clique do botão porque popup fora de gesto síncrono é bloqueado.
+async function sbPagarNaEntrega(){
+  sbAddMsg('bot','Boa! Vou preparar a mensagem com os dados do seu pedido... ⏳');
+  try{
+    const tel=((_sbPollTel||_statusBotTel||sbTelSalvo())||'').replace(/\D/g,'');
+    if(!tel)throw new Error('sem telefone');
+    const res=await fetch(`${CONFIG.WORKER_URL}/status-pedido?tel=${encodeURIComponent(tel)}`);
+    const d=await res.json().catch(()=>({}));
+    const pedidos=(d&&d.encontrado&&d.pedidos)||[];
+    const p=(_sbPollPaiId&&pedidos.find(x=>x.idPedido===_sbPollPaiId))||pedidos[0];
+    if(!p)throw new Error('pedido não encontrado');
+    const url=`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(sbMsgPagarNaEntrega(p))}`;
+    sbAddMsg('bot','Prontinho! É só tocar no botão e enviar a mensagem que eu já montei — a gente confirma por lá. 📲');
+    sbBotoes([
+      {label:'📲 Enviar no WhatsApp',onClick:()=>window.open(url,'_blank')},
+      {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+    ]);
+  }catch(e){
+    sbWhatsappFallback('Não consegui montar a mensagem automaticamente.',_sbPollWaUrl);
+  }
 }
 async function sbChecarStatusPedido(){
   if(!_sbPollTel)return;
@@ -432,7 +484,26 @@ async function sbChecarStatusPedido(){
     }
     if(atual.status===_sbPollUltimoStatus)return;
     if(atual.status==='Confirmado — Esperando pagamento'){
-      if(!atual.linkPagamento)return; // link ainda sendo gerado — espera o próximo ciclo
+      if(!atual.linkPagamento){
+        // Link ainda sendo gerado — espera alguns ciclos. Se não vier (ex.: confirmação
+        // por um caminho que não gera cobrança), avisa mesmo sem link, oferecendo o
+        // "pagar tudo na entrega". NÃO marca _sbPollUltimoStatus: assim, quando o link
+        // aparecer num ciclo futuro, a mensagem com o botão "Pagar agora" ainda sai.
+        _sbPollSemLink++;
+        if(_sbPollSemLink>=3&&!_sbPollAvisoSemLink){
+          _sbPollAvisoSemLink=true;
+          const entradaNum=parseFloat(atual.entrada)||0;
+          sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, falta o pagamento da entrada${entradaNum?` de ${fmtBRL(entradaNum)}`:''}. Assim que o link de pagamento ficar pronto, eu te mando aqui.`);
+          sbAddMsg('bot','Se preferir, dá pra combinar de pagar tudo na entrega/retirada. 😉');
+          sbSalvarSessao();
+          sbBotoes([
+            {label:'🛵 Pagar tudo na entrega',onClick:()=>sbPagarNaEntrega()},
+            {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+          ]);
+        }
+        return;
+      }
+      _sbPollSemLink=0;
       // parseFloat: "entrada" e "total" chegam crus do Coda e podem vir como string
       // (ex.: "150.00") em vez de number — fmtBRL(string) lança TypeError. Antes dessa
       // correção, _sbPollUltimoStatus era definido ANTES do sbAddMsg: se a chamada
@@ -441,8 +512,10 @@ async function sbChecarStatusPedido(){
       const entradaNum=parseFloat(atual.entrada)||parseFloat(atual.total)||0;
       _sbPollLinkPagamento=atual.linkPagamento;
       _sbPollEntradaValor=entradaNum;
-      sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
-      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
+      sbAddMsg('bot',_sbPollAvisoSemLink
+        ?`O link de pagamento ficou pronto! 💳 Entrada de ${fmtBRL(entradaNum)}:`
+        :`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
+      sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳 Se preferir, também dá pra combinar de pagar tudo na entrega/retirada.');
       // Só marca como "já avisado" DEPOIS que as mensagens entraram no DOM — se sbAddMsg
       // lançar por qualquer razão, o próximo ciclo do poll tenta novamente.
       // Os botões vêm por último para que sbBotoes() (que chama scrollTop=scrollHeight)
@@ -450,6 +523,7 @@ async function sbChecarStatusPedido(){
       _sbPollUltimoStatus=atual.status;
       sbBotoes([
         {label:'💳 Pagar agora',onClick:()=>window.open(atual.linkPagamento,'_blank')},
+        {label:'🛵 Pagar tudo na entrega',onClick:()=>sbPagarNaEntrega()},
         {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
       ]);
     }else if(atual.status==='Pago — Em produção'){
@@ -588,7 +662,10 @@ let _dluhEditItens=[];
 let _dluhEditPedido=null;
 function _dluhEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function abrirEditPedidoModal(pedido){
-  _dluhEditItens=(pedido.itens||[]).map(i=>({
+  // A subrow "🛵 Taxa de Entrega" volta do /status-pedido como se fosse item, mas a
+  // taxa é recalculada e reenviada à parte (taxaFrete) no checkout da edição — se ela
+  // entrar aqui como item, o pedido editado fica com a entrega DUPLICADA no Coda.
+  _dluhEditItens=(pedido.itens||[]).filter(i=>!String(i.produto||i.nome||'').includes('Taxa de Entrega')).map(i=>({
     nome:i.produto||i.nome||'',
     qtd:Number(i.qtd||i.quantidade)||1,
     valor:Number(i.valor||i.valorUnit||i.preco||0),
@@ -750,10 +827,13 @@ function sbNovoPedido(){
   sbNovoPedidoAjuda();
 }
 function sbNovoPedidoAjuda(){
+  // Autoatendimento primeiro (o bot já sabe responder sabores/recheios), humano em
+  // seguida — mantém o atalho pro atendente sempre visível, mas sem pular direto.
   sbAddMsg('bot','Quer ajuda pra escolher sabores ou montar o pedido?');
   sbBotoes([
-    {label:'💬 Sim, me ajuda',onClick:()=>sbAtendente()},
-    {label:'👍 Não, valeu',onClick:()=>sbMenuPrincipal()},
+    {label:'🍰 Ver sabores e recheios',onClick:()=>sbDuvidaSabores()},
+    {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+    {label:'👍 Não precisa, valeu',onClick:()=>sbMenuPrincipal()},
   ]);
 }
 
@@ -847,11 +927,25 @@ async function sbDuvidaPrazosConsultar(valor){
     const d=await res.json();
     const livres=(d.slots||[]).filter(s=>s.disponivel);
     if(d.limiteGlobal===0){
+      // Botões respondem exatamente a pergunta feita na mensagem ("outra data?"),
+      // em vez de cair nos genéricos de sbFimOpcoes.
       sbAddMsg('bot',`Em ${valor} (${d.diaSemana||'esse dia'}) a gente não atende — está fora da nossa agenda. Bora escolher outra data?`);
+      sbBotoes([
+        {label:'📅 Tentar outra data',onClick:()=>sbDuvidaPrazos()},
+        {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+        {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+      ]);
+      return;
     }else if(livres.length>0){
       sbAddMsg('bot',`Boa notícia! ${valor} ainda tem horários disponíveis. 🎉\n\nPra travar a data certinha, é só montar seu pedido aqui mesmo no cardápio.`);
     }else{
       sbAddMsg('bot',`Hmm, ${valor} já está bem concorrido e não sobrou horário livre. 😕 Quer tentar outra data ou falar com a equipe?`);
+      sbBotoes([
+        {label:'📅 Tentar outra data',onClick:()=>sbDuvidaPrazos()},
+        {label:'💬 Falar com atendente',onClick:()=>sbAtendente()},
+        {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+      ]);
+      return;
     }
   }catch(e){
     sbWhatsappFallback('Tive um probleminha pra checar a disponibilidade agora.');
@@ -866,9 +960,14 @@ function sbAtendente(contexto){
   if(contexto)_sbContextoAtendente=contexto;
   const h=new Date().getHours();
   if(h<8||h>=19){
+    // Fora do horário: nunca "volte depois" sem saída — o WhatsApp funciona como
+    // caixa de mensagens assíncrona; deixa claro QUANDO a resposta chega.
     sbEsconderInput();
-    sbAddMsg('bot','Nosso atendimento humano funciona das 8h às 19h. Tente novamente nesse horário! 😊');
-    sbFimOpcoes();
+    sbAddMsg('bot','Nosso atendimento ao vivo funciona das 8h às 19h. 😴 Mas pode deixar sua mensagem no WhatsApp que a gente responde logo cedinho, assim que abrir!');
+    sbBotoes([
+      {label:'📲 Deixar mensagem no WhatsApp',onClick:()=>window.open(`https://wa.me/${CONFIG.WHATSAPP}`,'_blank')},
+      {label:'🔁 Voltar ao menu',onClick:()=>sbMenuPrincipal()},
+    ]);
     return;
   }
   sbEsconderInput();

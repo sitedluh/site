@@ -53,6 +53,7 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .mp-card-valores{font-size:12px;color:var(--text3);margin-bottom:8px}
 .mp-card-actions{display:flex;gap:8px;flex-wrap:wrap}
 .mp-btn-pagar{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.mp-btn-naentrega{background:none;border:1px solid #16a34a;color:#16a34a;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .mp-btn-editar{background:none;border:1px solid #2563eb;color:#2563eb;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .mp-btn-cancelar{background:none;border:1px solid #c0725a;color:#c0725a;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .mp-cancel-erro{color:#c0392b;font-size:13px}
