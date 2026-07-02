@@ -816,3 +816,40 @@ body.checkout-active .cats-row{display:none!important}
 #edit-concluir-footer .ecf-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .15s}
 #edit-concluir-footer .ecf-btn:hover{background:var(--accent-dark)}
 
+/* ══════════════════════════════════════
+   TOP 3 MAIS VENDIDOS DA SEMANA
+══════════════════════════════════════ */
+.top-semana-section{padding:20px 0 6px}
+.top-semana-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:500;color:var(--text);padding:0 20px 6px}
+.top-semana-list{display:flex;flex-direction:column;gap:18px;padding:14px 16px 8px}
+.top-semana-grid{display:none}
+.tsw-card{position:relative;background:var(--surface);border:2px solid var(--border);border-radius:var(--radius-lg)}
+.tsw-card .prod-item{border-bottom:none}
+.tsw-card .prod-card{border:none;border-radius:calc(var(--radius-lg) - 2px);height:100%}
+.tsw-card .prod-card:hover{box-shadow:none;transform:none}
+/* contornos ouro / prata / bronze */
+.tsw-rank-1{border-color:#d4a017;box-shadow:0 0 0 1px rgba(212,160,23,.25),0 6px 20px rgba(212,160,23,.22)}
+.tsw-rank-2{border-color:#a4acb4;box-shadow:0 4px 14px rgba(164,172,180,.25)}
+.tsw-rank-3{border-color:#b87333;box-shadow:0 4px 14px rgba(184,115,51,.22)}
+/* coroa do 1º lugar */
+.tsw-crown{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:24px;line-height:1;z-index:3;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+/* badge de posição */
+.tsw-pos{position:absolute;top:-11px;left:12px;z-index:3;font-size:11px;font-weight:800;color:#fff;padding:3px 10px;border-radius:20px;letter-spacing:.03em;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.tsw-rank-1 .tsw-pos{background:linear-gradient(135deg,#e8b53a,#c0900f)}
+.tsw-rank-2 .tsw-pos{background:linear-gradient(135deg,#c3c9cf,#8f979e)}
+.tsw-rank-3 .tsw-pos{background:linear-gradient(135deg,#c98850,#9c6127)}
+/* contador alternante (pessoas ↔ unidades) */
+.tsw-counter{padding:0 16px 12px;font-size:12px;font-weight:600;color:var(--text2);min-height:18px}
+.tsw-counter-text{display:inline-block;opacity:1;transition:opacity .3s ease}
+.tsw-counter-text.tsw-fade-out{opacity:0}
+@media(min-width:768px){
+  .top-semana-list{display:none}
+  .top-semana-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:16px 20px 8px}
+  .top-semana-title{padding:0 20px 4px}
+  .tsw-card{display:flex;flex-direction:column}
+  .tsw-card .prod-card{flex:1;display:flex;flex-direction:column}
+}
+@media(max-width:767px){
+  .top-semana-grid{display:none}
+}
+

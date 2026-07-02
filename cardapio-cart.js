@@ -80,6 +80,7 @@ async function loadProducts(){
       return{id:row.id,nome:row.values[CONFIG.COLS.nome]||'',ingredientes:row.values[CONFIG.COLS.ingredientes]||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.values[CONFIG.COLS.tipo]||'Outros',mostrar:row.values['Mostrar'],popular:false};
     }).filter(p=>p.nome&&p.valorUnit>0);
     categories=['Todos',...new Set(allProducts.map(p=>p.tipo))];
+    _aplicarRanking(); // se o ranking já chegou, ordena antes do primeiro render
 
     if(resRec.ok){
       const dataRec=await resRec.json();
@@ -223,62 +224,176 @@ function positionIndicator(cat,progress,nextCat){
   indicator.style.width=width+'px';
 }
 
+// Builders de card (mobile e desktop) — reutilizados pela lista normal e pelo top 3 da semana
+function _buildProdItem(p){
+  const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
+  const recheioInfo=isBolo(p.tipo)&&qty>0?`<div class="prod-item-sub" style="color:#888;margin-top:2px">🎂 ${qty} bolo${qty>1?'s':''} — recheios definidos</div>`:'';
+  const precoTotal=p.valor;const precoUni=p.qtdMin>1?p.valorUnit:null;
+  return`<div class="prod-item">
+    <div class="prod-item-top">
+      ${p.imagem?`<div style="position:relative;flex-shrink:0"><img class="produto-img-thumb" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy">${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`:`<div class="prod-item-icon">${getIcon(p.tipo)}${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`}
+      <div class="prod-item-body">
+        ${p.popular?'<span class="badge-popular">⭐ Mais pedido</span>':''}
+        <div class="prod-item-name">${p.nome}</div>
+        <div class="prod-item-sub">Mín. ${p.qtdMin} unid. · ${p.tipo}</div>
+        ${p.ingredientes?`<div class="prod-item-sub" style="margin-top:2px">${p.ingredientes}</div>`:''}
+        <div class="prod-item-price">${fmtBRL(precoTotal)}${precoUni?`<span class="prod-item-unit">${fmtBRL(precoUni)}/un.</span>`:''}</div>
+        ${p.qtdMin>1?`<div class="prod-item-pkg">pacote com ${p.qtdMin} unidades</div>`:''}
+        ${recheioInfo}
+      </div>
+    </div>
+    <div class="add-area ${isEmpty?'empty':''}" id="add-${p.id}">
+      <button class="qty-minus" onclick="changeQty('${p.id}',-1)">−</button>
+      <input class="qty-input" type="number" min="${p.qtdMin}" value="${qty}" onchange="setQtyInput('${p.id}',this.value,${p.qtdMin})" onblur="(function(el){if(!cart['${p.id}'])return;const n=parseInt(el.value,10);if(isNaN(n)||n<${p.qtdMin}){el.value=${p.qtdMin};setQtyInput('${p.id}',${p.qtdMin},${p.qtdMin})}})(this)">
+      <button class="qty-plus" onclick="changeQty('${p.id}',1)">${isEmpty?'+ Adicionar ao pedido':'+'}</button>
+    </div>
+  </div>`;
+}
+
+function _buildProdCard(p){
+  const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
+  const precoTotal=p.valor;const precoUni=p.qtdMin>1?p.valorUnit:null;
+  return`<div class="prod-card">
+    ${p.imagem?`<img class="produto-img" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px 8px 0 0;display:block;">`:''}
+    ${!p.imagem?`<div class="prod-card-thumb">${getIcon(p.tipo)}${p.qtdMin>1&&qty===0?`<span class="prod-card-badge">Mín. ${p.qtdMin} un.</span>`:''}${qty>0?`<span class="prod-card-badge" style="background:#fff;color:#0f0f0f">${qty} no pedido</span>`:''}</div>`:''}
+    <div class="prod-card-body">
+      ${p.popular?'<span class="badge-popular">⭐ Mais pedido</span>':''}
+      <div class="prod-card-type">${p.tipo}</div>
+      <div class="prod-card-name">${p.nome}</div>
+      ${p.ingredientes?`<div class="prod-card-ingr">${p.ingredientes}</div>`:''}
+      <div class="prod-card-price">${fmtBRL(precoTotal)}${precoUni?`<span class="prod-card-unit">${fmtBRL(precoUni)}/un.</span>`:''}</div>
+      ${p.qtdMin>1?`<div class="prod-card-pkg">pacote com ${p.qtdMin} unidades</div>`:''}
+    </div>
+    <div class="prod-card-add ${isEmpty?'empty':''}" id="dadd-${p.id}">
+      <button class="dc-minus" onclick="changeQty('${p.id}',-1)">−</button>
+      <input class="qty-input" type="number" min="${p.qtdMin}" value="${qty}" onchange="setQtyInput('${p.id}',this.value,${p.qtdMin})" onblur="(function(el){if(!cart['${p.id}'])return;const n=parseInt(el.value,10);if(isNaN(n)||n<${p.qtdMin}){el.value=${p.qtdMin};setQtyInput('${p.id}',${p.qtdMin},${p.qtdMin})}})(this)">
+      <button class="dc-plus" onclick="changeQty('${p.id}',1)">${isEmpty?'+ Adicionar ao pedido':'+'}</button>
+    </div>
+  </div>`;
+}
+
 function renderProducts(){
   let filtered=allProducts;
   if(activeCategory!=='Todos')filtered=filtered.filter(p=>p.tipo===activeCategory);
   if(searchQuery){const q=searchQuery.toLowerCase();filtered=filtered.filter(p=>p.nome.toLowerCase().includes(q)||p.ingredientes.toLowerCase().includes(q)||p.tipo.toLowerCase().includes(q));}
   document.getElementById('results-sub').textContent=`${filtered.length} produto${filtered.length!==1?'s':''}`;
   document.getElementById('cat-title').textContent=searchQuery?`Resultados para "${searchQuery}"`:activeCategory==='Todos'?'Todos os produtos':activeCategory;
+  // Top 3 da semana só aparece na visão padrão ("Todos", sem busca)
+  const mostrarTop=activeCategory==='Todos'&&!searchQuery;
+  renderTopSemana(mostrarTop);
   const noRes=document.getElementById('no-results');
   if(!filtered.length){document.getElementById('prod-list').innerHTML='';document.getElementById('prod-grid').innerHTML='';noRes.style.display='block';return;}
   noRes.style.display='none';
+  // Quando o destaque está visível, os 3 produtos saem da lista normal (evita IDs duplicados)
+  let lista=filtered;
+  if(mostrarTop&&_top3Semana.length){
+    const topIds=new Set(_top3Semana.map(r=>r.prod.id));
+    lista=filtered.filter(p=>!topIds.has(p.id));
+  }
   // MOBILE LIST
-  document.getElementById('prod-list').innerHTML=filtered.map(p=>{
-    const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
-    const recheioInfo=isBolo(p.tipo)&&qty>0?`<div class="prod-item-sub" style="color:#888;margin-top:2px">🎂 ${qty} bolo${qty>1?'s':''} — recheios definidos</div>`:'';
-    const precoTotal=p.valor;const precoUni=p.qtdMin>1?p.valorUnit:null;
-    return`<div class="prod-item">
-      <div class="prod-item-top">
-        ${p.imagem?`<div style="position:relative;flex-shrink:0"><img class="produto-img-thumb" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy">${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`:`<div class="prod-item-icon">${getIcon(p.tipo)}${qty>0?`<span class="prod-item-badge">${qty}</span>`:''}</div>`}
-        <div class="prod-item-body">
-          ${p.popular?'<span class="badge-popular">⭐ Mais pedido</span>':''}
-          <div class="prod-item-name">${p.nome}</div>
-          <div class="prod-item-sub">Mín. ${p.qtdMin} unid. · ${p.tipo}</div>
-          ${p.ingredientes?`<div class="prod-item-sub" style="margin-top:2px">${p.ingredientes}</div>`:''}
-          <div class="prod-item-price">${fmtBRL(precoTotal)}${precoUni?`<span class="prod-item-unit">${fmtBRL(precoUni)}/un.</span>`:''}</div>
-          ${p.qtdMin>1?`<div class="prod-item-pkg">pacote com ${p.qtdMin} unidades</div>`:''}
-          ${recheioInfo}
-        </div>
-      </div>
-      <div class="add-area ${isEmpty?'empty':''}" id="add-${p.id}">
-        <button class="qty-minus" onclick="changeQty('${p.id}',-1)">−</button>
-        <input class="qty-input" type="number" min="${p.qtdMin}" value="${qty}" onchange="setQtyInput('${p.id}',this.value,${p.qtdMin})" onblur="(function(el){if(!cart['${p.id}'])return;const n=parseInt(el.value,10);if(isNaN(n)||n<${p.qtdMin}){el.value=${p.qtdMin};setQtyInput('${p.id}',${p.qtdMin},${p.qtdMin})}})(this)">
-        <button class="qty-plus" onclick="changeQty('${p.id}',1)">${isEmpty?'+ Adicionar ao pedido':'+'}</button>
-      </div>
-    </div>`;
-  }).join('');
+  document.getElementById('prod-list').innerHTML=lista.map(_buildProdItem).join('');
   // DESKTOP GRID
-  document.getElementById('prod-grid').innerHTML=filtered.map(p=>{
-    const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
-    const precoTotal=p.valor;const precoUni=p.qtdMin>1?p.valorUnit:null;
-    return`<div class="prod-card">
-      ${p.imagem?`<img class="produto-img" src="${CONFIG.WORKER_URL}/imagem-produto?url=${encodeURIComponent(p.imagem)}" alt="${p.nome}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px 8px 0 0;display:block;">`:''}
-      ${!p.imagem?`<div class="prod-card-thumb">${getIcon(p.tipo)}${p.qtdMin>1&&qty===0?`<span class="prod-card-badge">Mín. ${p.qtdMin} un.</span>`:''}${qty>0?`<span class="prod-card-badge" style="background:#fff;color:#0f0f0f">${qty} no pedido</span>`:''}</div>`:''}
-      <div class="prod-card-body">
-        ${p.popular?'<span class="badge-popular">⭐ Mais pedido</span>':''}
-        <div class="prod-card-type">${p.tipo}</div>
-        <div class="prod-card-name">${p.nome}</div>
-        ${p.ingredientes?`<div class="prod-card-ingr">${p.ingredientes}</div>`:''}
-        <div class="prod-card-price">${fmtBRL(precoTotal)}${precoUni?`<span class="prod-card-unit">${fmtBRL(precoUni)}/un.</span>`:''}</div>
-        ${p.qtdMin>1?`<div class="prod-card-pkg">pacote com ${p.qtdMin} unidades</div>`:''}
-      </div>
-      <div class="prod-card-add ${isEmpty?'empty':''}" id="dadd-${p.id}">
-        <button class="dc-minus" onclick="changeQty('${p.id}',-1)">−</button>
-        <input class="qty-input" type="number" min="${p.qtdMin}" value="${qty}" onchange="setQtyInput('${p.id}',this.value,${p.qtdMin})" onblur="(function(el){if(!cart['${p.id}'])return;const n=parseInt(el.value,10);if(isNaN(n)||n<${p.qtdMin}){el.value=${p.qtdMin};setQtyInput('${p.id}',${p.qtdMin},${p.qtdMin})}})(this)">
-        <button class="dc-plus" onclick="changeQty('${p.id}',1)">${isEmpty?'+ Adicionar ao pedido':'+'}</button>
-      </div>
-    </div>`;
-  }).join('');
+  document.getElementById('prod-grid').innerHTML=lista.map(_buildProdCard).join('');
+}
+
+// ── RANKING DE MAIS VENDIDOS (GET /ranking-produtos) ──
+// Busca em paralelo com loadProducts(); se falhar/vier vazio, o catálogo fica como antes.
+let _rankingMes=null;      // Map nome normalizado → quantidade vendida no mês
+let _rankingSemana=null;   // lista crua da semana [{produto,quantidade,compradores}]
+let _top3Semana=[];        // até 3 itens {prod,quantidade,compradores} presentes no catálogo
+let _tswTimer=null,_tswModo=0;
+
+function _rankNorm(s){return String(s||'').trim().toLowerCase();}
+
+async function loadRanking(){
+  try{
+    const ctrl=new AbortController();
+    const to=setTimeout(()=>ctrl.abort(),8000);
+    const res=await fetch(`${CONFIG.WORKER_URL}/ranking-produtos`,{signal:ctrl.signal});
+    clearTimeout(to);
+    if(!res.ok)return;
+    const data=await res.json();
+    const mes=Array.isArray(data.mes)?data.mes:[];
+    const semana=Array.isArray(data.semana)?data.semana:[];
+    if(!mes.length&&!semana.length)return;
+    _rankingMes=new Map();
+    mes.forEach(r=>{const k=_rankNorm(r.produto);if(k&&!_rankingMes.has(k))_rankingMes.set(k,Number(r.quantidade)||0);});
+    _rankingSemana=semana;
+    _aplicarRanking();
+    // Se os produtos já renderizaram, reordena/insere o destaque agora
+    if(allProducts.length)renderProducts();
+  }catch(e){/* silencioso: sem ranking, catálogo renderiza como sempre */}
+}
+
+function _aplicarRanking(){
+  if(!allProducts.length)return;
+  // Ordenação estável: quem vendeu no mês vem primeiro (desc); sem venda mantém a ordem original
+  if(_rankingMes&&_rankingMes.size){
+    allProducts=allProducts.map((p,i)=>({p,i})).sort((a,b)=>{
+      const qa=_rankingMes.get(_rankNorm(a.p.nome)),qb=_rankingMes.get(_rankNorm(b.p.nome));
+      if(qa!==undefined&&qb!==undefined)return(qb-qa)||(a.i-b.i);
+      if(qa!==undefined)return -1;
+      if(qb!==undefined)return 1;
+      return a.i-b.i;
+    }).map(x=>x.p);
+  }
+  // Top 3 da semana que existem no catálogo visível
+  _top3Semana=[];
+  if(Array.isArray(_rankingSemana)){
+    for(const r of _rankingSemana){
+      const prod=allProducts.find(p=>_rankNorm(p.nome)===_rankNorm(r.produto));
+      if(prod){
+        _top3Semana.push({prod,quantidade:Number(r.quantidade)||0,compradores:Number(r.compradores)||0});
+        if(_top3Semana.length===3)break;
+      }
+    }
+  }
+}
+
+function _tswTexto(comp,qtd,modo){
+  if(modo===0&&comp>0)return comp===1?'👥 1 pessoa comprou essa semana':`👥 ${comp} pessoas compraram essa semana`;
+  return qtd===1?'🧁 1 unidade vendida na semana':`🧁 ${qtd} unidades vendidas na semana`;
+}
+
+function _tswWrap(r,i,inner){
+  const pos=i+1;
+  return`<div class="tsw-card tsw-rank-${pos}">
+    ${pos===1?'<span class="tsw-crown">👑</span>':''}
+    <span class="tsw-pos">${pos}º</span>
+    ${inner}
+    <div class="tsw-counter" data-compradores="${r.compradores}" data-quantidade="${r.quantidade}"><span class="tsw-counter-text">${_tswTexto(r.compradores,r.quantidade,_tswModo)}</span></div>
+  </div>`;
+}
+
+function renderTopSemana(mostrar){
+  const sec=document.getElementById('top-semana-section');
+  if(!sec)return;
+  const ok=mostrar&&_top3Semana.length>0;
+  if(!ok){
+    sec.style.display='none';
+    if(_tswTimer){clearInterval(_tswTimer);_tswTimer=null;}
+    return;
+  }
+  sec.style.display='';
+  document.getElementById('top-semana-list').innerHTML=_top3Semana.map((r,i)=>_tswWrap(r,i,_buildProdItem(r.prod))).join('');
+  document.getElementById('top-semana-grid').innerHTML=_top3Semana.map((r,i)=>_tswWrap(r,i,_buildProdCard(r.prod))).join('');
+  _tswIniciarContador();
+}
+
+function _tswIniciarContador(){
+  if(_tswTimer)clearInterval(_tswTimer);
+  _tswTimer=setInterval(()=>{
+    _tswModo=1-_tswModo;
+    document.querySelectorAll('.tsw-counter').forEach(el=>{
+      const span=el.querySelector('.tsw-counter-text');
+      if(!span)return;
+      span.classList.add('tsw-fade-out');
+      setTimeout(()=>{
+        span.textContent=_tswTexto(Number(el.dataset.compradores)||0,Number(el.dataset.quantidade)||0,_tswModo);
+        span.classList.remove('tsw-fade-out');
+      },300);
+    });
+  },4000);
 }
 
 function cancelarEdicao(){
@@ -656,4 +771,5 @@ window.editarCarrinhoComItens=function(itens){
 document.addEventListener('DOMContentLoaded',_syncEditFooter);
 
 loadProducts();
+loadRanking();
 

@@ -187,6 +187,12 @@
     <div class="loading" id="loading-state"><div class="spinner"></div><span>Carregando cardápio...</span></div>
     <div class="error-state" id="error-state" style="display:none"><p>Não foi possível carregar os produtos.</p><button class="retry-btn" onclick="loadProducts()">Tentar novamente</button></div>
     <div id="catalog-content" style="display:none">
+      <!-- TOP 3 MAIS VENDIDOS DA SEMANA (preenchido por renderTopSemana em cardapio-cart.js) -->
+      <div id="top-semana-section" class="top-semana-section" style="display:none">
+        <div class="top-semana-title">🏆 Mais vendidos da semana</div>
+        <div class="top-semana-list" id="top-semana-list"></div>
+        <div class="top-semana-grid" id="top-semana-grid"></div>
+      </div>
       <div class="section-header">
         <span class="section-title" id="cat-title">Todos os produtos</span>
         <span class="section-count" id="results-sub"></span>
