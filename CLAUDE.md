@@ -101,7 +101,7 @@ Quatro cruzam `cardapio.html` **e** `empresas.html`, cada um num domínio de JS 
 
 As regras dentro dos subagentes são **reforços** das deste arquivo, não fonte de verdade paralela — se uma regra mudar aqui, atualize o `.md` do subagente correspondente. **Gotcha:** editar `.claude/agents/*.md` direto no disco só vale em sessão nova (precisa reiniciar); via o comando `/agents` dentro do Claude Code, vale na hora.
 
-**Equipe de marketing (projeto separado):** `marketing/` tem CLAUDE.md, BRAND.md e 4 subagentes próprios (estrategista, social-media, copywriter, SEO local) — pra usar, abra o Claude Code **direto nessa pasta**. Só produz conteúdo (nunca edita site/Coda) e está no `.gitignore` (não vai pro deploy).
+**Equipe de marketing (projeto separado):** `marketing/` tem CLAUDE.md, BRAND.md e 5 subagentes próprios (estrategista, social-media, copywriter, SEO local e designer — este gera PNG/MP4 finais via templates + Chrome headless/ffmpeg) — pra usar, abra o Claude Code **direto nessa pasta**. Só produz conteúdo (nunca edita site/Coda) e está no `.gitignore` (não vai pro deploy).
 
 ## Histórico
 
