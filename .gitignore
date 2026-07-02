@@ -2,3 +2,6 @@
 worker-completo-pronto.js
 .wrangler/cache/wrangler-account.json
 .wrangler/
+
+# Equipe de marketing (projeto Claude interno, não vai pro deploy)
+marketing/
