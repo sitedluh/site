@@ -44,7 +44,7 @@
 
 <div id="tabs-wrap" style="padding:20px 24px 0">
   <div class="tabs" id="tabs-bar">
-    <button class="tab-btn active" data-tab="estoque" onclick="switchTab('estoque')">📦 Estoque pendente</button>
+    <button class="tab-btn active" data-tab="estoque" onclick="switchTab('estoque')">📦 Estoque pendente <span class="tab-count" id="count-estoque"></span></button>
   </div>
 </div>
 <div class="tab-pane active" id="tab-estoque">
@@ -68,6 +68,37 @@
     <div class="confirm-actions">
       <button class="confirm-btn cancel" onclick="closeConfirm()">Cancelar</button>
       <button class="confirm-btn ok" id="confirm-ok-btn" onclick="_confirmOk()">Sim, finalizar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="edit-overlay">
+  <div class="edit-box">
+    <div class="edit-title">✏️ Editar itens do pedido</div>
+    <div class="edit-sub" id="edit-sub"></div>
+    <div class="itens-table-wrap">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px">
+            <th style="text-align:left;padding-bottom:4px;font-weight:600">Produto</th>
+            <th style="text-align:center;padding-bottom:4px;font-weight:600;width:60px">Qtd</th>
+            <th style="text-align:center;padding-bottom:4px;font-weight:600;width:80px">Unit</th>
+            <th style="text-align:right;padding-bottom:4px;font-weight:600;width:90px">Subtotal</th>
+            <th style="width:30px"></th>
+          </tr>
+        </thead>
+        <tbody id="edit-itens-body"></tbody>
+      </table>
+    </div>
+    <button class="edit-add-btn" onclick="addEditItem()">+ Adicionar item</button>
+    <div class="edit-frete-row">
+      <label for="edit-frete">🛵 Taxa de entrega (R$)</label>
+      <input id="edit-frete" type="number" min="0" step="0.01" oninput="recalcEdit()">
+    </div>
+    <div class="edit-total-row">Novo total: <b id="edit-total">R$ 0,00</b><span id="edit-pago"></span></div>
+    <div class="confirm-actions" style="margin-top:16px">
+      <button class="confirm-btn cancel" onclick="closeEditModal()">Cancelar</button>
+      <button class="confirm-btn ok" id="edit-save-btn" onclick="salvarEditItens()">Salvar alterações</button>
     </div>
   </div>
 </div>

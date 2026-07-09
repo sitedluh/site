@@ -35,21 +35,24 @@ function showToast(msg){
 let _produtosList = [];
 let _produtosMap  = {};
 
-// Carrega produtos + pedidos em paralelo; renderiza só depois que ambos chegarem
+// Carrega o catálogo de produtos (usado nos selects) e recarrega os pedidos.
+// A lista de pedidos em si vem SEMPRE de carregarStatus() — fetch ÚNICO que
+// alimenta a aba "Estoque pendente" E as abas de status ao mesmo tempo, com
+// partição exclusiva por rowId. Antes eram dois fetches independentes (e só o
+// de status rodava no polling de 30s): a aba Estoque ficava desatualizada e o
+// mesmo pedido aparecia em duas abas com "status" divergentes.
 async function carregarPedidos(){
   const btn=document.getElementById('btn-refresh');
   btn.classList.add('loading');btn.disabled=true;
   try{
-    const [prodData,pedData]=await Promise.all([
-      fetch(`${WORKER}/produtos`).then(r=>r.json()).catch(()=>({produtos:[]})),
-      fetch(`${WORKER}/pedidos-pendentes`).then(r=>r.json()).catch(()=>({pedidos:[]}))
-    ]);
+    const prodData=await fetch(`${WORKER}/produtos`).then(r=>r.json()).catch(()=>({produtos:[]}));
     const lista=prodData.produtos||[];
     _produtosList=lista.map(p=>p.nome);
     _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
     const dl=document.getElementById('produtos-datalist');
     if(dl)dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
-    renderPedidos(pedData.pedidos||[]);
+    _estoqueSig=null; // refresh manual força re-render da aba Estoque
+    await carregarStatus();
   }catch(e){
     document.getElementById('main').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar pedidos.<br><small>${e.message}</small></div>`;
   }finally{
@@ -58,6 +61,8 @@ async function carregarPedidos(){
 }
 
 function renderPedidos(pedidos){
+  const countEl=document.getElementById('count-estoque');
+  if(countEl)countEl.textContent=pedidos.length?`· ${pedidos.length}`:'';
   const main=document.getElementById('main');
   if(!pedidos.length){
     main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação.</div>';
@@ -97,13 +102,15 @@ function trocaProduto(sel,id){
   const unitInput=row.querySelector('.inp-unit');
   console.log('[trocaProduto] unitInput encontrado:',!!unitInput);
   if(unitInput)unitInput.value=preco;
-  recalcCard(id);
+  // id 'edit' = linha do modal "Editar itens" (não tem tbody itens-body-<id>)
+  if(id==='edit'){recalcEdit();}else{recalcCard(id);}
 }
 
 const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
 
 function cardPedido(p){
   const id=p.idPedido;
+  const st=p.status||'Aguardando confirmação';
   const total=p.total||p.itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
 
   // Taxa de entrega sempre por último
@@ -137,7 +144,10 @@ function cardPedido(p){
         ${p.pagamento?`<div class="card-meta" style="margin-top:2px">💳 ${esc(p.pagamento)}</div>`:''}
         ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
       </div>
-      <span class="badge">Verificar estoque</span>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <span class="badge">${esc(st)}</span>
+        ${p.rowId?buildStatusSelect(p.rowId,st):''}
+      </div>
     </div>
     <div class="card-body">
       <div class="itens-titulo" style="margin-bottom:6px">Itens &mdash; <span style="font-weight:400;font-size:11px;color:var(--text3)">edite se precisar trocar produto</span></div>
@@ -173,6 +183,9 @@ function cardPedido(p){
     <div class="card-footer">
       <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId||'')}','${esc(p.cliente)}',this)">
         🗑️ Apagar
+      </button>
+      <button class="btn-editar-itens" onclick="abrirEditItens('${esc(p.rowId||'')}')">
+        ✏️ Editar itens
       </button>
       <button onclick="notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
         📱 Avisar cliente
@@ -228,10 +241,6 @@ function addItem(id){
 (function(){
   const dl=document.createElement('datalist');dl.id='produtos-datalist';document.body.appendChild(dl);
 })();
-
-carregarPedidos();
-carregarStatus();
-setInterval(carregarStatus,30000);
 
 function notificarCliente(id){
   const card=document.getElementById(`card-${CSS.escape(id)}`);
@@ -350,25 +359,41 @@ const PEDIDO_STATUS_MAP = {
   'Entregue':    'Entregue — Esperando restante',
 };
 
-function renderStatusList(tabId,lista,statusFixo){
+// Status que pertencem à aba "Estoque pendente" (pré-confirmação). Um pedido
+// nesses status NÃO aparece nas abas de status — partição exclusiva, sem duplicata.
+const ESTOQUE_STATUS = ['', 'Aguardando confirmação', 'Verificando Estoque'];
+
+// Cache do último carregamento (rowId → pedido) — usado pelo modal "Editar itens".
+let _pedidosCache = {};
+// Assinatura da aba Estoque: o poll de 30s só re-renderiza os cards (e apaga uma
+// edição inline em andamento) se a lista realmente mudou no Coda.
+let _estoqueSig = null;
+
+// Select de status compartilhado (aba Estoque + abas de status). Status
+// legado/desconhecido aparece selecionado mas DESABILITADO: dá pra ver qual é,
+// mas nunca re-escrever no Coda uma string fora do ciclo canônico.
+function buildStatusSelect(rowId,status){
+  const statusConhecido=STATUS_OPTS.includes(status);
+  const extraOpt=(!statusConhecido&&status)?`<option value="${esc(status)}" selected disabled>⚠️ ${esc(status)} (antigo)</option>`:'';
+  const opts=extraOpt+STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+  return `<select class="status-select" onchange="atualizarStatus('${esc(rowId)}',this)">${opts}</select>`;
+}
+
+function renderStatusList(tabId,lista,statusFixo,emptyMsg){
   const countEl=document.getElementById('count-'+tabId);
   if(countEl)countEl.textContent=lista.length?`· ${lista.length}`:'';
   const el=document.getElementById('list-'+tabId);
   if(!el)return;
-  if(!lista.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Nenhum pedido aqui.</div>';return;}
+  if(!lista.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📭</div>${emptyMsg||'Nenhum pedido aqui.'}</div>`;return;}
   el.innerHTML=lista.map(p=>statusCardHtml(p,statusFixo||p.status||'Aguardando confirmação')).join('');
 }
 
 function statusCardHtml(p,status){
   const cls=STATUS_CLS[status]||'aguardando';
   // "Pedido Status" no Coda é multi-select → chega como array (ex: ["Entregue"]).
-  const ps=Array.isArray(p.pedidoStatus)?(p.pedidoStatus[0]||''):(p.pedidoStatus||'');
-  // Se o status atual for legado/desconhecido (não está em STATUS_OPTS), mostra ele
-  // mesmo no topo do select — senão o dropdown mostraria a 1ª opção como "selecionada"
-  // sem realmente refletir o status real do pedido (confuso).
-  const statusConhecido=STATUS_OPTS.includes(status);
-  const extraOpt=!statusConhecido?`<option value="${esc(status)}" selected>⚠️ ${esc(status)} (antigo)</option>`:'';
-  const opts=extraOpt+STATUS_OPTS.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+  const psArr=Array.isArray(p.pedidoStatus)?p.pedidoStatus:(p.pedidoStatus?[p.pedidoStatus]:[]);
+  const ps=psArr.filter(Boolean).join(', ');
+  const psEntregue=psArr.includes('Entregue');
   const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
   const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
@@ -381,15 +406,16 @@ function statusCardHtml(p,status){
       <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
       ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
-        <span class="sc-badge ${cls}">${status}</span>
-        ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${ps==='Entregue'?'#d1fae5':'#fef3c7'};color:${ps==='Entregue'?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
+        <span class="sc-badge ${cls}">${esc(status)}</span>
+        ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${psEntregue?'#d1fae5':'#fef3c7'};color:${psEntregue?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
       </div>
       ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
       ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
     </div>
     <div class="sc-actions">
-      <select class="status-select" onchange="atualizarStatus('${esc(p.rowId)}',this)">${opts}</select>
+      ${buildStatusSelect(p.rowId,status)}
       <div class="sc-actions-row">
+        <button class="btn-editar-itens" onclick="abrirEditItens('${esc(p.rowId)}')">✏️ Itens</button>
         ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
         <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
       </div>
@@ -397,20 +423,35 @@ function statusCardHtml(p,status){
   </div>`;
 }
 
+// Fetch ÚNICO que alimenta TODAS as abas (Estoque pendente + status + Outros),
+// com dedup por rowId e partição mutuamente exclusiva — o mesmo pedido nunca
+// aparece em duas abas ao mesmo tempo.
 async function carregarStatus(){
   try{
     const res=await fetch(`${WORKER}/pedidos-pendentes?todos=1`);
     const data=await res.json();
-    const pedidos=data.pedidos||[];
+    // Dedup por rowId — mesmo que o worker devolva o pedido repetido, só entra 1x
+    const vistos=new Set();
+    const pedidos=(data.pedidos||[]).filter(p=>{
+      const k=p.rowId||p.idPedido;
+      if(vistos.has(k))return false;
+      vistos.add(k);
+      return true;
+    });
+    _pedidosCache=Object.fromEntries(pedidos.map(p=>[p.rowId,p]));
 
-    // Auto-atualiza status baseado em Pedido Status da tabela Pedidos
+    // Auto-atualiza status baseado em "Pedido Status" da tabela Pedidos.
+    // ⚠️ "Pedido Status" é multi-select no Coda → chega como ARRAY.
     for(const p of pedidos){
-      const ps=p.pedidoStatus||'';
-      const novoStatus=PEDIDO_STATUS_MAP[ps];
-      // "Finalizado" é um estado final — uma vez finalizado manualmente (ex: pago
-      // por fora, sem Infinite Pay), nunca mais reescreve automaticamente com base
-      // no "Pedido Status" (era esse o motivo do status voltar pro anterior).
-      if(novoStatus && p.status!==novoStatus && p.status!=='Finalizado' && p.rowId){
+      const psArr=Array.isArray(p.pedidoStatus)?p.pedidoStatus:(p.pedidoStatus?[p.pedidoStatus]:[]);
+      const chave=psArr.find(s=>PEDIDO_STATUS_MAP[s]);
+      const novoStatus=chave?PEDIDO_STATUS_MAP[chave]:null;
+      // "Finalizado" e "Cancelado" são estados FINAIS — nunca reescreve por cima
+      // (era esse o motivo do status "voltar pro antigo" sozinho). E só escreve
+      // valores que existem em STATUS_OPTS: string fora das Options do Coda
+      // falharia silenciosamente lá e ficaria re-tentando a cada poll.
+      if(novoStatus && STATUS_OPTS.includes(novoStatus) && p.status!==novoStatus
+        && p.status!=='Finalizado' && p.status!=='Cancelado' && p.rowId){
         p.status=novoStatus; // atualiza localmente para renderizar certo
         fetch(`${WORKER}/atualizar-status`,{
           method:'POST',
@@ -420,19 +461,30 @@ async function carregarStatus(){
       }
     }
 
-    // Agrupa os pedidos por status
+    // Partição exclusiva: pré-confirmação → aba Estoque; resto → aba do status
+    const estoque=[];
     const grupos={};
     pedidos.forEach(p=>{
       const status=p.status||'Aguardando confirmação';
+      if(ESTOQUE_STATUS.includes(status)){estoque.push(p);return;}
       (grupos[status]=grupos[status]||[]).push(p);
     });
 
+    // Aba Estoque só re-renderiza se a lista mudou (preserva edição inline em andamento)
+    const sig=JSON.stringify(estoque.map(p=>[p.rowId,p.status,(p.itens||[]).length,p.total]));
+    if(sig!==_estoqueSig){
+      _estoqueSig=sig;
+      renderPedidos(estoque);
+    }
+
     // Renderiza cada status na sua própria aba
     STATUS_OPTS.forEach((status,idx)=>{
-      renderStatusList(statusTabId(idx),grupos[status]||[],status);
+      renderStatusList(statusTabId(idx),grupos[status]||[],status,
+        ESTOQUE_STATUS.includes(status)?'Pedidos nessa etapa ficam na aba "📦 Estoque pendente".':null);
     });
 
-    // Qualquer status fora da lista padrão cai na aba "Outros"
+    // Qualquer status fora da lista padrão cai na aba "Outros" (só exibição —
+    // o select mostra o status antigo desabilitado, nunca re-escreve ele no Coda)
     const outros=Object.keys(grupos).filter(s=>!STATUS_OPTS.includes(s)).flatMap(s=>grupos[s]);
     renderStatusList('status-outros',outros,null);
 
@@ -450,6 +502,13 @@ function cobrarRestante(pedidoId,telefone,cliente){
 
 async function atualizarStatus(rowId,sel){
   const novoStatus=sel.value;
+  // Trava de segurança: só escreve no Coda valores do ciclo canônico. Qualquer
+  // outra string não existe como Option na coluna "Status" e falharia silenciosamente.
+  if(!STATUS_OPTS.includes(novoStatus)){
+    showToast('Esse status é antigo e não pode ser regravado — escolha um da lista.');
+    carregarStatus();
+    return;
+  }
   sel.disabled=true;
   try{
     await fetch(`${WORKER}/atualizar-status`,{
@@ -530,8 +589,7 @@ async function _confirmApagarOk(){
     const data=await res.json().catch(()=>({}));
     if(!res.ok||data.ok===false)throw new Error(data.error||'Falha ao apagar no Coda');
     showToast('Pedido apagado 🗑️');
-    // Recarrega as duas listas — o pedido pode estar visível em Estoque e/ou Status
-    carregarStatus();
+    // carregarPedidos() já recarrega tudo (Estoque + abas de status via carregarStatus)
     carregarPedidos();
   }catch(e){
     showToast('Erro ao apagar: '+e.message);
@@ -577,4 +635,133 @@ async function _confirmPagarRetiradaOk(){
     closeConfirm();
   }
 }
+
+// ── EDITAR ITENS (admin — disponível em QUALQUER status) ────────────────────
+// Reusa o POST /editar-pedido do worker enviando origem:'admin': o worker então
+// não restringe pela lista EDITAVEIS e NÃO rebaixa o Status do pedido (o gating
+// por status continua valendo pro cliente via bot/Meus Pedidos).
+// ⚠️ A subrow "🛵 Taxa de Entrega" NUNCA vai como item: aqui ela vira o campo
+// taxaFrete (o worker tem o mesmo filtro do outro lado — sem isso a entrega
+// entraria duplicada no pedido editado).
+let _editRowId=null;
+
+function abrirEditItens(rowId){
+  const p=_pedidosCache[rowId];
+  if(!p){showToast('Pedido ainda não carregou — tente de novo em instantes.');return;}
+  _editRowId=rowId;
+  const itens=p.itens||[];
+  const taxaItem=itens.find(i=>String(i.produto||'').includes('Taxa de Entrega'));
+  const editaveis=itens.filter(i=>!String(i.produto||'').includes('Taxa de Entrega'));
+  document.getElementById('edit-sub').innerHTML=
+    `<b>${esc(p.cliente||'—')}</b> · 📱 ${esc(p.telefone||'—')} · status atual: <b>${esc(p.status||'Aguardando confirmação')}</b>`;
+  const tbody=document.getElementById('edit-itens-body');
+  tbody.innerHTML='';
+  editaveis.forEach(i=>tbody.appendChild(buildEditRow(i)));
+  if(!editaveis.length)addEditItem();
+  document.getElementById('edit-frete').value=taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0).toFixed(2):'0.00';
+  document.getElementById('edit-pago').textContent=(p.valorPago||0)>0?` · já pago: ${fmtBRL(p.valorPago)}`:'';
+  recalcEdit();
+  document.getElementById('edit-overlay').classList.add('open');
+}
+
+function buildEditRow(i){
+  const tr=document.createElement('tr');
+  // Recheios/Topo Info da subrow original são preservados no dataset e reenviados
+  // junto — a edição do admin troca produto/qtd/preço, não os detalhes do item.
+  tr.dataset.recheios=(i&&i.recheios)||'';
+  tr.dataset.topoinfo=(i&&i.topoInfo)||'';
+  tr.style.borderTop='1px solid var(--border)';
+  tr.innerHTML=`
+    <td style="padding:7px 0">
+      ${buildProdutoSelect('edit',i?i.produto:'')}
+      ${i&&i.recheios?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(i.recheios)}</div>`:''}
+    </td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="${i?(i.quantidade||1):1}" min="0.1" step="0.1" oninput="recalcEdit()" style="${IS}width:52px;text-align:center"></td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="${i?Number(i.valorUnit||0).toFixed(2):'0.00'}" min="0" step="0.01" oninput="recalcEdit()" style="${IS}width:72px;text-align:center"></td>
+    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600;white-space:nowrap">R$ 0,00</td>
+    <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcEdit()" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0" title="Remover">×</button></td>`;
+  return tr;
+}
+
+function addEditItem(){
+  document.getElementById('edit-itens-body').appendChild(buildEditRow(null));
+}
+
+function recalcEdit(){
+  let total=0;
+  document.querySelectorAll('#edit-itens-body tr').forEach(tr=>{
+    const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
+    const unit=parseFloat(tr.querySelector('.inp-unit')?.value)||0;
+    const sub=Math.round(qty*unit*100)/100;
+    total+=sub;
+    const td=tr.querySelector('.td-sub');
+    if(td)td.textContent=fmtBRL(sub);
+  });
+  total+=parseFloat(document.getElementById('edit-frete')?.value)||0;
+  const el=document.getElementById('edit-total');
+  if(el)el.textContent=fmtBRL(Math.round(total*100)/100);
+}
+
+function closeEditModal(){
+  document.getElementById('edit-overlay').classList.remove('open');
+  _editRowId=null;
+}
+
+async function salvarEditItens(){
+  const p=_pedidosCache[_editRowId];
+  if(!p){closeEditModal();return;}
+  const itens=[];
+  document.querySelectorAll('#edit-itens-body tr').forEach(tr=>{
+    const nome=(tr.querySelector('.inp-nome')?.value||'').trim();
+    const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
+    const unit=parseFloat(tr.querySelector('.inp-unit')?.value)||0;
+    if(!nome||qty<=0)return;
+    if(nome.includes('Taxa de Entrega'))return; // taxa nunca vai como item — vai em taxaFrete
+    itens.push({nome,qty,unit,recheios:tr.dataset.recheios||'',topoInfo:tr.dataset.topoinfo||''});
+  });
+  if(!itens.length){showToast('O pedido precisa de pelo menos 1 item.');return;}
+  const taxa=Math.max(0,parseFloat(document.getElementById('edit-frete').value)||0);
+  const total=Math.round((itens.reduce((s,i)=>s+i.qty*i.unit,0)+taxa)*100)/100;
+  // Contexto replicado nas subrows — mesmo padrão do fluxo de edição do cliente
+  const ctx=[
+    {column:'Cliente',value:p.cliente||''},
+    {column:'WhatsApp',value:p.telefone||''},
+    {column:'Entrega',value:p.entrega||''},
+    {column:'Pagamento',value:p.pagamento||''},
+    {column:'Data Desejada',value:p.data||''},
+    {column:'Hora',value:p.hora||''},
+  ];
+  const subrows=itens.map(i=>[
+    {column:'Produto',value:i.nome},
+    {column:'Quantidade',value:i.qty},
+    {column:'Valor Unit',value:i.unit},
+    ...(i.recheios?[{column:'Recheios',value:i.recheios}]:[]),
+    ...(i.topoInfo?[{column:'Topo Info',value:i.topoInfo}]:[]),
+    ...ctx,
+  ]);
+  const btn=document.getElementById('edit-save-btn');
+  btn.disabled=true;btn.textContent='Salvando...';
+  try{
+    const res=await fetch(`${WORKER}/editar-pedido`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({paiId:_editRowId,pai:[{column:'Total',value:total}],subrows,taxaFrete:taxa,origem:'admin'})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao salvar edição no Coda');
+    const novoTotal=(d.novoTotal!=null)?d.novoTotal:total;
+    showToast(`Itens atualizados ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}`);
+    closeEditModal();
+    _estoqueSig=null; // itens mudaram — força re-render da aba Estoque também
+    carregarStatus();
+  }catch(e){
+    showToast('Erro ao editar: '+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent='Salvar alterações';
+  }
+}
+
+// ── BOOTSTRAP (no fim do arquivo: garante que todas as constantes já existem) ──
+carregarPedidos();
+setInterval(carregarStatus,30000);
 
