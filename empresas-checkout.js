@@ -138,6 +138,12 @@ function getRadio(groupId){const a=document.querySelector('#'+groupId+' .radio-o
 // escolhida, consultando o Worker, que verifica a capacidade já comprometida em "Calendário Base"
 // contra o limite cadastrado em "Limites". Slots cheios ficam desabilitados com aviso "Horário cheio".
 let _horariosIndisponiveis=new Set();
+// Pra HOJE, o worker já filtra os slots antes de agora+1h (arredondado pra próxima meia hora)
+// e devolve 'minHoje' (string "HH:MM" ou null) + 'esgotadoHoje' (bool). O front gera a lista de
+// slots localmente (gerarSlotsHorario), então precisa aplicar a MESMA regra aqui também —
+// senão continua oferecendo horário passado quando o worker não respondeu a tempo.
+let _minHojeAtual=null;
+let _esgotadoHojeAtual=false;
 function gerarSlotsHorario(){
   const slots=[];
   for(let h=8;h<=19;h++){
@@ -148,11 +154,30 @@ function gerarSlotsHorario(){
   }
   return slots;
 }
+function _dataHojeStr(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+}
+// agora+1h, arredondado pra cima pra próxima meia hora (fuso do navegador). null = já passou
+// do horário de atendimento (19:00) — dia esgotado por horário, mesmo sem o worker confirmar.
+function _calcMinHorarioHojeStr(){
+  const d=new Date(Date.now()+60*60*1000);
+  let h=d.getHours(),m=d.getMinutes();
+  const resto=m%30;
+  if(resto!==0){ m=m-resto+30; if(m===60){m=0;h+=1;} }
+  if(h>19||(h===19&&m>0))return null;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
 async function carregarHorarios(dataStr){
   const horaEl=document.getElementById('f-hora');
   const statusEl=document.getElementById('f-hora-status');
+  const esgotadoEl=document.getElementById('f-hora-esgotado');
   if(!horaEl)return;
   _horariosIndisponiveis=new Set();
+  _minHojeAtual=null;
+  _esgotadoHojeAtual=false;
+  if(esgotadoEl)esgotadoEl.style.display='none';
   if(!dataStr){
     horaEl.innerHTML='<option value="">Selecione uma data primeiro</option>';
     horaEl.disabled=true;
@@ -168,16 +193,36 @@ async function carregarHorarios(dataStr){
   horaEl.disabled=true;
   horaEl.innerHTML='<option value="">Carregando horários...</option>';
   if(statusEl)statusEl.textContent='';
-  const slots=gerarSlotsHorario();
+  const ehHoje=dataStr===_dataHojeStr();
+  let slots=gerarSlotsHorario();
   const cheios={};
   try{
     const res=await fetch(`${CONFIG.WORKER_URL}/horarios-disponiveis?data=${encodeURIComponent(dataStr)}`);
     if(res.ok){
       const json=await res.json();
       (json.slots||[]).forEach(s=>{ if(s.cheio) cheios[s.hora]=true; });
+      if(ehHoje){
+        _minHojeAtual=json.minHoje||null;
+        _esgotadoHojeAtual=!!json.esgotadoHoje;
+      }
     }
   }catch(e){
     console.warn('Não foi possível verificar disponibilidade de horários:',e);
+  }
+  if(ehHoje){
+    const minLocal=_calcMinHorarioHojeStr();
+    if(!_minHojeAtual)_minHojeAtual=minLocal;
+    if(minLocal===null)_esgotadoHojeAtual=true;
+    const limite=_minHojeAtual||minLocal;
+    slots=limite?slots.filter(h=>h>=limite):[];
+    if(!slots.length)_esgotadoHojeAtual=true;
+  }
+  if(ehHoje&&_esgotadoHojeAtual){
+    horaEl.innerHTML='<option value="">Sem horários disponíveis hoje</option>';
+    horaEl.disabled=true;
+    if(statusEl)statusEl.textContent='';
+    if(esgotadoEl)esgotadoEl.style.display='block';
+    return;
   }
   horaEl.innerHTML='<option value="">Selecione um horário</option>'+slots.map(h=>{
     const cheio=!!cheios[h];
@@ -185,9 +230,12 @@ async function carregarHorarios(dataStr){
     return `<option value="${h}"${cheio?' disabled':''}>${h}${cheio?' — Horário cheio':''}</option>`;
   }).join('');
   horaEl.disabled=false;
-  if(statusEl)statusEl.textContent=Object.keys(cheios).length?'Alguns horários estão cheios e não podem ser selecionados — escolha outro horário disponível.':'';
+  if(statusEl)statusEl.textContent=Object.keys(cheios).length?'Alguns horários estão cheios e não podem ser selecionados — escolha outro horário disponível.':(ehHoje&&_minHojeAtual?`Pra hoje, conseguimos a partir das ${_minHojeAtual} ⏰`:'');
 }
-function validate(){
+// 'skipHora' pula a validação do campo de horário — usado pelo fluxo "Falar com atendente"
+// (dia esgotado hoje: não existe horário válido pra escolher, mas o resto do form precisa
+// estar completo do mesmo jeito que no envio normal).
+function validate(skipHora){
   let ok=true;
   let firstErrorEl=null;
   const markError=(rowEl,hasError)=>{
@@ -220,20 +268,32 @@ function validate(){
   const horaVal=horaEl?horaEl.value:'';
   const dataValChk=document.getElementById('f-data')?document.getElementById('f-data').value:'';
   const ehDomingo=dataValChk&&new Date(dataValChk+'T00:00:00').getDay()===0;
-  let horaInvalida=false,horaMsg='';
-  if(ehDomingo){
-    horaInvalida=true;
-    horaMsg='Não atendemos aos domingos — escolha outro dia';
-  }else if(!horaVal){
-    horaInvalida=true;
-    horaMsg='Selecione um horário desejado entre 08:00 e 19:00';
-  }else if(_horariosIndisponiveis.has(horaVal)){
-    horaInvalida=true;
-    horaMsg='Esse horário ficou cheio — selecione outro horário disponível';
+  const ehHojeChk=dataValChk&&dataValChk===_dataHojeStr();
+  if(skipHora){
+    if(horaMsgEl)horaMsgEl.textContent='';
+    markError(horaRow,false);
+  }else{
+    let horaInvalida=false,horaMsg='';
+    if(ehDomingo){
+      horaInvalida=true;
+      horaMsg='Não atendemos aos domingos — escolha outro dia';
+    }else if(ehHojeChk&&_esgotadoHojeAtual){
+      horaInvalida=true;
+      horaMsg='Não conseguimos mais encomendas pra hoje 😔';
+    }else if(!horaVal){
+      horaInvalida=true;
+      horaMsg='Selecione um horário desejado entre 08:00 e 19:00';
+    }else if(_horariosIndisponiveis.has(horaVal)){
+      horaInvalida=true;
+      horaMsg='Esse horário ficou cheio — selecione outro horário disponível';
+    }else if(ehHojeChk&&_minHojeAtual&&horaVal<_minHojeAtual){
+      horaInvalida=true;
+      horaMsg=`Pra hoje, conseguimos a partir das ${_minHojeAtual} ⏰`;
+    }
+    if(horaMsgEl)horaMsgEl.textContent=horaMsg;
+    markError(horaRow,horaInvalida);
+    if(horaInvalida)ok=false;
   }
-  if(horaMsgEl)horaMsgEl.textContent=horaMsg;
-  markError(horaRow,horaInvalida);
-  if(horaInvalida)ok=false;
 
   if(firstErrorEl){
     firstErrorEl.scrollIntoView({behavior:'smooth',block:'center'});
@@ -273,8 +333,20 @@ function confirmPhoneAndSend(){
 
 async function finalizar(){
   if(!validate())return;
+  _pedidoParaAtendenteFlow=false; // garante que o envio normal nunca herde a flag do fluxo "Falar com atendente"
   showConfirmPhone();
   return;
+}
+// Dia esgotado hoje (ver f-hora-esgotado): não existe horário válido pra escolher, então o
+// checkout inteiro (exceto hora) precisa estar completo e válido antes de liberar o pedido.
+// Reaproveita o mesmo fluxo de confirmação de telefone + envio do "Enviar Pedido" normal —
+// só marca _pedidoParaAtendenteFlow pra _doFinalizar saber que deve mandar statusInicial
+// 'Para ver' e, no sucesso, ir direto pro WhatsApp (em vez de abrir o bot de status).
+let _pedidoParaAtendenteFlow=false;
+function falarComAtendenteEsgotado(){
+  if(!validate(true))return;
+  _pedidoParaAtendenteFlow=true;
+  showConfirmPhone();
 }
 let _pedidoPendente=null; // dados do pedido aguardando confirmação no Coda (usado por retry/skip)
 let _confirmandoPedido=false;
@@ -445,7 +517,11 @@ async function _doFinalizar(){
     // '_editData' existe quando o cliente está editando um pedido já existente
     // (chave 'dluh_edit_pedido' no localStorage, gravada pelo painel "Meus Pedidos").
     const _editData=(()=>{try{const s=localStorage.getItem('dluh_edit_pedido');return s?JSON.parse(s):null;}catch(_){return null;}})();
-    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,msg,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items,_editData};
+    // statusInicial:'Para ver' identifica o fluxo de dia esgotado (botão "Falar com atendente")
+    // — captura a flag aqui e já reseta o módulo pra não vazar pro próximo pedido.
+    const statusInicial=_pedidoParaAtendenteFlow?'Para ver':undefined;
+    _pedidoParaAtendenteFlow=false;
+    _pedidoPendente={paiCells,subrowInputs,taxaFrete,waUrl,msg,nome,tel,entrega,endereco,pagamento,data,horaVal,obs,total,entradaVal,restoVal,itensTexto,items,_editData,statusInicial};
 
     // Só passa para o WhatsApp depois que o pedido for registrado no Coda
     await _confirmarESeguirWhats();
@@ -483,7 +559,7 @@ async function _confirmarESeguirWhats(){
         res=await fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({pai:p.paiCells,subrows:p.subrowInputs,taxaFrete:p.taxaFrete}),
+          body:JSON.stringify({pai:p.paiCells,subrows:p.subrowInputs,taxaFrete:p.taxaFrete,...(p.statusInicial?{statusInicial:p.statusInicial}:{})}),
           signal:ctrl.signal
         });
       }
@@ -515,9 +591,15 @@ async function _confirmarESeguirWhats(){
       setPedidoLoadingState('success');
       clearCart();topperPorProduto={};
       _pedidoPendente=null;
-      // Em vez de ir direto pro WhatsApp, abre o bot de status (chat próprio) —
-      // ele já mostra a situação atual e pode ser consultado de novo a qualquer momento.
-      setTimeout(()=>abrirStatusBotPosPedido(p),700);
+      if(p.statusInicial==='Para ver'){
+        // Dia esgotado (fluxo "Falar com atendente"): vai direto pro WhatsApp com o
+        // resumo do pedido já montado, em vez de abrir o bot de acompanhamento de status.
+        setTimeout(()=>irParaWhatsapp(p.waUrl),700);
+      }else{
+        // Em vez de ir direto pro WhatsApp, abre o bot de status (chat próprio) —
+        // ele já mostra a situação atual e pode ser consultado de novo a qualquer momento.
+        setTimeout(()=>abrirStatusBotPosPedido(p),700);
+      }
     }
   }catch(e){
     console.warn('Erro ao confirmar pedido no Coda:',e);
