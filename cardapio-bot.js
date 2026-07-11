@@ -241,7 +241,11 @@ function abrirStatusBotPosPedido(p){
   if(p.msg)sbAddMsg('user',p.msg.replace(/\*/g,''));
   sbAddMsg('bot','Pedido recebido! ✅ Já tô verificando o estoque dos itens com a cozinha. Assim que confirmar, mando o link de pagamento aqui mesmo. 🙂');
   sbAddMsg('bot','⏳ Seu pedido está sendo verificado pela nossa equipe.');
-  sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
+  sbBotoes([
+    {label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()},
+    // Sai do bot direto pro WhatsApp da loja, com o mesmo resumo do pedido já pré-preenchido.
+    {label:'💬 Continuar no Whats',onClick:()=>window.open(p.waUrl||`https://wa.me/${CONFIG.WHATSAPP}`,'_blank')},
+  ]);
   sbIniciarAcompanhamento(_statusBotTel,p.waUrl,p.paiId);
   sbPedirPermissaoNotificacao();
 }
@@ -984,30 +988,10 @@ function sbAtendente(contexto){
     return;
   }
   sbEsconderInput();
-  try{
-    if(window.Tawk_API&&typeof window.Tawk_API.maximize==='function'){
-      sbAddMsg('bot','Tô te transferindo pra um atendente agora. Só um instante! 💬');
-      // Envia contexto e identidade ao Tawk antes de abrir o widget
-      try{
-        if(window._fbUser&&typeof Tawk_API.setAttributes==='function')
-          Tawk_API.setAttributes({name:window._fbUser.displayName||'',email:window._fbUser.email||''},function(){});
-        const tags=['bot-dluh'];
-        if(_sbContextoAtendente)tags.push(_sbContextoAtendente);
-        if(typeof Tawk_API.addTags==='function')Tawk_API.addTags(tags,function(){});
-        if(typeof Tawk_API.addEvent==='function')
-          Tawk_API.addEvent('atendente-solicitado',{origem:_sbContextoAtendente||'bot',pagina:'cardapio'},function(){});
-      }catch(_){}
-      if(typeof window.Tawk_API.showWidget==='function')window.Tawk_API.showWidget();
-      window.Tawk_API.maximize();
-      fecharStatusBot();
-      // Desliza o FAB pro lado enquanto o Tawk ocupa o mesmo canto (volta ao normal em onChatMinimized).
-      const fab=document.getElementById('status-bot-fab');
-      if(fab)fab.classList.add('sb-lado');
-      _sbTawkAtivo=true;
-      return;
-    }
-  }catch(_){}
-  sbWhatsappFallback('Nosso chat ao vivo está indisponível no momento.');
+  // Tawk.to desativado (atendimento migrou pro WhatsApp/bot) — "Falar com atendente"
+  // vai direto pro WhatsApp da loja, reaproveitando o mesmo fallback usado quando
+  // alguma integração falha.
+  sbWhatsappFallback('Te conectando com um atendente agora!');
 }
 // Reabre o widget do Tawk quando a conversa com atendente está ativa mas minimizada.
 // Chamado pelo botão #sb-tawk-fab (aparece em onChatMinimized quando _sbTawkAtivo=true).
