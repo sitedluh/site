@@ -16,7 +16,13 @@ const CFG = {
     // O worker (/pedido-feito) grava Status="Feito" na Pedidos Base — é a fonte da
     // escrita. O painel NÃO escreve mais no Status; só usa este valor para reconhecer
     // (na leitura/poll) quais pedidos já saíram como "Feito" e marcá-los como concluídos.
-    statusValor: 'Feito'
+    statusValor: 'Feito',
+    // Valores de Status que significam pedido CONCLUÍDO (não é mais fila, não pode
+    // ficar "atrasado"). Cobre o desfecho novo ("Feito") e os antigos ("Entregue",
+    // "Retirado", "Finalizado") — a coluna Status pode ter qualquer um dependendo
+    // do fluxo em que o pedido foi fechado. Comparação case-insensitive e tolerante
+    // a array (a coluna pode chegar como multi-select).
+    statusFinais: ['Feito', 'Entregue', 'Retirado', 'Finalizado']
   },
   alertHours: 1
 };
@@ -329,9 +335,19 @@ function parseRows(rows, valorTotalMap, valorPagoMap, valorEntregaMap, pagoStatu
       valorPago: (valorPagoMap[row.id] !== undefined && valorPagoMap[row.id] !== null) ? valorPagoMap[row.id] : 0,
       valorEntrega: valorEntregaMap[row.id] || '',
       pago: pagoStatusMap[row.id] || '',
-      entregue: String(v[c.status] || '').toLowerCase() === String(c.statusValor).toLowerCase()
+      entregue: pedidoConcluido(v[c.status], c.statusFinais)
     };
   }).filter(Boolean).sort((a,b) => a.datetime - b.datetime);
+}
+
+// Um pedido está CONCLUÍDO quando o Status da Pedidos Base bate com qualquer valor
+// da lista de finais (CFG.cols.statusFinais). Trata a coluna Status como string OU
+// array (multi-select) e compara case-insensitive, com trim. Concluído => nunca é
+// tratado como fila/atrasado (o resto do painel deriva tudo de `entregue`).
+function pedidoConcluido(statusVal, finais) {
+  const finaisLc = (finais || []).map(s => String(s).trim().toLowerCase());
+  const arr = Array.isArray(statusVal) ? statusVal : [statusVal];
+  return arr.some(s => finaisLc.includes(String(s || '').trim().toLowerCase()));
 }
 
 // Calcula o restante a cobrar de um pedido (total - valor pago), nunca negativo.
