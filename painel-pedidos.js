@@ -13,7 +13,10 @@ const CFG = {
     telefone: 'c-WhdvD5qzPB',
     valor: 'c-lTihbeP5Cj',
     status: 'c-SpdhR0ZMGd',
-    statusValor: 'Entregue'
+    // O worker (/pedido-feito) grava Status="Feito" na Pedidos Base — é a fonte da
+    // escrita. O painel NÃO escreve mais no Status; só usa este valor para reconhecer
+    // (na leitura/poll) quais pedidos já saíram como "Feito" e marcá-los como concluídos.
+    statusValor: 'Feito'
   },
   alertHours: 1
 };
@@ -346,31 +349,17 @@ function fmtMoneyBR(n) {
 // Pedido pendente de confirmação (aguardando resposta da caixa de diálogo).
 let _entregaPendingId = null;
 
-// Chamado pelos botões "Marcar como Entregue/Retirado". Nenhuma alteração (Coda,
-// worker, WhatsApp) é feita aqui — só abre a caixa de confirmação. Só depois que o
-// usuário responder (entregaConfirmResposta) é que markDelivered roda de fato.
+// Chamado pelos botões "Feito". Nenhuma alteração (Coda, worker, WhatsApp) é feita
+// aqui — só abre a caixa de confirmação. Só depois que o usuário confirmar
+// (entregaConfirmSim) é que marcarFeito roda de fato.
 function confirmarEntrega(id) {
   // Procura em orders e também em allOrders (fallback de segurança — orders é o
   // subconjunto filtrado pela data selecionada, então se algo ficar fora do filtro
   // ainda achamos o pedido aqui em vez de simplesmente não fazer nada).
   const o = (orders.find(x => x.id === id)) || (allOrders.find(x => x.id === id));
   if (!o) { console.error('confirmarEntrega: pedido não encontrado', id); return; }
-  const isEntrega = String(o.tipo || '').toLowerCase().includes('entrega');
-  const { restanteNum } = calcRestante(o);
   _entregaPendingId = id;
-  document.getElementById('entrega-confirm-title').textContent = `Marcar como ${isEntrega ? 'entregue' : 'retirado'}?`;
   document.getElementById('entrega-confirm-nome').textContent = o.nome;
-  document.getElementById('entrega-confirm-valor').textContent = fmtMoneyBR(restanteNum);
-  const yesBtn = document.getElementById('entrega-confirm-yes');
-  if (restanteNum > 0) {
-    yesBtn.style.display = '';
-    yesBtn.textContent = `💳 Marcar e cobrar ${fmtMoneyBR(restanteNum)}`;
-  } else {
-    // Sem valor de "Valor Total"/"Valor Pago" cadastrado no Coda para este pedido —
-    // não dá pra gerar cobrança de verdade, então some com o botão de cobrar.
-    yesBtn.style.display = 'none';
-  }
-  document.getElementById('entrega-confirm-no').textContent = `✓ Marcar sem cobrar`;
   document.getElementById('entrega-confirm-overlay').classList.add('open');
 }
 
@@ -379,76 +368,54 @@ function closeEntregaConfirm() {
   _entregaPendingId = null;
 }
 
-function entregaConfirmResposta(cobrar) {
+// Confirmação única — o usuário disse "Sim, marcar como Feito".
+function entregaConfirmSim() {
   const id = _entregaPendingId;
   document.getElementById('entrega-confirm-overlay').classList.remove('open');
   _entregaPendingId = null;
   if (!id) return;
-  // 'feito-nao-pago' = novo botão: marca o pedido como feito/entregue SEM cobrar,
-  // e registra explicitamente "Pago?" = 'Não pago' na Pedidos Base.
-  if (cobrar === 'feito-nao-pago') { markDelivered(id, false, 'Não pago'); return; }
-  markDelivered(id, cobrar);
+  marcarFeito(id);
 }
 
-async function markDelivered(id, cobrar = true, pagoStatus = null) {
+// Marca o pedido como "Feito" chamando o worker. O worker é a fonte de verdade:
+// grava Status="Feito" na Pedidos Base, gera/recupera o link InfinitePay e ENVIA a
+// mensagem de cobrança ao cliente no WhatsApp. O painel NÃO cobra nem escreve Status
+// no Coda — só dispara a rota e reflete o resultado na UI local.
+async function marcarFeito(id) {
   const btn = document.getElementById('db-' + id);
-  const originalText = btn ? btn.textContent : '✓ Marcar como Entregue';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando...'; }
-  const o = orders.find(x => x.id === id);
-  if (o) o.entregue = true;
+  const originalText = btn ? btn.textContent : '✔️ Feito';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
+  const o = (orders.find(x => x.id === id)) || (allOrders.find(x => x.id === id));
   try {
-    const url = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows/${id}`;
-    // Além do status "Entregue", grava "Pago?" quando informado (botão "Feito, não pago").
-    // A API do Coda aceita nome de coluna; a Option precisa existir EXATA no Coda.
-    const cells = [{ column: 'c-SpdhR0ZMGd', value: CFG.cols.statusValor }];
-    if (pagoStatus) cells.push({ column: 'Pago?', value: pagoStatus });
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${CFG.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ row: { cells } })
+    // valor = restante a cobrar já calculado pelo painel; o worker tem fallback
+    // ("Valor Total") caso venha vazio/ausente.
+    const restanteNum = o ? calcRestante(o).restanteNum : undefined;
+    const res = await fetch('https://coda-proxy.sitedluh.workers.dev/pedido-feito', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rowId: id,
+        telefone: o ? o.telefone : undefined,
+        cliente: o ? o.nome : undefined,
+        valor: restanteNum,
+      })
     });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      showToast('❌ Erro ao salvar', e.message || '');
-      if (o) o.entregue = false;
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) {
+      showToast('❌ Erro ao marcar Feito', d.error || ('HTTP ' + res.status));
       if (btn) { btn.disabled = false; btn.textContent = originalText; }
       return;
     }
-    if (pagoStatus) { if (o) o.pago = pagoStatus; }
-    showToast(cobrar ? '✅ Entregue! Gerando cobrança...' : (pagoStatus ? '✅ Feito — marcado como NÃO PAGO' : '✅ Entregue!'), o ? o.nome : '');
-    speak(pagoStatus ? 'Pedido feito, marcado como não pago!' : 'Pedido marcado como entregue!');
-    // Gera link InfinitePay e abre WhatsApp com a mensagem — só se o usuário pediu para cobrar.
-    if (cobrar && o) {
-      const { totalNum, pagoNum, restanteNum } = calcRestante(o);
-      fetch('https://coda-proxy.sitedluh.workers.dev/entrega-confirmada', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pedidoId: id,
-          cliente: o.nome,
-          telefone: o.telefone,
-          total: totalNum,
-          valorPago: pagoNum,
-          restante: restanteNum,
-        })
-      }).then(r => r.json()).then(d => {
-        if (d.ok && d.waUrl) {
-          showToast('💳 Abrindo WhatsApp...', o.nome);
-          window.open(d.waUrl, '_blank');
-        } else if (d.ok && d.link) {
-          showToast('💳 Link gerado!', d.link);
-        } else {
-          showToast('⚠️ Cobrança não gerada', d.error || '');
-        }
-      }).catch(() => showToast('⚠️ Worker indisponível', 'Tente novamente'));
-    }
+    // Sucesso: worker já gravou "Feito" no Coda. Reflete localmente para a UI atualizar
+    // na hora (sem reescrever o Status no Coda). O próximo poll relê "Feito" e mantém.
+    if (o) o.entregue = true;
+    showToast('✅ Pedido Feito!', (d.cliente || (o ? o.nome : '')) + ' — cobrança enviada no WhatsApp');
+    speak('Pedido marcado como feito!');
+    renderAll();
   } catch(e) {
     showToast('❌ Erro de conexão', e.message);
-    if (o) o.entregue = false;
     if (btn) { btn.disabled = false; btn.textContent = originalText; }
-    return;
   }
-  renderAll();
 }
 
 // ── RENDER ──────────────────────────────────────────────
@@ -688,7 +655,7 @@ function renderFeatured(order, now) {
         <div class="fc-total">${esc(fmtMoney(order.valor))}</div>
       </div>
       ${!order.entregue
-        ? `<button class="btn-deliver${isLate?' late':''}" id="db-${order.id}" onclick="confirmarEntrega('${order.id}')">✓ Marcar como ${isEntrega?'Entregue':'Retirado'}</button>`
+        ? `<button class="btn-deliver${isLate?' late':''}" id="db-${order.id}" onclick="confirmarEntrega('${order.id}')">✔️ Feito</button>`
         : `<div style="text-align:center;color:var(--green);font-size:.82rem;padding:10px 0">✅ Concluído</div>`}
       <button class="btn-print" style="margin:0 18px 16px;width:calc(100% - 36px);justify-content:center" onclick="printOrder('${order.id}')">🖨️ Imprimir Nota</button>
     </div>`;
@@ -724,7 +691,7 @@ function renderQueue(list, featured, now) {
     const tc = isEntrega ? 'entrega' : 'retirada';
     const isUrg = mins >= 0 && mins <= 60;
     let cd = '', cdcls = '';
-    if (o.entregue) { cd = '✅ Entregue'; }
+    if (o.entregue) { cd = '✅ Feito'; }
     else if (isLate) { cd = `ATRASADO ${Math.abs(mins)}min`; cdcls = 'urg'; }
     else if (mins === 0) { cd = 'AGORA'; cdcls = 'urg'; }
     else if (mins >= 60) { cd = `${Math.floor(mins/60)}h${mins%60?` ${mins%60}min`:''}`; cdcls = ''; }
@@ -748,7 +715,7 @@ function renderQueue(list, featured, now) {
           ${items}
           ${o.telefone?`<div style="margin-top:7px;font-size:.78rem;color:var(--text3)">📞 ${esc(o.telefone)}</div>`:''}
           ${o.valor?`<div style="font-size:.82rem;color:var(--green);font-weight:700;margin-top:3px">${esc(fmtMoney(o.valor))}</div>`:''}
-          ${!o.entregue?`<button class="btn-qdeliver${isLate?' late':''}" id="db-${o.id}" onclick="event.stopPropagation();confirmarEntrega('${o.id}')">✓ Marcar como ${isEntrega?'Entregue':'Retirado'}</button>`
+          ${!o.entregue?`<button class="btn-qdeliver${isLate?' late':''}" id="db-${o.id}" onclick="event.stopPropagation();confirmarEntrega('${o.id}')">✔️ Feito</button>`
           :'<div style="color:var(--green);font-size:.75rem;padding:5px 0">✅ Concluído</div>'}
           <button class="btn-print" style="margin-top:8px" onclick="event.stopPropagation();printOrder('${o.id}')">🖨️ Imprimir</button>
         </div>
@@ -858,7 +825,7 @@ function renderMobile() {
     const tipoLabel = isEntrega ? 'Entrega' : 'Retirada';
     const tc = isEntrega ? 'ent' : 'ret';
     let cd = '', cdcls = '';
-    if (o.entregue) { cd = '✅ Entregue'; }
+    if (o.entregue) { cd = '✅ Feito'; }
     else if (isLate) { cd = `ATRASADO ${Math.abs(mins)}min`; cdcls = 'urg'; }
     else if (mins === 0) { cd = 'AGORA'; cdcls = 'urg'; }
     else if (mins >= 60) { cd = `${Math.floor(mins/60)}h${mins%60?` ${mins%60}min`:''}`; }
@@ -928,7 +895,7 @@ function openMModal(id) {
         <div><div class="m-modal-label">Total</div><div class="m-modal-val green">${esc(fmtMoney(o.valor))}</div></div>
       </div>
       ${!o.entregue
-        ? `<button class="m-modal-btn deliver${isLate ? ' late' : ''}" id="db-${o.id}" onclick="confirmarEntrega('${o.id}')">✓ Marcar como ${isEntrega ? 'Entregue' : 'Retirado'}</button>`
+        ? `<button class="m-modal-btn deliver${isLate ? ' late' : ''}" id="db-${o.id}" onclick="confirmarEntrega('${o.id}')">✔️ Feito</button>`
         : `<div style="text-align:center;color:var(--green);font-size:.82rem;padding:10px 0">✅ Concluído</div>`}
       <button class="m-modal-btn print" onclick="event.stopPropagation();printOrder('${o.id}')">🖨️ Imprimir</button>
     </div>

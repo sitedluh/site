@@ -103,19 +103,17 @@
   </div>
 </div>
 
-<!-- CONFIRMAÇÃO DE ENTREGA / COBRANÇA -->
+<!-- CONFIRMAÇÃO DE "FEITO" -->
 <div class="pp-confirm-overlay" id="entrega-confirm-overlay">
   <div class="pp-confirm-box">
-    <div class="pp-confirm-icon">💳</div>
-    <div class="pp-confirm-title" id="entrega-confirm-title">Marcar como entregue?</div>
+    <div class="pp-confirm-icon">✔️</div>
+    <div class="pp-confirm-title" id="entrega-confirm-title">Marcar como Feito?</div>
     <div class="pp-confirm-msg">
-      Confirmar pedido de <b id="entrega-confirm-nome"></b>?<br>
-      Restante a cobrar: <b id="entrega-confirm-valor" style="color:var(--green)"></b>
+      Marcar o pedido de <b id="entrega-confirm-nome"></b> como <b>Feito</b>?<br>
+      O cliente receberá a mensagem com o link de pagamento.
     </div>
     <div class="pp-confirm-actions">
-      <button class="pp-confirm-btn yes" id="entrega-confirm-yes" onclick="entregaConfirmResposta(true)">💳 Marcar e cobrar restante</button>
-      <button class="pp-confirm-btn no" id="entrega-confirm-no" onclick="entregaConfirmResposta(false)">✓ Marcar sem cobrar</button>
-      <button class="pp-confirm-btn feito" id="entrega-confirm-feito" onclick="entregaConfirmResposta('feito-nao-pago')">✔️ Feito, não pago</button>
+      <button class="pp-confirm-btn yes" id="entrega-confirm-yes" onclick="entregaConfirmSim()">✔️ Sim, marcar como Feito</button>
       <button class="pp-confirm-btn cancel" onclick="closeEntregaConfirm()">Cancelar</button>
     </div>
   </div>
