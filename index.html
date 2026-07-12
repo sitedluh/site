@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>D'Luh Festas — Doces & Salgados para sua festa</title>
 <link rel="icon" type="image/png" href="logo.png">
 <meta property="og:title" content="D'Luh Festas — Faça seu pedido">
@@ -21,46 +21,129 @@
   --text:#1f1410;--text2:#6b5344;--text3:#9c7b6a;
   --radius:12px;--radius-sm:8px;
 }
-html,body{height:100%;overflow:hidden}body{font-family:'DM Sans',sans-serif;background:var(--surface2)}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);min-height:100%;overflow-x:hidden}
 
-/* HERO */
-.hero{position:relative;width:100%;height:100svh;min-height:480px;overflow:hidden;display:flex;flex-direction:column}
-.hero-img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
-.hero-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(31,20,16,.72) 0%,rgba(31,20,16,.2) 55%,transparent 100%);display:flex;align-items:center;padding:0 6%}
-.hero-content{color:#fff;max-width:420px}
-.hero-tag{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:rgba(200,112,58,.15);border:1px solid rgba(200,112,58,.3);border-radius:20px;padding:4px 12px;display:inline-block;margin-bottom:14px}
-.hero-title{font-family:'Playfair Display',serif;font-size:clamp(28px,6vw,52px);font-weight:700;line-height:1.15;margin-bottom:12px}
-.hero-sub{font-size:15px;color:rgba(255,255,255,.8);line-height:1.6;margin-bottom:28px}
-.hero-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:14px 28px;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s;text-decoration:none}
-.hero-btn:hover{background:var(--accent-dark)}
+/* ─────────── HEADER FIXO ─────────── */
+.top-header{position:sticky;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;gap:14px;
+  padding:10px 5%;background:rgba(245,240,235,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.th-logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);margin-right:auto}
+.th-logo img{width:34px;height:34px;border-radius:8px;object-fit:cover}
+.th-logo b{font-family:'Playfair Display',serif;font-size:18px;font-weight:700}
+.th-logo b span{color:var(--accent)}
+.th-nav{display:flex;gap:8px}
+.th-btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-size:13px;font-weight:600;
+  padding:8px 14px;border-radius:20px;border:1px solid var(--border);color:var(--text);background:var(--surface);transition:.15s;white-space:nowrap}
+.th-btn:hover{border-color:var(--accent);color:var(--accent)}
+.th-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.th-btn.primary:hover{background:var(--accent-dark);color:#fff}
 @media(max-width:600px){
-  .hero-overlay{
-    background:linear-gradient(180deg,rgba(31,20,16,.3) 0%,rgba(31,20,16,.85) 100%);
-    align-items:flex-end;
-    padding:0 5% 22%;
-  }
-  .hero-content{max-width:100%;text-align:center}
-  .hero-tag{font-size:10px}
-  .hero-title{font-size:clamp(26px,8vw,38px);margin-bottom:10px}
-  .hero-sub{font-size:13px;margin-bottom:20px}
-  .hero-btn{width:100%;justify-content:center;padding:14px;font-size:15px}
-  .ticker-section{padding:12px 0;bottom:0}
-  .ticker-item{padding:9px 14px;gap:8px;border-radius:10px}
-  .ticker-item-emoji{font-size:22px}
-  .ticker-item-name{font-size:13px}
-  .ticker-item-price{font-size:12px}
+  .top-header{padding:9px 4%}
+  .th-logo b{font-size:16px}
+  .th-btn{padding:7px 11px;font-size:12px}
+  .th-btn .lbl{display:none}
 }
 
-/* TICKER */
-.ticker-section{position:absolute;bottom:0;left:0;right:0;overflow:hidden;padding:14px 0 18px;z-index:10}
-.ticker-track{display:flex;gap:20px;animation:ticker 35s linear infinite;width:max-content}
-.ticker-track:hover{animation-play-state:paused}
-@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.ticker-item{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.15);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.25);border-radius:var(--radius);padding:12px 22px;white-space:nowrap;cursor:pointer;transition:background .2s;text-decoration:none}
-.ticker-item:hover{background:rgba(255,255,255,.25)}
-.ticker-item-emoji{font-size:28px;line-height:1}
-.ticker-item-name{font-size:15px;font-weight:600;color:#fff}
-.ticker-item-price{font-size:14px;color:#f5c89a;font-weight:600}
+/* ─────────── HERO SPLASH ─────────── */
+.hero{position:relative;width:100%;height:72svh;min-height:440px;max-height:640px;overflow:hidden;display:flex}
+.hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(31,20,16,.78) 0%,rgba(31,20,16,.35) 55%,rgba(31,20,16,.15) 100%);
+  display:flex;align-items:center;padding:0 6%}
+.hero-content{color:#fff;max-width:560px;position:relative;z-index:2}
+.hero-tag{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+  background:rgba(200,112,58,.15);border:1px solid rgba(200,112,58,.3);border-radius:20px;padding:4px 12px;display:inline-block;margin-bottom:14px}
+.hero-title{font-family:'Playfair Display',serif;font-size:clamp(30px,6vw,54px);font-weight:700;line-height:1.12;margin-bottom:12px}
+.hero-sub{font-size:16px;color:rgba(255,255,255,.85);line-height:1.6;margin-bottom:26px;max-width:440px}
+.hero-cta-row{display:flex;gap:14px;flex-wrap:wrap}
+.hero-cta{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;text-decoration:none;
+  border-radius:14px;padding:16px 24px;min-width:180px;transition:transform .15s,box-shadow .15s,background .15s;cursor:pointer}
+.hero-cta:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(0,0,0,.35)}
+.hero-cta .big{font-size:19px;font-weight:700;display:flex;align-items:center;gap:8px}
+.hero-cta .small{font-size:12.5px;font-weight:400;opacity:.85;margin-top:3px}
+.hero-cta.festas{background:var(--accent);color:#fff}
+.hero-cta.festas:hover{background:var(--accent-dark)}
+.hero-cta.cardapio{background:rgba(255,255,255,.95);color:var(--text)}
+.hero-cta.cardapio:hover{background:#fff}
+@media(max-width:600px){
+  .hero{height:auto;min-height:0;max-height:none}
+  .hero-overlay{position:relative;inset:auto;background:linear-gradient(180deg,rgba(31,20,16,.35) 0%,rgba(31,20,16,.82) 60%);
+    align-items:flex-end;padding:26vh 5% 26px;min-height:64svh}
+  .hero-content{max-width:100%}
+  .hero-sub{font-size:14px;margin-bottom:20px}
+  .hero-cta-row{gap:10px}
+  .hero-cta{flex:1 1 100%;min-width:0;flex-direction:row;justify-content:space-between;align-items:center;padding:14px 18px}
+  .hero-cta .info{display:flex;flex-direction:column}
+  .hero-cta .big{font-size:17px}
+  .hero-cta .arrow{font-size:18px}
+}
+
+/* ─────────── TRILHAS NETFLIX ─────────── */
+.rows-wrap{padding:26px 0 8px}
+.nflx-row{margin:0 0 30px}
+.nflx-row-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 5%;margin-bottom:12px}
+.nflx-row-title{font-family:'Playfair Display',serif;font-size:clamp(19px,3vw,24px);font-weight:700;color:var(--text)}
+.nflx-row-title .em{margin-right:6px}
+.nflx-row-link{font-size:13px;font-weight:600;color:var(--accent);text-decoration:none;white-space:nowrap}
+.nflx-row-link:hover{text-decoration:underline}
+.nflx-scroller{position:relative}
+.nflx-track{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x proximity;scroll-behavior:smooth;
+  padding:4px 5% 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.nflx-track::-webkit-scrollbar{display:none}
+/* Card de mídia */
+.nflx-card{position:relative;flex:0 0 auto;width:190px;aspect-ratio:3/4;border-radius:var(--radius);overflow:hidden;
+  scroll-snap-align:start;background:linear-gradient(135deg,#efe4d8,#e5d3c2);cursor:pointer;text-decoration:none;
+  box-shadow:0 2px 8px rgba(31,20,16,.08);transition:transform .18s,box-shadow .18s;display:block}
+.nflx-card:hover{transform:scale(1.04);box-shadow:0 10px 26px rgba(31,20,16,.22);z-index:3}
+.nflx-card img,.nflx-card video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.nflx-card video{opacity:0;transition:opacity .25s}
+.nflx-card.playing video{opacity:1}
+/* Placeholder (sem mídia real) */
+.nflx-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:54px;
+  background:linear-gradient(135deg,#f0e5d8,#e2cdb9)}
+.nflx-card-grad{position:absolute;left:0;right:0;bottom:0;height:62%;
+  background:linear-gradient(to top,rgba(31,20,16,.82) 0%,rgba(31,20,16,.15) 70%,transparent 100%)}
+.nflx-card-cap{position:absolute;left:0;right:0;bottom:0;padding:12px 12px 12px;color:#fff;z-index:2}
+.nflx-card-cap .n{font-size:14px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nflx-card-cap .p{font-size:12.5px;font-weight:600;color:#f5c89a;margin-top:3px}
+.nflx-badge{position:absolute;top:8px;left:8px;z-index:3;background:var(--accent);color:#fff;font-size:10px;font-weight:700;
+  letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+/* Setas desktop */
+.nflx-arrow{position:absolute;top:0;bottom:8px;width:46px;border:none;cursor:pointer;z-index:5;display:none;
+  align-items:center;justify-content:center;font-size:22px;color:#fff;background:rgba(31,20,16,.35);opacity:0;transition:opacity .15s}
+.nflx-scroller:hover .nflx-arrow{opacity:1}
+.nflx-arrow:hover{background:rgba(31,20,16,.55)}
+.nflx-arrow.prev{left:0}.nflx-arrow.next{right:0}
+@media(hover:hover) and (pointer:fine){.nflx-arrow{display:flex}}
+@media(max-width:600px){
+  .nflx-card{width:150px}
+  .nflx-row{margin-bottom:24px}
+}
+
+/* ─────────── FAIXA DUPLA DE CONVERSÃO ─────────── */
+.conv-band{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:22px 5% 34px;max-width:1100px;margin:0 auto}
+.conv-card{border-radius:16px;padding:26px 24px;text-decoration:none;color:#fff;position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .15s;min-height:150px;display:flex;flex-direction:column;justify-content:flex-end}
+.conv-card:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(31,20,16,.25)}
+.conv-card.festas{background:linear-gradient(135deg,#c8703a,#a85a2e)}
+.conv-card.cardapio{background:linear-gradient(135deg,#5b4636,#3a2c22)}
+.conv-card .ico{font-size:34px;margin-bottom:auto}
+.conv-card h3{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;margin-bottom:5px}
+.conv-card p{font-size:14px;opacity:.9;margin-bottom:12px}
+.conv-card .go{font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+@media(max-width:600px){.conv-band{grid-template-columns:1fr;gap:12px;padding:14px 5% 26px}}
+
+/* ─────────── FOOTER ─────────── */
+.site-footer{background:#3a2c22;color:rgba(255,255,255,.82);padding:34px 5% 40px}
+.foot-inner{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;gap:28px;justify-content:space-between}
+.foot-brand{display:flex;align-items:center;gap:10px}
+.foot-brand img{width:40px;height:40px;border-radius:9px;object-fit:cover}
+.foot-brand b{font-family:'Playfair Display',serif;font-size:20px;color:#fff}
+.foot-brand b span{color:var(--accent)}
+.foot-col h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:10px}
+.foot-col a,.foot-col span{display:block;color:rgba(255,255,255,.82);text-decoration:none;font-size:14px;margin-bottom:7px}
+.foot-col a:hover{color:#fff}
+.foot-bottom{max-width:1100px;margin:24px auto 0;padding-top:18px;border-top:1px solid rgba(255,255,255,.12);
+  font-size:12px;color:rgba(255,255,255,.5)}
 </style>
 <link rel="stylesheet" href="animations.css">
 <script type="application/ld+json">
@@ -90,54 +173,345 @@ html,body{height:100%;overflow:hidden}body{font-family:'DM Sans',sans-serif;back
 </head>
 <body>
 
-<div class="hero">
-  <img class="hero-img" src="hero.jpg" alt="D'Luh Festas" fetchpriority="high">
+<!-- ═══════════ HEADER FIXO ═══════════ -->
+<header class="top-header">
+  <a class="th-logo" href="index.html">
+    <img src="logo.png" alt="D'Luh Festas">
+    <b>D'Luh <span>Festas</span></b>
+  </a>
+  <nav class="th-nav">
+    <a class="th-btn primary" href="festas.html">🎉 <span class="lbl">Festas</span></a>
+    <a class="th-btn" href="cardapio.html">🍰 <span class="lbl">Cardápio</span></a>
+  </nav>
+</header>
+
+<!-- ═══════════ HERO SPLASH ═══════════ -->
+<section class="hero">
+  <!-- TROCAR por vídeo de capa opcional: ver comentário <video> abaixo. Hoje usa hero.jpg -->
+  <img class="hero-img" src="hero.jpg" alt="Mesa de festa D'Luh" fetchpriority="high">
   <div class="hero-overlay">
     <div class="hero-content">
-      <span class="hero-tag">🎀 Encomendas especiais</span>
-      <h1 class="hero-title">Doces & Salgados<br>para sua festa</h1>
-      <p class="hero-sub">Brigadeiros, bolos personalizados, salgados artesanais e muito mais. Feitos com amor em Montes Claros.</p>
-      <a class="hero-btn" href="cardapio.html">Ver cardápio →</a>
+      <span class="hero-tag">🎀 Doces, salgados & festas</span>
+      <h1 class="hero-title">Sua festa começa aqui</h1>
+      <p class="hero-sub">Bolos personalizados, brigadeiros, salgados artesanais e festas completas. Feitos com amor em Montes Claros.</p>
+      <div class="hero-cta-row">
+        <a class="hero-cta festas" href="festas.html">
+          <span class="info">
+            <span class="big">🎉 Festas completas</span>
+            <span class="small">Monte um orçamento de festa</span>
+          </span>
+        </a>
+        <a class="hero-cta cardapio" href="cardapio.html">
+          <span class="info">
+            <span class="big">🍰 Cardápio</span>
+            <span class="small">Peça doces e salgados</span>
+          </span>
+        </a>
+      </div>
     </div>
   </div>
-  <div class="ticker-section">
-    <div class="ticker-track" id="ticker-track">
-      <div class="ticker-item"><span class="ticker-item-emoji">🎂</span><span class="ticker-item-name">Carregando produtos...</span></div>
+</section>
+
+<!-- ═══════════ TRILHAS ═══════════ -->
+<main class="rows-wrap" id="rows-wrap">
+
+  <!-- Trilha 1 · Festas que fizemos (mídia estática — placeholders) -->
+  <section class="nflx-row" data-row="festas">
+    <div class="nflx-row-head">
+      <h2 class="nflx-row-title"><span class="em">🎉</span>Festas que fizemos</h2>
+      <a class="nflx-row-link" href="festas.html">Quero uma festa →</a>
+    </div>
+    <div class="nflx-scroller">
+      <button class="nflx-arrow prev" aria-label="Anterior" data-dir="-1">‹</button>
+      <div class="nflx-track" id="track-festas">
+        <!-- Cards inseridos por JS a partir do array FESTAS_MEDIA (editável no <script>) -->
+      </div>
+      <button class="nflx-arrow next" aria-label="Próximo" data-dir="1">›</button>
+    </div>
+  </section>
+
+  <!-- Trilha 2 · Mais vendidos da semana (dinâmica: /ranking-produtos + /produtos) -->
+  <section class="nflx-row" data-row="vendidos" id="row-vendidos" style="display:none">
+    <div class="nflx-row-head">
+      <h2 class="nflx-row-title"><span class="em">🔥</span>Mais vendidos da semana</h2>
+      <a class="nflx-row-link" href="cardapio.html">Ver cardápio →</a>
+    </div>
+    <div class="nflx-scroller">
+      <button class="nflx-arrow prev" aria-label="Anterior" data-dir="-1">‹</button>
+      <div class="nflx-track" id="track-vendidos"></div>
+      <button class="nflx-arrow next" aria-label="Próximo" data-dir="1">›</button>
+    </div>
+  </section>
+
+  <!-- Trilha 3 · Bolos (dinâmica: /produtos tipo Bolo/Torta) -->
+  <section class="nflx-row" data-row="bolos" id="row-bolos" style="display:none">
+    <div class="nflx-row-head">
+      <h2 class="nflx-row-title"><span class="em">🎂</span>Bolos</h2>
+      <a class="nflx-row-link" href="cardapio.html">Ver todos →</a>
+    </div>
+    <div class="nflx-scroller">
+      <button class="nflx-arrow prev" aria-label="Anterior" data-dir="-1">‹</button>
+      <div class="nflx-track" id="track-bolos"></div>
+      <button class="nflx-arrow next" aria-label="Próximo" data-dir="1">›</button>
+    </div>
+  </section>
+
+  <!-- Trilha 4 · Doces (dinâmica: /produtos tipo Docinho) -->
+  <section class="nflx-row" data-row="doces" id="row-doces" style="display:none">
+    <div class="nflx-row-head">
+      <h2 class="nflx-row-title"><span class="em">🍬</span>Doces</h2>
+      <a class="nflx-row-link" href="cardapio.html">Ver todos →</a>
+    </div>
+    <div class="nflx-scroller">
+      <button class="nflx-arrow prev" aria-label="Anterior" data-dir="-1">‹</button>
+      <div class="nflx-track" id="track-doces"></div>
+      <button class="nflx-arrow next" aria-label="Próximo" data-dir="1">›</button>
+    </div>
+  </section>
+
+  <!-- Trilha 5 · Salgados (dinâmica: /produtos tipo Salgado) -->
+  <section class="nflx-row" data-row="salgados" id="row-salgados" style="display:none">
+    <div class="nflx-row-head">
+      <h2 class="nflx-row-title"><span class="em">🥐</span>Salgados</h2>
+      <a class="nflx-row-link" href="cardapio.html">Ver todos →</a>
+    </div>
+    <div class="nflx-scroller">
+      <button class="nflx-arrow prev" aria-label="Anterior" data-dir="-1">‹</button>
+      <div class="nflx-track" id="track-salgados"></div>
+      <button class="nflx-arrow next" aria-label="Próximo" data-dir="1">›</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════ FAIXA DUPLA DE CONVERSÃO ═══════════ -->
+<section class="conv-band">
+  <a class="conv-card festas" href="festas.html">
+    <span class="ico">🎉</span>
+    <h3>Vai dar uma festa?</h3>
+    <p>Monte um orçamento completo: bolo, doces, salgados e mais.</p>
+    <span class="go">Fazer orçamento de festa →</span>
+  </a>
+  <a class="conv-card cardapio" href="cardapio.html">
+    <span class="ico">🍰</span>
+    <h3>Quer só docinhos?</h3>
+    <p>Peça direto do cardápio, com entrega em Montes Claros.</p>
+    <span class="go">Ver o cardápio →</span>
+  </a>
+</section>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<footer class="site-footer">
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <img src="logo.png" alt="D'Luh Festas">
+      <b>D'Luh <span>Festas</span></b>
+    </div>
+    <div class="foot-col">
+      <h4>Navegar</h4>
+      <a href="festas.html">🎉 Festas completas</a>
+      <a href="cardapio.html">🍰 Cardápio</a>
+      <a href="empresas.html">🏢 Empresas</a>
+    </div>
+    <div class="foot-col">
+      <h4>Contato</h4>
+      <a href="https://wa.me/5538992229178" target="_blank" rel="noopener">📱 WhatsApp (38) 99222-9178</a>
+      <a href="https://www.instagram.com/dluhfestas/" target="_blank" rel="noopener">📷 @dluhfestas</a>
+      <span>📍 Montes Claros — MG</span>
     </div>
   </div>
-</div>
+  <div class="foot-bottom">© D'Luh Festas — Feito com amor em Montes Claros.</div>
+</footer>
+
 <script>
 const WORKER_URL = 'https://coda-proxy.sitedluh.workers.dev';
 
-const TIPO_EMOJI = {
-  'Bolo':'🎂','Docinho':'🍬','Salgado':'🥐','Torta':'🥧','Bebida':'🥤'
-};
-async function loadTicker() {
-  try {
-    const res   = await fetch(WORKER_URL + '/produtos');
-    const data  = await res.json();
-    const items = data.produtos || [];
-    if (!items.length) return;
-    const track = document.getElementById('ticker-track');
-    const fmt   = v => v ? ' R$ ' + Number(v).toFixed(2).replace('.',',') : '';
-    const emoji = p => TIPO_EMOJI[p.tipo] || '🎂';
-    const make  = p => {
-      const a = document.createElement('a');
-      a.className = 'ticker-item';
-      a.href = 'cardapio.html';
-      a.innerHTML =
-        '<span class="ticker-item-emoji">' + emoji(p) + '</span>' +
-        '<span class="ticker-item-name">' + p.nome + '</span>' +
-        (p.valor ? '<span class="ticker-item-price">· A partir de ' + fmt(p.valor * (p.qtdMin || 1)) + '</span>' : '');
-      return a;
-    };
-    track.innerHTML = '';
-    [...items,...items].forEach(p => track.appendChild(make(p)));
-    track.style.animationDuration = Math.max(25, items.length * 3.5) + 's';
-  } catch(e) {}
+/* ══════════════════════════════════════════════════════════════
+   MÍDIA DAS FESTAS — trilha "Festas que fizemos" (estática)
+   ──────────────────────────────────────────────────────────────
+   Edite este array pra trocar pelos arquivos REAIS da loja.
+   Coloque os arquivos em  assets/home/  (crie a pasta na raiz do repo).
+   Cada item pode ser:
+     { emoji:'🎉', nome:'Festa infantil' }                          → placeholder (sem mídia)
+     { img:'assets/home/festa-1.webp', nome:'...' }                 → FOTO (recomendado WebP)
+     { video:'assets/home/festa-1.mp4', poster:'assets/home/festa-1.webp', nome:'...' } → VÍDEO curto
+   Formatos recomendados:
+     • Foto  → WebP (ou JPG), ~800x1067px (proporção 3:4).
+     • Vídeo → MP4 (H.264), sem áudio, ≤ 5–8s, ~480–720p, bem comprimido + poster WebP.
+   Se um arquivo faltar (404), o card cai automaticamente no placeholder de emoji.
+══════════════════════════════════════════════════════════════ */
+const FESTAS_MEDIA = [
+  // TROCAR por foto/vídeo real: assets/home/festa-*.webp|mp4
+  { emoji:'🎂', nome:'Festa de aniversário' },
+  { emoji:'🎈', nome:'Festa infantil' },
+  { emoji:'💍', nome:'Chá & noivado' },
+  { emoji:'🎉', nome:'Festa completa' },
+  { emoji:'🏢', nome:'Evento corporativo' },
+  { emoji:'🍰', nome:'Mesa de doces' },
+  // Exemplo de VÍDEO (descomente e aponte pro arquivo real):
+  // { video:'assets/home/festa-video-1.mp4', poster:'assets/home/festa-video-1.webp', nome:'Making of' },
+];
+
+const TIPO_EMOJI = { 'Bolo':'🎂','Torta':'🥧','Docinho':'🍬','Salgado':'🥐','Bebida':'🥤' };
+const fmtBRL = v => v ? 'A partir de R$ ' + Number(v).toFixed(2).replace('.',',') : '';
+
+/* ── Cria um card de mídia (foto/vídeo/placeholder) ── */
+function makeCard(cfg){
+  // cfg: { href, nome, preco, emoji, img, video, poster, badge }
+  const a = document.createElement('a');
+  a.className = 'nflx-card';
+  a.href = cfg.href || 'cardapio.html';
+
+  if (cfg.video){
+    // Vídeo: preload none, muted/loop/playsinline, poster leve, autoplay no hover / IntersectionObserver.
+    const v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true; v.setAttribute('playsinline','');
+    v.preload = 'none';
+    if (cfg.poster) v.poster = cfg.poster;
+    v.dataset.src = cfg.video;                 // src só é atribuída ao ativar (economia)
+    v.addEventListener('error', () => { v.remove(); ph(); }, { once:true });
+    a.appendChild(v);
+    a.classList.add('has-video');
+    // fundo com poster mesmo antes do vídeo carregar
+    if (cfg.poster){ const p = new Image(); p.loading='lazy'; p.src=cfg.poster; a.appendChild(p); }
+    else ph();
+  } else if (cfg.img){
+    const img = document.createElement('img');
+    img.loading = 'lazy'; img.src = cfg.img; img.alt = cfg.nome || '';
+    img.addEventListener('error', () => { img.remove(); ph(); }, { once:true });
+    a.appendChild(img);
+  } else {
+    ph();
+  }
+  function ph(){
+    const d = document.createElement('div');
+    d.className = 'nflx-ph';
+    d.textContent = cfg.emoji || '🎂';
+    a.insertBefore(d, a.firstChild);
+  }
+
+  if (cfg.badge){ const b=document.createElement('span'); b.className='nflx-badge'; b.textContent=cfg.badge; a.appendChild(b); }
+  const grad = document.createElement('div'); grad.className='nflx-card-grad'; a.appendChild(grad);
+  const cap = document.createElement('div'); cap.className='nflx-card-cap';
+  cap.innerHTML = '<div class="n">'+ (cfg.nome||'') +'</div>' + (cfg.preco ? '<div class="p">'+cfg.preco+'</div>' : '');
+  a.appendChild(cap);
+  return a;
 }
 
-loadTicker();
+/* ── Popular a trilha de Festas (estática) ── */
+function renderFestas(){
+  const track = document.getElementById('track-festas');
+  FESTAS_MEDIA.forEach(m => track.appendChild(makeCard({
+    href:'festas.html', nome:m.nome, emoji:m.emoji, img:m.img, video:m.video, poster:m.poster
+  })));
+}
+
+/* ── Trilhas dinâmicas do /produtos + /ranking-produtos ── */
+async function loadTrilhas(){
+  let produtos = [];
+  try {
+    const res = await fetch(WORKER_URL + '/produtos');
+    const data = await res.json();
+    produtos = data.produtos || [];
+  } catch(e){ produtos = []; }
+
+  const cardDe = (p, badge) => makeCard({
+    href:'cardapio.html',
+    nome:p.nome,
+    preco: p.valor ? fmtBRL(p.valor * (p.qtdMin || 1)) : '',
+    emoji: TIPO_EMOJI[p.tipo] || '🎂',
+    img: p.imagem || null,   // imagem real do Coda quando existir; senão placeholder de emoji
+    badge
+  });
+
+  const fill = (id, list, badge) => {
+    if (!list.length) return false;
+    const track = document.getElementById(id);
+    list.forEach(p => track.appendChild(cardDe(p, badge)));
+    document.getElementById('row-' + id.replace('track-','')).style.display = '';
+    return true;
+  };
+
+  // Categorias
+  fill('track-bolos',    produtos.filter(p => p.tipo === 'Bolo' || p.tipo === 'Torta'));
+  fill('track-doces',    produtos.filter(p => p.tipo === 'Docinho'));
+  fill('track-salgados', produtos.filter(p => p.tipo === 'Salgado'));
+
+  // Mais vendidos: cruza /ranking-produtos (nomes) com /produtos (imagem/preço)
+  try {
+    const rk = await (await fetch(WORKER_URL + '/ranking-produtos')).json();
+    const semana = (rk.semana || []).map(x => x.produto);
+    const byNome = {};
+    produtos.forEach(p => { byNome[(p.nome||'').toLowerCase()] = p; });
+    let vend = semana.map(n => byNome[(n||'').toLowerCase()]).filter(Boolean);
+    // fallback: se ranking vier vazio, usa os marcados como "Popular", senão os primeiros
+    if (!vend.length) vend = produtos.filter(p => p.popular);
+    if (!vend.length) vend = produtos.slice(0, 10);
+    fill('track-vendidos', vend.slice(0, 12), '🔥 Top');
+  } catch(e){ /* trilha fica escondida */ }
+
+  initVideoAutoplay();
+  initArrows();
+}
+
+/* ── Setas de scroll (desktop) ── */
+function initArrows(){
+  document.querySelectorAll('.nflx-arrow').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const track = btn.parentElement.querySelector('.nflx-track');
+      track.scrollBy({ left: btn.dataset.dir * (track.clientWidth * 0.8), behavior:'smooth' });
+    });
+  });
+}
+
+/* ── Autoplay de vídeo: hover no desktop, IntersectionObserver no mobile (1 por vez) ── */
+function initVideoAutoplay(){
+  const cards = [...document.querySelectorAll('.nflx-card.has-video')];
+  if (!cards.length) return;
+  const hoverCapable = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+
+  const activate = card => {
+    const v = card.querySelector('video'); if (!v) return;
+    if (!v.src && v.dataset.src) v.src = v.dataset.src;
+    card.classList.add('playing');
+    v.play().catch(()=>{});
+  };
+  const deactivate = card => {
+    const v = card.querySelector('video'); if (!v) return;
+    card.classList.remove('playing');
+    try { v.pause(); } catch(e){}
+  };
+
+  if (hoverCapable){
+    cards.forEach(card => {
+      card.addEventListener('mouseenter', () => activate(card));
+      card.addEventListener('mouseleave', () => deactivate(card));
+    });
+  } else {
+    // Mobile: só 1 vídeo tocando por vez (o mais visível)
+    let current = null;
+    const io = new IntersectionObserver(entries => {
+      // escolhe o card mais visível dentre os que estão >55%
+      let best = null, bestRatio = 0.55;
+      entries.forEach(e => {
+        const card = e.target;
+        if (e.isIntersecting && e.intersectionRatio >= bestRatio){ best = card; bestRatio = e.intersectionRatio; }
+      });
+      if (best && best !== current){
+        if (current) deactivate(current);
+        current = best; activate(best);
+      } else if (!best && current){
+        // se o atual saiu de vista, pausa
+        const still = entries.find(e => e.target === current && e.intersectionRatio >= 0.55);
+        if (!still){ deactivate(current); current = null; }
+      }
+    }, { threshold:[0,0.55,0.9] });
+    cards.forEach(c => io.observe(c));
+  }
+}
+
+renderFestas();
+loadTrilhas();
 </script>
 <!-- Tawk.to DESATIVADO — atendimento migrou pro WhatsApp/bot, reativar descomentando.
 Start of Tawk.to Script

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D'Luh Festas — Orçamento de Festas Completas</title>
+<link rel="icon" type="image/png" href="logo.png">
+<meta name="description" content="Peça um orçamento de festa completa com a D'Luh Festas: aniversários, casamentos, eventos corporativos e infantis em Montes Claros.">
+<meta property="og:title" content="D'Luh Festas — Festas Completas">
+<meta property="og:description" content="Buffet, bolo, doces, salgados e decoração para sua festa. Peça seu orçamento!">
+<meta property="og:image" content="https://sitedluh.github.io/site/logo.png">
+<meta property="og:url" content="https://sitedluh.github.io/site/festas.html">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="festas.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Bakery",
+  "name": "D'Luh Festas",
+  "description": "Festas completas: buffet, bolos personalizados, doces, salgados e decoração. Montes Claros, MG.",
+  "url": "https://sitedluh.github.io/site/festas.html",
+  "image": "https://sitedluh.github.io/site/logo.png",
+  "servesCuisine": ["Confeitaria Artesanal", "Buffet", "Doces", "Salgados"],
+  "priceRange": "$$",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Montes Claros",
+    "addressRegion": "MG",
+    "addressCountry": "BR"
+  },
+  "hasMenu": "https://sitedluh.github.io/site/cardapio.html"
+}
+</script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-top">
+    <a class="header-logo" href="index.html">
+      <img class="header-logo-img" src="logo.png" alt="D'Luh Festas">
+      <span class="header-logo-name">D'Luh <span>Festas</span></span>
+    </a>
+    <nav class="header-nav">
+      <a href="index.html">🏠 Início</a>
+      <a href="cardapio.html">🍰 Cardápio</a>
+      <a href="#orcamento" class="primary">🎉 Pedir orçamento</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="f-hero">
+  <!-- TROCAR por foto/vídeo real de festa montada. Usando hero.jpg como placeholder. -->
+  <img class="f-hero-img" src="hero.jpg" alt="Festa D'Luh" fetchpriority="high">
+  <div class="f-hero-overlay"></div>
+  <div class="f-hero-content">
+    <span class="f-hero-tag">🎉 Festas completas</span>
+    <h1 class="f-hero-title">Sua festa completa,<br>do bolo à decoração</h1>
+    <p class="f-hero-sub">Aniversários, casamentos, eventos corporativos e festas infantis. Conte pra gente como você imagina e receba um orçamento personalizado.</p>
+    <div class="f-hero-btns">
+      <a href="#orcamento" class="f-btn f-btn-primary">Pedir orçamento →</a>
+      <a href="cardapio.html" class="f-btn f-btn-ghost">🍰 Ver o cardápio</a>
+    </div>
+  </div>
+</section>
+
+<!-- VITRINE (placeholders de foto e vídeo) -->
+<section class="f-section">
+  <h2 class="f-section-title">Festas que fizemos</h2>
+  <p class="f-section-sub">Um gostinho do que a gente monta. (Fotos e vídeos reais em breve.)</p>
+  <div class="f-vitrine">
+    <!-- ============================================================
+         VITRINE DE MÍDIA — PLACEHOLDERS
+         Como trocar pelos arquivos reais:
+         1) Crie a pasta  assets/festas/  na raiz do repositório.
+         2) Fotos: WebP/JPEG ~4:5 (ex.: assets/festas/aniversario.webp).
+         3) Vídeos curtos (≤8s, sem áudio, ~480-720p, H.264 MP4) com
+            um poster leve. Mantenha SEMPRE: muted playsinline preload="none" + poster.
+         Enquanto não houver mídia real, cada card usa hero.jpg/logo.png.
+         ============================================================ -->
+
+    <!-- CARD 1 — foto (placeholder) -->
+    <div class="f-card">
+      <span class="f-card-badge">Aniversário</span>
+      <!-- TROCAR por: <img src="assets/festas/aniversario.webp" alt="Festa de aniversário" loading="lazy"> -->
+      <img src="hero.jpg" alt="Festa de aniversário" loading="lazy">
+      <div class="f-card-cap">Aniversário completo</div>
+    </div>
+
+    <!-- CARD 2 — vídeo (placeholder). Descomente e aponte pro MP4 real. -->
+    <div class="f-card">
+      <span class="f-card-badge">▶ Vídeo</span>
+      <!-- TROCAR por foto/vídeo real. Exemplo de vídeo:
+      <video muted playsinline loop preload="none" poster="assets/festas/casamento-poster.webp">
+        <source src="assets/festas/casamento.mp4" type="video/mp4">
+      </video> -->
+      <img src="hero.jpg" alt="Casamento" loading="lazy">
+      <div class="f-card-cap">Casamento</div>
+    </div>
+
+    <!-- CARD 3 — foto (placeholder) -->
+    <div class="f-card">
+      <span class="f-card-badge">Corporativo</span>
+      <!-- TROCAR por: <img src="assets/festas/corporativo.webp" alt="Evento corporativo" loading="lazy"> -->
+      <img src="hero.jpg" alt="Evento corporativo" loading="lazy">
+      <div class="f-card-cap">Evento corporativo</div>
+    </div>
+
+    <!-- CARD 4 — foto (placeholder) -->
+    <div class="f-card">
+      <span class="f-card-badge">Infantil</span>
+      <!-- TROCAR por: <img src="assets/festas/infantil.webp" alt="Festa infantil" loading="lazy"> -->
+      <img src="hero.jpg" alt="Festa infantil" loading="lazy">
+      <div class="f-card-cap">Festa infantil</div>
+    </div>
+  </div>
+</section>
+
+<!-- FORMULÁRIO DE ORÇAMENTO -->
+<section class="f-section" id="orcamento">
+  <h2 class="f-section-title">Peça seu orçamento</h2>
+  <p class="f-section-sub">Preencha os detalhes da festa. A gente entra em contato pelo WhatsApp para combinar tudo.</p>
+
+  <div class="f-form-wrap">
+    <div class="f-row" id="row-nome">
+      <label for="f-nome">Seu nome *</label>
+      <input type="text" id="f-nome" placeholder="Como podemos te chamar?" autocomplete="name">
+      <div class="f-err">Informe seu nome</div>
+    </div>
+
+    <div class="f-grid2">
+      <div class="f-row" id="row-tel">
+        <label for="f-tel">WhatsApp *</label>
+        <input type="tel" id="f-tel" placeholder="(38) 99999-9999" inputmode="numeric" oninput="maskPhone(this)" autocomplete="tel">
+        <div class="f-err">Informe um telefone válido</div>
+      </div>
+      <div class="f-row" id="row-tipo-evento">
+        <label for="f-tipo-evento">Tipo de evento *</label>
+        <select id="f-tipo-evento">
+          <option value="">Selecione...</option>
+          <option value="Aniversário">Aniversário</option>
+          <option value="Casamento">Casamento</option>
+          <option value="Corporativo">Corporativo</option>
+          <option value="Infantil">Infantil</option>
+          <option value="Outro">Outro</option>
+        </select>
+        <div class="f-err">Escolha o tipo de evento</div>
+      </div>
+    </div>
+
+    <div class="f-grid2">
+      <div class="f-row">
+        <label for="f-convidados">Nº de convidados</label>
+        <input type="number" id="f-convidados" min="1" placeholder="Ex.: 50" inputmode="numeric">
+      </div>
+      <div class="f-row" id="row-data">
+        <label for="f-data">Data do evento *</label>
+        <input type="date" id="f-data">
+        <div class="f-err">Escolha a data</div>
+      </div>
+    </div>
+
+    <div class="f-grid2">
+      <div class="f-row">
+        <label for="f-hora">Horário (aprox.)</label>
+        <input type="time" id="f-hora">
+      </div>
+      <div class="f-row">
+        <label for="f-cep">CEP do local (opcional)</label>
+        <input type="text" id="f-cep" placeholder="00000-000" inputmode="numeric" oninput="onCepFesta(this)">
+      </div>
+    </div>
+
+    <div class="f-row">
+      <label for="f-local">Local do evento</label>
+      <input type="text" id="f-local" placeholder="Endereço, salão, chácara...">
+    </div>
+
+    <div class="f-row">
+      <label>Serviços desejados</label>
+      <div class="f-servicos">
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Buffet"> Buffet</label>
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Bolo"> Bolo</label>
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Doces"> Doces</label>
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Salgados"> Salgados</label>
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Bebidas"> Bebidas</label>
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Decoração"> Decoração</label>
+        <label class="f-chk" onclick="setTimeout(()=>toggleServico(this))"><input type="checkbox" value="Estrutura (mesas/tendas)"> Estrutura</label>
+      </div>
+      <p class="f-hint">Marque tudo o que precisar — o atendente orça cada item com você.</p>
+    </div>
+
+    <div class="f-row">
+      <label for="f-obs">Observações</label>
+      <textarea id="f-obs" placeholder="Tema, cores, restrições alimentares, o que mais quiser contar..."></textarea>
+    </div>
+
+    <button class="f-submit" id="f-submit-btn" onclick="enviarOrcamento()">
+      🎉 Enviar orçamento
+    </button>
+    <p class="f-submit-note">Sem compromisso. Combinamos os valores pelo WhatsApp.</p>
+  </div>
+</section>
+
+<!-- FAIXA CTA — só quer encomenda avulsa? -->
+<section class="f-cta-band">
+  <h3>Quer só docinhos ou um bolo?</h3>
+  <a href="cardapio.html" class="f-btn">🍰 Ir para o cardápio</a>
+</section>
+
+<!-- FOOTER -->
+<footer class="f-footer">
+  <div class="f-footer-links">
+    <a href="index.html">Início</a>
+    <a href="cardapio.html">Cardápio</a>
+    <a href="https://www.instagram.com/dluhfestas/" target="_blank" rel="noopener">Instagram</a>
+    <a href="https://wa.me/5538992229178" target="_blank" rel="noopener">WhatsApp</a>
+  </div>
+  <div>D'Luh Festas · Montes Claros, MG · Feito com amor 🎂</div>
+</footer>
+
+<div id="toast"></div>
+
+<script src="festas.js" defer></script>
+</body>
+</html>
