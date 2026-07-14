@@ -644,6 +644,10 @@ async function _confirmPagarRetiradaOk(){
 // taxaFrete (o worker tem o mesmo filtro do outro lado — sem isso a entrega
 // entraria duplicada no pedido editado).
 let _editRowId=null;
+// Snapshot dos itens editáveis no momento da abertura — base do diff no salvar.
+let _editSnap=[];
+let _editSnapTaxa=0;
+let _editSnapCliente='';
 
 function abrirEditItens(rowId){
   const p=_pedidosCache[rowId];
@@ -652,11 +656,19 @@ function abrirEditItens(rowId){
   const itens=p.itens||[];
   const taxaItem=itens.find(i=>String(i.produto||'').includes('Taxa de Entrega'));
   const editaveis=itens.filter(i=>!String(i.produto||'').includes('Taxa de Entrega'));
+  // Guarda o estado ANTES da edição (nome/qtd/valor de cada item + taxa).
+  _editSnap=editaveis.map(i=>({
+    produto:String(i.produto||'').trim(),
+    quantidade:Number(i.quantidade||1),
+    valorUnit:Number(i.valorUnit||0),
+  }));
+  _editSnapTaxa=taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0):0;
+  _editSnapCliente=p.cliente||'';
   document.getElementById('edit-sub').innerHTML=
     `<b>${esc(p.cliente||'—')}</b> · 📱 ${esc(p.telefone||'—')} · status atual: <b>${esc(p.status||'Aguardando confirmação')}</b>`;
   const tbody=document.getElementById('edit-itens-body');
   tbody.innerHTML='';
-  editaveis.forEach(i=>tbody.appendChild(buildEditRow(i)));
+  editaveis.forEach((i,idx)=>tbody.appendChild(buildEditRow(i,idx)));
   if(!editaveis.length)addEditItem();
   document.getElementById('edit-frete').value=taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0).toFixed(2):'0.00';
   document.getElementById('edit-pago').textContent=(p.valorPago||0)>0?` · já pago: ${fmtBRL(p.valorPago)}`:'';
@@ -664,12 +676,15 @@ function abrirEditItens(rowId){
   document.getElementById('edit-overlay').classList.add('open');
 }
 
-function buildEditRow(i){
+function buildEditRow(i,origIdx){
   const tr=document.createElement('tr');
   // Recheios/Topo Info da subrow original são preservados no dataset e reenviados
   // junto — a edição do admin troca produto/qtd/preço, não os detalhes do item.
   tr.dataset.recheios=(i&&i.recheios)||'';
   tr.dataset.topoinfo=(i&&i.topoInfo)||'';
+  // origIdx casa a linha com o item do snapshot original (pra detectar A → B na
+  // mesma linha vs item adicionado/removido). Linhas novas ficam sem o atributo.
+  if(origIdx!=null)tr.dataset.origIdx=String(origIdx);
   tr.style.borderTop='1px solid var(--border)';
   tr.innerHTML=`
     <td style="padding:7px 0">
@@ -707,10 +722,53 @@ function closeEditModal(){
   _editRowId=null;
 }
 
+// Formata quantidade sem casas decimais desnecessárias (10 em vez de 10.0).
+function _fmtQty(n){const v=Number(n)||0;return Number.isInteger(v)?String(v):String(v);}
+
+// Monta o resumo legível das alterações comparando o snapshot original (_editSnap)
+// com as linhas atuais. Cada linha nova carrega origIdx (índice no snapshot) quando
+// veio de um item existente; sem origIdx = item adicionado. Índices do snapshot
+// não consumidos = itens removidos.
+function _montarResumoEdicao(cliente,linhas,taxaDepois){
+  const partes=[];
+  const usados=new Set();
+  linhas.forEach(l=>{
+    if(l.origIdx==null||!_editSnap[l.origIdx]){
+      // Item adicionado
+      partes.push(`+ ${l.nome} (x${_fmtQty(l.qty)})`);
+      return;
+    }
+    usados.add(l.origIdx);
+    const o=_editSnap[l.origIdx];
+    const nomeMudou=o.produto!==l.nome;
+    const qtdMudou=Number(o.quantidade)!==Number(l.qty);
+    const valMudou=Math.round(Number(o.valorUnit)*100)!==Math.round(Number(l.unit)*100);
+    if(nomeMudou){
+      partes.push(`${o.produto} → ${l.nome}`);
+      if(qtdMudou)partes.push(`${l.nome}: ${_fmtQty(o.quantidade)} → ${_fmtQty(l.qty)}`);
+      if(valMudou)partes.push(`${l.nome}: ${fmtBRL(o.valorUnit)} → ${fmtBRL(l.unit)}`);
+    }else{
+      if(qtdMudou)partes.push(`${l.nome}: ${_fmtQty(o.quantidade)} → ${_fmtQty(l.qty)}`);
+      if(valMudou)partes.push(`${l.nome}: ${fmtBRL(o.valorUnit)} → ${fmtBRL(l.unit)}`);
+    }
+  });
+  // Itens removidos (no snapshot mas sem linha correspondente)
+  _editSnap.forEach((o,idx)=>{
+    if(!usados.has(idx))partes.push(`− ${o.produto} (x${_fmtQty(o.quantidade)})`);
+  });
+  // Mudança da taxa de entrega
+  if(Math.round(Number(_editSnapTaxa)*100)!==Math.round(Number(taxaDepois)*100)){
+    partes.push(`🛵 Taxa de entrega: ${fmtBRL(_editSnapTaxa)} → ${fmtBRL(taxaDepois)}`);
+  }
+  if(!partes.length)return '';
+  return `Pedido de ${cliente||'—'}\n`+partes.join('\n');
+}
+
 async function salvarEditItens(){
   const p=_pedidosCache[_editRowId];
   if(!p){closeEditModal();return;}
   const itens=[];
+  const linhas=[]; // paralelo a itens, com origIdx pra montar o diff
   document.querySelectorAll('#edit-itens-body tr').forEach(tr=>{
     const nome=(tr.querySelector('.inp-nome')?.value||'').trim();
     const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
@@ -718,9 +776,13 @@ async function salvarEditItens(){
     if(!nome||qty<=0)return;
     if(nome.includes('Taxa de Entrega'))return; // taxa nunca vai como item — vai em taxaFrete
     itens.push({nome,qty,unit,recheios:tr.dataset.recheios||'',topoInfo:tr.dataset.topoinfo||''});
+    const origIdx=tr.dataset.origIdx!==undefined?parseInt(tr.dataset.origIdx,10):null;
+    linhas.push({nome,qty,unit,origIdx});
   });
   if(!itens.length){showToast('O pedido precisa de pelo menos 1 item.');return;}
   const taxa=Math.max(0,parseFloat(document.getElementById('edit-frete').value)||0);
+  const alteracoesResumo=_montarResumoEdicao(p.cliente||_editSnapCliente,linhas,taxa);
+  const notificar=!!alteracoesResumo;
   const total=Math.round((itens.reduce((s,i)=>s+i.qty*i.unit,0)+taxa)*100)/100;
   // Contexto replicado nas subrows — mesmo padrão do fluxo de edição do cliente
   const ctx=[
@@ -745,12 +807,13 @@ async function salvarEditItens(){
     const res=await fetch(`${WORKER}/editar-pedido`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({paiId:_editRowId,pai:[{column:'Total',value:total}],subrows,taxaFrete:taxa,origem:'admin'})
+      body:JSON.stringify({paiId:_editRowId,pai:[{column:'Total',value:total}],subrows,taxaFrete:taxa,origem:'admin',alteracoesResumo,notificar})
     });
     const d=await res.json().catch(()=>({}));
     if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao salvar edição no Coda');
     const novoTotal=(d.novoTotal!=null)?d.novoTotal:total;
-    showToast(`Itens atualizados ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}`);
+    const aviso=notificar?' · cliente e Telegram avisados':' · nenhuma alteração a comunicar';
+    showToast(`Itens atualizados ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}${aviso}`);
     closeEditModal();
     _estoqueSig=null; // itens mudaram — força re-render da aba Estoque também
     carregarStatus();
