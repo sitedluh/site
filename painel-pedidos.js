@@ -3,16 +3,19 @@
 const CFG = {
   token: 'c2df9327-a40c-4716-9f59-c40620d691ef',
   docId: 'Wq8ktEEI3N',
-  tableId: 'Pedidos Base',
+  // Reconstrução do Coda (CODA-PLANO.md): a fila agora é a table "Fila Cozinha",
+  // lida por NOME de coluna (useColumnNames=true no fetch) — sem IDs c-... que
+  // viram órfãos quando a table é recriada.
+  tableId: 'Fila Cozinha',
   cols: {
-    nome: 'c-qNsNbVHKNI',
-    data: 'c-0y6_X-_T7g',
-    hora: 'c-bL3KECWBkd',
-    tipo: 'c-NWtelSDmAE',
-    pedido: 'c-txX8tge0sr',
-    telefone: 'c-WhdvD5qzPB',
-    valor: 'c-lTihbeP5Cj',
-    status: 'c-SpdhR0ZMGd',
+    nome: 'Cliente',
+    data: 'Data',
+    hora: 'Hora',
+    tipo: 'Tipo',
+    pedido: 'Pedido',
+    telefone: 'Telefone',
+    valor: 'Valor Total',
+    status: 'Status',
     // O worker (/pedido-feito) grava Status="Feito" na Pedidos Base — é a fonte da
     // escrita. O painel NÃO escreve mais no Status; só usa este valor para reconhecer
     // (na leitura/poll) quais pedidos já saíram como "Feito" e marcá-los como concluídos.
@@ -218,7 +221,7 @@ async function fetchOrders() {
     let pageToken = null;
 
     do {
-      const url = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows?limit=500${pageToken ? '&pageToken=' + pageToken : ''}`;
+      const url = `https://coda.io/apis/v1/docs/${CFG.docId}/tables/${encodeURIComponent(CFG.tableId)}/rows?limit=500&valueFormat=simpleWithArrays&useColumnNames=true${pageToken ? '&pageToken=' + pageToken : ''}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${CFG.token}` } });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));

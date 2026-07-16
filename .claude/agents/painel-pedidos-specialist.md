@@ -22,7 +22,7 @@ O `<style>` inline virou `painel-pedidos.css`, e o único `<script>` (toda a ló
 
 ## Particularidade de arquitetura — diferente de todos os outros arquivos do site
 
-Este é o **único** arquivo HTML do projeto que não fala com o Coda só através do Worker: ele tem um **token do Coda hardcoded no próprio JS do cliente** (`CFG.token`, hoje em `painel-pedidos.js` desde a extração de CSS/JS) e lê/escreve diretamente na tabela "Pedidos Base" via API do Coda. Só passa pelo Worker num único passo: gerar a cobrança do restante, via `/entrega-confirmada`.
+Este é o **único** arquivo HTML do projeto que não fala com o Coda só através do Worker: ele tem um **token do Coda hardcoded no próprio JS do cliente** (`CFG.token`, hoje em `painel-pedidos.js` desde a extração de CSS/JS) e lê diretamente a table **"Fila Cozinha"** (reconstrução do Coda, `CODA-PLANO.md`) via API do Coda — por **nome de coluna** (`useColumnNames=true`; `CFG.cols` mapeia pra nomes como `Cliente`/`Data`/`Valor Total`, não mais IDs `c-...`). Só passa pelo Worker num único passo: gerar a cobrança do restante, via `/entrega-confirmada`.
 
 - Isso é uma **falha de segurança conhecida e documentada** (token exposto no código-fonte da página) — **não foi corrigida de propósito** e não é sua responsabilidade corrigir sem o usuário pedir explicitamente. Não introduza mais segredos client-side do que já existe; se notar a oportunidade de adicionar alguma chave/token novo direto no HTML, pare e avise o usuário em vez de fazer.
 - Não confunda esse token com as credenciais do `worker-completo-pronto.js` (Coda/Telegram/Google) — são coisas diferentes, em arquivos diferentes, com riscos diferentes.
