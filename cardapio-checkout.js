@@ -590,14 +590,15 @@ async function _confirmarESeguirWhats(){
       setPedidoLoadingState('success');
       clearCart();topperPorProduto={};
       _pedidoPendente=null;
-      if(p.statusInicial==='Para ver'){
-        // Dia esgotado (fluxo "Falar com atendente"): vai direto pro WhatsApp com o
-        // resumo do pedido já montado, em vez de abrir o bot de acompanhamento de status.
-        setTimeout(()=>irParaWhatsapp(p.waUrl),700);
+      if(p.statusInicial!=='Para ver'){
+        // Pós-pedido: vai DIRETO pro WhatsApp da empresa (sem texto pré-preenchido —
+        // decisão de 2026-07: o bot de WhatsApp da loja assume o atendimento a partir
+        // daqui; o acompanhamento no chat do site foi aposentado neste fluxo).
+        setTimeout(()=>irParaWhatsapp(`https://wa.me/${CONFIG.WHATSAPP}`),700);
       }else{
-        // Em vez de ir direto pro WhatsApp, abre o bot de status (chat próprio) —
-        // ele já mostra a situação atual e pode ser consultado de novo a qualquer momento.
-        setTimeout(()=>abrirStatusBotPosPedido(p),700);
+        // Dia esgotado (fluxo "Falar com atendente"): vai direto pro WhatsApp com o
+        // resumo do pedido já montado.
+        setTimeout(()=>irParaWhatsapp(p.waUrl),700);
       }
     }
   }catch(e){
