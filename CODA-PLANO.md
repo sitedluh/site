@@ -91,7 +91,7 @@ O worker cria a row da fila diretamente em 2 momentos: entrada paga (webhook, `P
    - Adicionar a Option **`Feito`** no `Status` da `Fila Cozinha`.
    - Recriar as **colunas-botão de cobrança** (se usadas): na `Fila Cozinha`, botão com `OpenWindow("https://coda-proxy.sitedluh.workers.dev/cobrar-pedido-base?rowId=" & thisRow.Id())`; na `Pedidos Site`, o equivalente do `/cobrar-total`.
 4. **Teste ponta a ponta** com um pedido real: site → Telegram → confirmar → pagar → fila → painel → entregar → restante.
-5. Usuário passa os pedidos antigos que quiser pras tables novas (manual, sem pressa — as velhas ficam como arquivo).
+5. ✅ **Migração de dados automatizada** — `GET /migrar-coda?tabela=<produtos|recheios|limites|pedidos|fila|tudo>&confirmar=<0|1>`: copia das tables antigas (`grid-...`) pras novas. Sem `confirmar=1` é **dry-run** (só conta). **Idempotente**: pula o que já existe (produtos/recheios por nome, limites por dia, pedidos e fila por Cliente+Data+Hora). Pedidos migram em 2 passadas (pais → itens re-ligados ao pai novo via `addedRowIds`); Status legados da fila são mapeados (`Retirado`/`Finalizado`→`Entregue`, desconhecido→`Pendente`); `Pago?` é derivado de Valor Pago×Total quando não existir. **Caveats:** `ID Pedido` é fórmula — pedidos migrados ganham ID novo, então **link de pagamento pendente de pedido antigo não casa mais com o webhook** (re-gerar a cobrança pelos botões); imagens de produto são best-effort (podem precisar de re-upload manual). As tables velhas ficam intocadas (arquivo).
 
 ## Gotchas que continuam valendo
 
