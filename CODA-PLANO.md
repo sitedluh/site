@@ -71,7 +71,7 @@ O worker cria a row da fila diretamente em 2 momentos: entrada paga (webhook, `P
 
 ### 3. `Produtos Site`
 
-`Produto` (texto), `Ingredientes` (texto), `Valor` (moeda), `Quantidade mínima` (número), `Tipo` (select: os tipos do cardápio — Bolos, Doces, Salgados, Outros...), `Imagem` (imagem), `Mostrar` (checkbox), `Popular` (checkbox), `Valor Empresa` (moeda), `Quanti. Empresa` (número), `Mostrar Empresa` (checkbox).
+`Produto` (texto), `Ingredientes` (texto), `Valor` (moeda), `Quantidade mínima` (número), `Tipo` (select: os tipos do cardápio — Bolos, Doces, Salgados, Pacote Congelado, Outros...), `Imagem` (imagem), `Mostrar` (checkbox), `Popular` (checkbox), `Valor Empresa` (moeda), `Quanti. Empresa` (número), `Mostrar Empresa` (checkbox), `Tipos (Pacotes)` (texto ou seleção múltipla — lista de tipos possíveis **daquele produto específico** de Pacote Congelado, ex. "Coxinha, Kibe, Risole"; `GET /produtos` devolve como `tiposPacote` (array de strings), aceitando tanto array quanto texto separado por vírgula/ponto-e-vírgula/quebra de linha; produto sem essa coluna preenchida devolve `tiposPacote: []`. Só tem efeito em produtos cujo `Tipo` contenha "pacote" — o site então abre, por unidade, o mesmo modal de escolha usado pelos recheios de bolo, deixando escolher até 2 tipos dentre os cadastrados nessa coluna).
 
 ### 4. `Recheios Site`
 

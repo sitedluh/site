@@ -18,9 +18,10 @@ function goCheckout(){
   document.getElementById('order-review').innerHTML=`<div class="order-review">
     ${items.map(i=>{
       let linhas=`<div class="order-review-item"><span>${i.nome} · ${i.qty} unid.</span><span>${fmtBRL(i.valorUnit*i.qty)}</span></div>`;
-      if(isBolo(i.tipo)&&i.recheios){
+      if((isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios){
+        const rotulo=isBolo(i.tipo)?'Bolo':'Pacote';
         i.recheios.forEach((r,idx)=>{
-          linhas+=`<div style="font-size:12px;color:#666;padding:2px 0 2px 12px">Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}</div>`;
+          linhas+=`<div style="font-size:12px;color:#666;padding:2px 0 2px 12px">${rotulo} ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}</div>`;
         });
       }
       if(topperPorProduto[i.id]?.quero){
@@ -55,9 +56,10 @@ function goCheckout(){
   initCheckoutStepObserver();
   document.body.classList.add('checkout-active');
   window.scrollTo(0,0);
-  // Reseta slider de entrada para 50% e recalcula
-  const sliderEl=document.getElementById('f-entrada-pct');
-  if(sliderEl)sliderEl.value=50;
+  // Reseta seleção de entrada para 50% e recalcula
+  const fEntradaPct=document.getElementById('f-entrada-pct');
+  if(fEntradaPct)fEntradaPct.value=50;
+  document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o=>o.classList.toggle('active',o.dataset.val==='50'));
   atualizarEntrada();
   loadUserData();
   goCheckoutPushState();
@@ -118,6 +120,8 @@ window.addEventListener('popstate',(e)=>{
 });
 function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';saveUserData();if(el.dataset.val==='Entrega em endereço'&&document.getElementById('f-cep')?.value)calcDeliveryFee();}atualizarEntrada();}
 
+function selecionarEntradaPct(el,pct){document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');const f=document.getElementById('f-entrada-pct');if(f)f.value=pct;atualizarEntrada();}
+
 function atualizarEntrada(){
   const items=Object.values(cart).filter(i=>i.qty>0);
   const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
@@ -127,8 +131,6 @@ function atualizarEntrada(){
   const pct=parseInt(slider?.value||50)/100;
   const entrada=Math.round(total*pct*100)/100;
   const resto=Math.round((total-entrada)*100)/100;
-  // Atualiza gradiente do slider
-  if(slider){const p=(pct-0.5)/0.5*100;slider.style.background=`linear-gradient(to right,var(--accent) 0%,var(--accent) ${p}%,var(--border) ${p}%,var(--border) 100%)`;}
   if(document.getElementById('entrada-pct-label'))document.getElementById('entrada-pct-label').textContent=Math.round(pct*100)+'%';
   if(document.getElementById('entrada-val'))document.getElementById('entrada-val').textContent=fmtBRL(entrada);
   if(document.getElementById('entrada-resto'))document.getElementById('entrada-resto').textContent=fmtBRL(Math.max(0,resto));
@@ -421,7 +423,7 @@ async function _doFinalizar(){
     msg+=`\n📋 *Itens:*\n`;
     items.forEach(i=>{
       msg+=`  • ${i.nome} — ${i.qty} unid. = ${fmtBRL(i.valorUnit*i.qty)}\n`;
-      if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{msg+=`    Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}\n`;});
+      if((isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios){const rotulo=isBolo(i.tipo)?'Bolo':'Pacote';i.recheios.forEach((r,idx)=>{msg+=`    ${rotulo} ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}\n`;});}
     });
     if(topperBonus>0)msg+=`\n  • Topper personalizado (${Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length}x) = ${fmtBRL(topperBonus)}`;
     if(taxaFrete>0)msg+=`\n  • Taxa de entrega = ${fmtBRL(taxaFrete)}`;
@@ -461,7 +463,8 @@ async function _doFinalizar(){
       {column:'Restante',value:restoVal},
     ];
     const subrowInputs=items.map(i=>{
-      const recheiosTxt=(isBolo(i.tipo)&&i.recheios)?i.recheios.map((r,idx)=>`Bolo ${idx+1}: ${Array.isArray(r)?r.join(' + '):r||'sem recheio'}`).join(' | '):'';
+      const rotuloRecheio=isBolo(i.tipo)?'Bolo':'Pacote';
+      const recheiosTxt=((isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios)?i.recheios.map((r,idx)=>`${rotuloRecheio} ${idx+1}: ${Array.isArray(r)?r.join(' + '):r||'sem recheio'}`).join(' | '):'';
       return [
         {column:'Produto',value:i.nome},
         {column:'Row ID Produto',value:i.id},
@@ -506,7 +509,7 @@ async function _doFinalizar(){
 
     const itensTexto=items.map(i=>{
       let txt=`${i.nome} · ${i.qty} unid. = R$ ${(i.valorUnit*i.qty).toFixed(2)}`;
-      if(isBolo(i.tipo)&&i.recheios)i.recheios.forEach((r,idx)=>{txt+=`\n  Bolo ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}`;});
+      if((isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios){const rotulo=isBolo(i.tipo)?'Bolo':'Pacote';i.recheios.forEach((r,idx)=>{txt+=`\n  ${rotulo} ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}`;});}
       return txt;
     }).join('\n');
 

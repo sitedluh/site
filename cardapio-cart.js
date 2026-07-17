@@ -2,6 +2,8 @@ let allProducts=[],categories=[],cart={},activeCategory='Todos',searchQuery='';
 let recheios=[];
 // recheiosPendentes: fila de {prodId, unidadeIdx} esperando escolha
 let recheiosPendentes=[],recheioAtual=0,recheiosSelecionados=[];
+// modalOpcoesAtuais: lista de opções do modal em uso (recheios global p/ bolo, tiposPacote do produto p/ pacote)
+let modalOpcoesAtuais=[];
 // topper: mapa prodId → {quero, tema, detalhes, refFile, refUrl}
 let topperPorProduto={},_topperProdIdAtual=null;
 
@@ -73,7 +75,7 @@ async function loadProducts(){
       if(row.nome!==undefined){
         const valorUnit=Number(row.valor)||0;
         const qtdMin=Number(row.qtdMin)||1;
-        return{id:row.id,nome:row.nome||'',ingredientes:row.ingredientes||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.tipo||'Outros',mostrar:true,imagem:row.imagem||null,popular:row.popular||false};
+        return{id:row.id,nome:row.nome||'',ingredientes:row.ingredientes||'',valorUnit,qtdMin,valor:valorUnit*qtdMin,tipo:row.tipo||'Outros',mostrar:true,imagem:row.imagem||null,popular:row.popular||false,tiposPacote:row.tiposPacote||[]};
       }
       const valorUnit=parseBRL(row.values[CONFIG.COLS.valor]);
       const qtdMin=parseInt(row.values[CONFIG.COLS.qtdMin])||1;
@@ -227,7 +229,7 @@ function positionIndicator(cat,progress,nextCat){
 // Builders de card (mobile e desktop) — reutilizados pela lista normal e pelo top 3 da semana
 function _buildProdItem(p){
   const qty=cart[p.id]?.qty||0;const isEmpty=qty===0;
-  const recheioInfo=isBolo(p.tipo)&&qty>0?`<div class="prod-item-sub" style="color:#888;margin-top:2px">🎂 ${qty} bolo${qty>1?'s':''} — recheios definidos</div>`:'';
+  const recheioInfo=isBolo(p.tipo)&&qty>0?`<div class="prod-item-sub" style="color:#888;margin-top:2px">🎂 ${qty} bolo${qty>1?'s':''} — recheios definidos</div>`:(isPacote(p.tipo)&&qty>0?`<div class="prod-item-sub" style="color:#888;margin-top:2px">📦 ${qty} pacote${qty>1?'s':''} — tipos definidos</div>`:'');
   const precoTotal=p.valor;const precoUni=p.qtdMin>1?p.valorUnit:null;
   return`<div class="prod-item">
     <div class="prod-item-top">
@@ -425,7 +427,8 @@ function renderDrawer(){
   if(!items.length){document.getElementById('drawer-body').innerHTML=bannerHtml+`<div class="empty-cart-msg"><div class="empty-icon">🛍️</div><p>Seu carrinho está vazio.</p></div>`;footer.style.display='none';return;}
   footer.style.display='block';
   document.getElementById('drawer-body').innerHTML=bannerHtml+items.map(i=>{
-    const recheioLines=isBolo(i.tipo)&&i.recheios?i.recheios.map((r,idx)=>`<div style="font-size:11px;color:#666;margin-top:1px">Bolo ${idx+1}: ${r.join(' + ')||'sem recheio'}</div>`).join(''):'';
+    const _rotuloRec=isBolo(i.tipo)?'Bolo':'Pacote';
+    const recheioLines=(isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios?i.recheios.map((r,idx)=>`<div style="font-size:11px;color:#666;margin-top:1px">${_rotuloRec} ${idx+1}: ${r.join(' + ')||'sem recheio'}</div>`).join(''):'';
     return`<div class="cart-item">
       <div class="cart-item-icon">${getIcon(i.tipo)}</div>
       <div class="cart-item-info">
@@ -452,6 +455,9 @@ function abrirModalRecheios(prodId, novasUnidades){
   recheiosPendentes=novasUnidades.map(idx=>({prodId,unidadeIdx:idx}));
   recheioAtual=0;
   recheiosSelecionados=[];
+  // resolve a lista de opções pro produto sendo aberto (todas as unidades pendentes são do mesmo produto)
+  const p=allProducts.find(x=>x.id===prodId);
+  modalOpcoesAtuais=isPacote(p?.tipo)?(p?.tiposPacote||[]):recheios;
   renderModalStep();
   document.getElementById('modal-recheios').classList.add('open');
 }
@@ -462,9 +468,15 @@ function renderModalStep(){
   const pend=recheiosPendentes[atual];
   const p=allProducts.find(x=>x.id===pend.prodId);
 
-  document.getElementById('modal-title').textContent=`Recheios — ${p.nome}`;
-  document.getElementById('modal-subtitle').textContent=`Bolo ${pend.unidadeIdx+1} de ${total} — escolha até 2 recheios`;
-  document.getElementById('modal-bolo-label').textContent=`🎂 Bolo ${pend.unidadeIdx+1}`;
+  if(isPacote(p.tipo)){
+    document.getElementById('modal-title').textContent=`Tipos do pacote — ${p.nome}`;
+    document.getElementById('modal-subtitle').textContent=`Pacote ${pend.unidadeIdx+1} de ${total} — escolha até 2 tipos`;
+    document.getElementById('modal-bolo-label').textContent=`📦 Pacote ${pend.unidadeIdx+1}`;
+  }else{
+    document.getElementById('modal-title').textContent=`Recheios — ${p.nome}`;
+    document.getElementById('modal-subtitle').textContent=`Bolo ${pend.unidadeIdx+1} de ${total} — escolha até 2 recheios`;
+    document.getElementById('modal-bolo-label').textContent=`🎂 Bolo ${pend.unidadeIdx+1}`;
+  }
 
   // progress dots
   document.getElementById('modal-progress').innerHTML=recheiosPendentes.map((_,i)=>
@@ -474,7 +486,7 @@ function renderModalStep(){
   recheiosSelecionados[atual]=recheiosSelecionados[atual]||[];
   const sel=recheiosSelecionados[atual];
 
-  document.getElementById('recheio-grid').innerHTML=recheios.map(r=>{
+  document.getElementById('recheio-grid').innerHTML=modalOpcoesAtuais.map(r=>{
     const isSel=sel.includes(r);
     const isDisabled=!isSel&&sel.length>=2;
     return`<button class="recheio-btn ${isSel?'selected':''} ${isDisabled?'disabled':''}"
@@ -511,7 +523,7 @@ function nextRecheio(){
     renderProducts();renderDrawer();saveCart();
     const _pIdR=recheiosPendentes[0].prodId;
     if(isBolo(cart[_pIdR]?.tipo)&&!topperPorProduto[_pIdR])openTopperModal(_pIdR);
-    else showToast('Recheios salvos!');
+    else showToast('Salvo!');
   }
 }
 
@@ -530,6 +542,7 @@ function skipRecheio(){
     renderProducts();renderDrawer();saveCart();
     const _pIdS=recheiosPendentes[0].prodId;
     if(isBolo(cart[_pIdS]?.tipo)&&!topperPorProduto[_pIdS])openTopperModal(_pIdS);
+    else showToast('Salvo!');
   }
 }
 
@@ -592,7 +605,7 @@ function changeQty(id,delta){
     const oldQty=cart[id].qty;
     cart[id].qty=newQty;
 
-    if(isBolo(p.tipo)&&recheios.length>0){
+    if((isBolo(p.tipo)&&recheios.length>0)||(isPacote(p.tipo)&&p.tiposPacote&&p.tiposPacote.length>0)){
       const novasUnidades=[];
       for(let i=oldQty;i<newQty;i++)novasUnidades.push(i);
       saveCart();refreshCardQty(id);
@@ -610,7 +623,7 @@ function changeQty(id,delta){
       delete cart[id];
     }else{
       cart[id].qty=current-1;
-      if(isBolo(p.tipo)&&cart[id].recheios)cart[id].recheios.splice(cart[id].qty);
+      if((isBolo(p.tipo)||isPacote(p.tipo))&&cart[id].recheios)cart[id].recheios.splice(cart[id].qty);
     }
     saveCart();refreshCardQty(id);
   }
@@ -754,7 +767,7 @@ window.editarCarrinhoComItens=function(itens){
     const prod=allProducts.find(function(p){return p.nome.trim().toLowerCase()===nomeLower;});
     if(prod){
       cart[prod.id]={...prod,qty:item.qtd,recheios:[]};
-      if(item.recheio&&isBolo(prod.tipo)){
+      if(item.recheio&&(isBolo(prod.tipo)||isPacote(prod.tipo))){
         const recheioArr=Array.isArray(item.recheio)?item.recheio:[item.recheio];
         cart[prod.id].recheios=Array.from({length:item.qtd},function(){return recheioArr.slice(0,2);});
       }

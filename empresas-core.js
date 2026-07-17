@@ -10,6 +10,7 @@ function getIcon(t){if(!t)return TIPO_ICONS.default;const k=Object.keys(TIPO_ICO
 function parseBRL(v){return parseFloat((String(v||'0')).replace('R$','').replace(/\./g,'').replace(',','.'))||0;}
 function fmtBRL(v){return'R$ '+v.toFixed(2).replace('.',',');}
 function isBolo(tipo){return tipo&&tipo.toLowerCase().includes('bolo');}
+function isPacote(tipo){return tipo&&tipo.toLowerCase().includes('pacote');}
 
 // ── Phone mask & validation ──
 function maskPhone(input){
