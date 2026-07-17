@@ -103,6 +103,11 @@
   .btn-cobrar-restante{margin-top:8px;background:#c0725a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
   .btn-pagar-retirada{margin-top:8px;background:#2e7d32;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
   .btn-pagar-retirada:hover{background:#1b5e20}
+  .sc-cobranca-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .btn-cobrar-total-adm{background:#6c4a9e;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+  .btn-cobrar-total-adm:hover{background:#563b7e}
+  .btn-cobrar-entrada-adm{background:#2563a8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+  .btn-cobrar-entrada-adm:hover{background:#1d4f87}
   .itens-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
   /* Editar itens (qualquer status) */
@@ -151,6 +156,8 @@
     .btn-finalizar,.btn-apagar,.btn-editar-itens{flex:1}
     .btn-cobrar-restante{width:100%;justify-content:center}
     .btn-pagar-retirada{width:100%;justify-content:center}
+    .sc-cobranca-row{width:100%}
+    .btn-cobrar-total-adm,.btn-cobrar-entrada-adm{flex:1;width:100%;justify-content:center}
   }
 
   /* ── Pedido manual (modal ➕ no header) ── */

@@ -270,6 +270,15 @@ function renderDrawer(){
   }).join('');
 }
 
+// resolve as opções de um pacote: "Tipos (Pacotes)" é um filtro de CATEGORIA
+// (bate com o campo Tipo de outros produtos), não uma lista literal de opções.
+// Retorna os NOMES dos produtos do catálogo cujo Tipo casa alguma categoria do pacote.
+function opcoesPacote(p){
+  const cats=(p.tiposPacote||[]).map(c=>String(c).toLowerCase().trim()).filter(Boolean);
+  if(!cats.length)return[];
+  return allProducts.filter(x=>x.id!==p.id&&cats.includes(String(x.tipo||'').toLowerCase().trim())).map(x=>x.nome);
+}
+
 // ── RECHEIOS MODAL ──
 function abrirModalRecheios(prodId, novasUnidades){
   // novasUnidades: array de índices das unidades novas que precisam de recheio
@@ -278,7 +287,7 @@ function abrirModalRecheios(prodId, novasUnidades){
   recheiosSelecionados=[];
   // resolve a lista de opções pro produto sendo aberto (todas as unidades pendentes são do mesmo produto)
   const p=allProducts.find(x=>x.id===prodId);
-  modalOpcoesAtuais=isPacote(p?.tipo)?(p?.tiposPacote||[]):recheios;
+  modalOpcoesAtuais=isPacote(p?.tipo)?opcoesPacote(p):recheios;
   renderModalStep();
   document.getElementById('modal-recheios').classList.add('open');
 }
@@ -426,7 +435,7 @@ function changeQty(id,delta){
     const oldQty=cart[id].qty;
     cart[id].qty=newQty;
 
-    if((isBolo(p.tipo)&&recheios.length>0)||(isPacote(p.tipo)&&p.tiposPacote&&p.tiposPacote.length>0)){
+    if((isBolo(p.tipo)&&recheios.length>0)||(isPacote(p.tipo)&&opcoesPacote(p).length>0)){
       const novasUnidades=[];
       for(let i=oldQty;i<newQty;i++)novasUnidades.push(i);
       renderProducts();renderDrawer();

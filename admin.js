@@ -45,7 +45,7 @@ async function carregarPedidos(){
   const btn=document.getElementById('btn-refresh');
   btn.classList.add('loading');btn.disabled=true;
   try{
-    const prodData=await fetch(`${WORKER}/produtos`).then(r=>r.json()).catch(()=>({produtos:[]}));
+    const prodData=await fetch(`${WORKER}/produtos?todos=1`).then(r=>r.json()).catch(()=>({produtos:[]}));
     const lista=prodData.produtos||[];
     _produtosList=lista.map(p=>p.nome);
     _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
@@ -414,6 +414,10 @@ function statusCardHtml(p,status){
       </div>
       ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
       ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
+      <div class="sc-cobranca-row">
+        <button class="btn-cobrar-total-adm" onclick="cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
+        <button class="btn-cobrar-entrada-adm" onclick="cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
+      </div>
     </div>
     <div class="sc-actions">
       ${buildStatusSelect(p.rowId,status)}
@@ -501,6 +505,14 @@ function cobrarRestante(pedidoId,telefone,cliente){
   const url=`${WORKER}/cobrar-restante?pedidoId=${enc(pedidoId)}&telefone=${enc(telefone)}&cliente=${enc(cliente)}`;
   window.open(url,'_blank');
   showToast('Abrindo WhatsApp com link do restante…');
+}
+
+function cobrarTotalAdmin(rowId){
+  window.open(`${WORKER}/cobrar-total?rowId=${enc(rowId)}`,'_blank');
+}
+
+function cobrarEntradaAdmin(rowId){
+  window.open(`${WORKER}/cobrar-entrada?rowId=${enc(rowId)}`,'_blank');
 }
 
 async function atualizarStatus(rowId,sel){
