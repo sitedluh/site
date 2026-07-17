@@ -847,7 +847,8 @@ function buildManualRow(){
   const tr=document.createElement('tr');
   tr.innerHTML=`
     <td style="padding:7px 0">
-      <input class="inp-nome" list="produtos-datalist" placeholder="Digite pra filtrar o produto..." autocomplete="off" oninput="manualProdutoInput(this)" style="${IS}width:100%">
+      <input class="inp-nome" placeholder="Digite pra filtrar o produto..." autocomplete="off" oninput="manualProdutoInput(this)" onfocus="manualProdutoInput(this)" onblur="acFecharDepois(this)" style="${IS}width:100%">
+      <div class="ac-lista" style="display:none"></div>
       <input class="inp-rech" placeholder="Recheios (opcional)" style="${IS}width:100%;margin-top:4px">
     </td>
     <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcManual()" style="${IS}width:52px;text-align:center"></td>
@@ -858,15 +859,45 @@ function buildManualRow(){
 }
 function addManualItem(){document.getElementById('manual-itens-body').appendChild(buildManualRow());}
 
-// Autocomplete do input de texto do pedido manual: quando o valor digitado bate
-// exatamente com um produto do catálogo, preenche o preço unitário sozinho.
-// Produto fora do catálogo é permitido (preço manual) — só não preenche o preço.
+// Autocomplete do input de produto do pedido manual — dropdown PRÓPRIO (o
+// <datalist> nativo não abre as sugestões em vários navegadores de celular).
+// A lista aparece inline logo abaixo do campo (não é cortada pelo overflow do
+// .itens-table-wrap e é boa de tocar). Digitar filtra sem acento/caixa; tocar
+// numa sugestão preenche nome + preço. Produto fora do catálogo é permitido
+// (preço manual) — só não preenche o preço.
+function _acNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function manualProdutoInput(el){
   if(_produtosMap[el.value]!==undefined){
     const unitInput=el.closest('tr').querySelector('.inp-unit');
     if(unitInput)unitInput.value=(_produtosMap[el.value]||0).toFixed(2);
   }
   recalcManual();
+  const box=el.closest('td')?.querySelector('.ac-lista');
+  if(!box)return;
+  const q=_acNorm(el.value);
+  // Nome já escolhido (bate exato) e sem edição: não reabre a lista por cima
+  if(_produtosMap[el.value]!==undefined&&document.activeElement!==el){box.style.display='none';return;}
+  const matches=_produtosList.filter(n=>!q||_acNorm(n).includes(q)).slice(0,8);
+  if(!matches.length||(matches.length===1&&matches[0]===el.value)){box.style.display='none';box.innerHTML='';return;}
+  box.innerHTML=matches.map(n=>`<div class="ac-item" onmousedown="acEscolher(event,this)">${esc(n)}</div>`).join('');
+  box.style.display='block';
+}
+// mousedown (dispara antes do blur do input) — funciona em desktop e touch
+function acEscolher(ev,item){
+  ev.preventDefault();
+  const td=item.closest('td');
+  const inp=td.querySelector('.inp-nome');
+  inp.value=item.textContent;
+  td.querySelector('.ac-lista').style.display='none';
+  const unit=inp.closest('tr').querySelector('.inp-unit');
+  if(unit&&_produtosMap[inp.value]!==undefined)unit.value=(_produtosMap[inp.value]||0).toFixed(2);
+  recalcManual();
+}
+function acFecharDepois(el){
+  setTimeout(()=>{
+    const box=el.closest('td')?.querySelector('.ac-lista');
+    if(box)box.style.display='none';
+  },250);
 }
 
 function manualToggleEndereco(){

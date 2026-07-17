@@ -154,6 +154,10 @@
   }
 
   /* ── Pedido manual (modal ➕ no header) ── */
+  .ac-lista{margin-top:4px;background:#fff;border:1px solid #e8e0d8;border-radius:6px;max-height:170px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+  .ac-item{padding:9px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid #f3ede7;color:var(--text)}
+  .ac-item:last-child{border-bottom:none}
+  .ac-item:hover,.ac-item:active{background:var(--accent-light)}
   .manual-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin:12px 0}
   .manual-grid label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.3px}
   .manual-grid input,.manual-grid select{border:1px solid #e8e0d8;border-radius:6px;padding:7px 8px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
