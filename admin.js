@@ -102,8 +102,9 @@ function trocaProduto(sel,id){
   const unitInput=row.querySelector('.inp-unit');
   console.log('[trocaProduto] unitInput encontrado:',!!unitInput);
   if(unitInput)unitInput.value=preco;
-  // id 'edit' = linha do modal "Editar itens" (não tem tbody itens-body-<id>)
-  if(id==='edit'){recalcEdit();}else{recalcCard(id);}
+  // id 'edit' = modal "Editar itens"; 'manual' = modal "Pedido manual";
+  // qualquer outro id é card da aba Estoque (tbody itens-body-<id>).
+  if(id==='edit'){recalcEdit();}else if(id==='manual'){recalcManual();}else{recalcCard(id);}
 }
 
 const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
@@ -821,6 +822,144 @@ async function salvarEditItens(){
     showToast('Erro ao editar: '+e.message);
   }finally{
     btn.disabled=false;btn.textContent='Salvar alterações';
+  }
+}
+
+// ── PEDIDO MANUAL — o atendente faz o pedido "como se fosse o cliente" ──
+// Envia pro MESMO POST /novo-pedido do site (mesmo payload do checkout), então
+// tudo se conecta sozinho: row no Pedidos Site, Telegram com "Confirmar Estoque",
+// ciclo de status, cobrança/pagar-na-retirada, fila da cozinha, avisos no
+// WhatsApp do cliente. Nada é gravado direto no Coda por aqui.
+function abrirPedidoManual(){
+  if(!_produtosList.length){showToast('Catálogo ainda carregando... tenta de novo em instantes');carregarPedidos();return;}
+  document.getElementById('manual-itens-body').innerHTML='';
+  addManualItem();
+  const hoje=new Date();
+  document.getElementById('man-data').value=hoje.toISOString().split('T')[0];
+  document.getElementById('manual-overlay').classList.add('open');
+  recalcManual();
+}
+function closeManualModal(){document.getElementById('manual-overlay').classList.remove('open');}
+
+function buildManualRow(){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
+    <td style="padding:7px 0">
+      ${buildProdutoSelect('manual','')}
+      <input class="inp-rech" placeholder="Recheios (opcional)" style="${IS}width:100%;margin-top:4px">
+    </td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcManual()" style="${IS}width:52px;text-align:center"></td>
+    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="0.00" min="0" step="0.01" oninput="recalcManual()" style="${IS}width:72px;text-align:center"></td>
+    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600;white-space:nowrap">R$ 0,00</td>
+    <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcManual()" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0" title="Remover">×</button></td>`;
+  return tr;
+}
+function addManualItem(){document.getElementById('manual-itens-body').appendChild(buildManualRow());}
+
+function manualToggleEndereco(){
+  const ehEntrega=document.getElementById('man-entrega').value==='Entrega em endereço';
+  document.getElementById('man-end-wrap').style.display=ehEntrega?'':'none';
+  document.getElementById('man-taxa-wrap').style.display=ehEntrega?'':'none';
+  recalcManual();
+}
+
+// Coleta itens + valores do formulário (fonte única pra recalc e envio)
+function _manualColeta(){
+  const itens=[];
+  document.querySelectorAll('#manual-itens-body tr').forEach(tr=>{
+    const nome=(tr.querySelector('.inp-nome')?.value||'').trim();
+    const qtd=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
+    const unit=parseFloat(tr.querySelector('.inp-unit')?.value)||0;
+    const rech=(tr.querySelector('.inp-rech')?.value||'').trim();
+    if(nome&&nome!=='__outro__'&&qtd>0)itens.push({nome,qtd,unit,rech});
+  });
+  const ehEntrega=document.getElementById('man-entrega').value==='Entrega em endereço';
+  const taxa=ehEntrega?(parseFloat(document.getElementById('man-taxa').value)||0):0;
+  const subtotal=itens.reduce((s,i)=>s+Math.round(i.qtd*i.unit*100)/100,0);
+  const total=Math.round((subtotal+taxa)*100)/100;
+  const pct=Math.min(100,Math.max(0,parseFloat(document.getElementById('man-entrada').value)||0))/100;
+  const entrada=Math.round(total*pct*100)/100;
+  return{itens,ehEntrega,taxa,total,entrada,restante:Math.round((total-entrada)*100)/100,pct};
+}
+
+function recalcManual(){
+  document.querySelectorAll('#manual-itens-body tr').forEach(tr=>{
+    const qtd=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
+    const unit=parseFloat(tr.querySelector('.inp-unit')?.value)||0;
+    const td=tr.querySelector('.td-sub');
+    if(td)td.textContent=fmtBRL(Math.round(qtd*unit*100)/100);
+  });
+  const c=_manualColeta();
+  document.getElementById('man-total').textContent=fmtBRL(c.total);
+  document.getElementById('man-resumo').textContent=` · Entrada ${Math.round(c.pct*100)}%: ${fmtBRL(c.entrada)} · Restante: ${fmtBRL(c.restante)}`;
+}
+
+async function enviarPedidoManual(){
+  const nome=document.getElementById('man-nome').value.trim();
+  const telRaw=document.getElementById('man-tel').value.trim();
+  const telDigits=telRaw.replace(/\D/g,'');
+  const data=document.getElementById('man-data').value;
+  const hora=document.getElementById('man-hora').value||'';
+  const c=_manualColeta();
+  if(!nome){showToast('Falta o nome do cliente');return;}
+  if(telDigits.length<10||telDigits.length>13){showToast('WhatsApp inválido — DDD + número');return;}
+  if(!data){showToast('Falta a data de entrega');return;}
+  if(!c.itens.length){showToast('Adicione pelo menos 1 item com produto e quantidade');return;}
+  const entrega=document.getElementById('man-entrega').value;
+  const endereco=c.ehEntrega?document.getElementById('man-end').value.trim():'';
+  const pagamento=document.getElementById('man-pgto').value;
+  const tipoCliente=document.getElementById('man-tipo').value;
+  const obsBase=document.getElementById('man-obs').value.trim();
+  const obs=obsBase?`${obsBase} [pedido manual — admin]`:'[pedido manual — admin]';
+
+  // Payload idêntico ao do checkout do site (colunas exatas do Pedidos Site)
+  const paiCells=[
+    {column:'Cliente',value:nome},
+    {column:'WhatsApp',value:telRaw},
+    {column:'Total',value:c.total},
+    {column:'Entrega',value:entrega},
+    {column:'Endereço',value:endereco},
+    {column:'Pagamento',value:pagamento},
+    {column:'Data Desejada',value:data},
+    {column:'Hora',value:hora},
+    {column:'Observações',value:obs},
+    {column:'Entrada',value:c.entrada},
+    {column:'Restante',value:c.restante},
+  ];
+  if(tipoCliente)paiCells.push({column:'Tipo Cliente',value:tipoCliente});
+  const subrows=c.itens.map(i=>[
+    {column:'Produto',value:i.nome},
+    {column:'Quantidade',value:i.qtd},
+    {column:'Valor Unit',value:i.unit},
+    {column:'Recheios',value:i.rech},
+    {column:'Cliente',value:nome},
+    {column:'WhatsApp',value:telRaw},
+    {column:'Entrega',value:entrega},
+    {column:'Pagamento',value:pagamento},
+    {column:'Entrada',value:c.entrada},
+    {column:'Restante',value:c.restante},
+    {column:'Data Desejada',value:data},
+    {column:'Hora',value:hora},
+    {column:'Observações',value:obsBase},
+  ]);
+
+  const btn=document.getElementById('man-enviar');
+  btn.disabled=true;btn.textContent='Criando...';
+  try{
+    const res=await fetch(`${WORKER}/novo-pedido`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pai:paiCells,subrows,taxaFrete:c.taxa})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||!d||d.ok===false)throw new Error((d&&d.error)?d.error:'Falha ao registrar no Coda');
+    showToast('Pedido criado! ✅ Telegram notificado — segue o fluxo normal.');
+    closeManualModal();
+    carregarStatus();
+  }catch(e){
+    showToast('Erro: '+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent='Criar pedido';
   }
 }
 

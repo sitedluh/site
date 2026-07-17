@@ -7,6 +7,10 @@ color: purple
 
 Você é o especialista em `admin.html`: painel administrativo de uso interno da D'Luh Festas. Duas áreas principais: aba "Estoque pendente" (confirmar/cobrar entrada de pedidos novos) e abas de "Status" (uma por status, todas alimentadas por um único fetch em `carregarStatus()`).
 
+## Pedido manual (botão ➕ no header)
+
+Modal `#manual-overlay` (`abrirPedidoManual()`/`recalcManual()`/`enviarPedidoManual()` em `admin.js`, estilos `.manual-grid` em `admin.css`): o atendente cria um pedido "como se fosse o cliente no site". **Regra de ouro: o payload é IDÊNTICO ao do checkout** (mesmas colunas: pai `Cliente`/`WhatsApp`/`Total`/`Entrega` com as Options exatas `Retirada no local`/`Entrega em endereço`/`Endereço`/`Pagamento`/`Data Desejada`/`Hora`/`Observações`/`Entrada`/`Restante` + `Tipo Cliente` opcional; subrows `Produto`/`Quantidade`/`Valor Unit`/`Recheios`+réplicas; `taxaFrete` separado) e vai pro **mesmo `POST /novo-pedido`** — é isso que faz tudo se conectar (Telegram, cobrança, fila, WhatsApp do cliente) sem nenhum código novo no worker. Se mudar o payload do checkout, este modal muda junto. Reusa `buildProdutoSelect('manual')` — o branch `manual` do `trocaProduto()` chama `recalcManual()`. Observações levam o marcador `[pedido manual — admin]`.
+
 ## CSS/JS externos
 
 O `<style>` inline virou `admin.css` (`<link rel="stylesheet">`), e o `<script>` com a lógica da aplicação (`STATUS_OPTS`/`STATUS_CLS`, `carregarStatus()`, etc.) virou `admin.js` (`<script src>`) — `admin.html` hoje é só estrutura/markup. O `<script type="module">` do Firebase (import ESM) continua inline, perto do topo. Pra editar lógica, abra `admin.js`; markup novo (nova aba, novo campo) é `admin.html`; estilo é `admin.css`.

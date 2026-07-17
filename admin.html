@@ -36,6 +36,7 @@
     <div class="header-title">🎂 D'Luh Festas</div>
     <div class="header-sub">Gestão de pedidos D'Luh Festas</div>
   </div>
+  <button class="btn-refresh" id="btn-manual" onclick="abrirPedidoManual()" style="margin-right:8px">➕ Pedido manual</button>
   <button class="btn-refresh" id="btn-refresh" onclick="carregarPedidos()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 9M21 3v6h-6M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64L3 15M3 21v-6h6"/></svg>
     Atualizar
@@ -99,6 +100,56 @@
     <div class="confirm-actions" style="margin-top:16px">
       <button class="confirm-btn cancel" onclick="closeEditModal()">Cancelar</button>
       <button class="confirm-btn ok" id="edit-save-btn" onclick="salvarEditItens()">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<!-- PEDIDO MANUAL — atendente cria o pedido pelo mesmo fluxo do site (/novo-pedido) -->
+<div class="confirm-overlay" id="manual-overlay">
+  <div class="edit-box">
+    <div class="edit-title">➕ Pedido manual</div>
+    <div class="edit-sub">Mesmo fluxo do site: registra no Coda, notifica o Telegram (Confirmar Estoque) e segue o ciclo normal — cobrança, fila da cozinha, avisos no WhatsApp do cliente.</div>
+    <div class="manual-grid">
+      <label>Cliente *<input id="man-nome" placeholder="Nome do cliente"></label>
+      <label>WhatsApp *<input id="man-tel" placeholder="(38) 99999-9999"></label>
+      <label>Data de entrega *<input id="man-data" type="date"></label>
+      <label>Hora<input id="man-hora" type="time"></label>
+      <label>Entrega
+        <select id="man-entrega" onchange="manualToggleEndereco()">
+          <option value="Retirada no local">🛍️ Retirada no local</option>
+          <option value="Entrega em endereço">🛵 Entrega em endereço</option>
+        </select>
+      </label>
+      <label>Pagamento
+        <select id="man-pgto"><option>Pix</option><option>Cartão</option><option>Dinheiro</option></select>
+      </label>
+      <label id="man-end-wrap" style="display:none;grid-column:1/-1">Endereço<input id="man-end" placeholder="Rua, número, bairro, CEP"></label>
+      <label id="man-taxa-wrap" style="display:none">Taxa de entrega (R$)<input id="man-taxa" type="number" min="0" step="0.01" value="0" oninput="recalcManual()"></label>
+      <label>Entrada (%)<input id="man-entrada" type="number" min="0" max="100" step="5" value="50" oninput="recalcManual()"></label>
+      <label>Tipo de cliente
+        <select id="man-tipo"><option value="">Pessoa física</option><option value="Empresa">🏢 Empresa</option><option value="Festa">🎉 Festa</option></select>
+      </label>
+      <label style="grid-column:1/-1">Observações<input id="man-obs" placeholder="Opcional"></label>
+    </div>
+    <div class="itens-table-wrap">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px">
+            <th style="text-align:left;padding-bottom:4px;font-weight:600">Produto</th>
+            <th style="text-align:center;padding-bottom:4px;font-weight:600;width:60px">Qtd</th>
+            <th style="text-align:center;padding-bottom:4px;font-weight:600;width:80px">Unit</th>
+            <th style="text-align:right;padding-bottom:4px;font-weight:600;width:90px">Subtotal</th>
+            <th style="width:30px"></th>
+          </tr>
+        </thead>
+        <tbody id="manual-itens-body"></tbody>
+      </table>
+    </div>
+    <button class="edit-add-btn" onclick="addManualItem()">+ Adicionar item</button>
+    <div class="edit-total-row">Total: <b id="man-total">R$ 0,00</b><span id="man-resumo" style="color:var(--text3);font-size:12px"></span></div>
+    <div class="confirm-actions" style="margin-top:16px">
+      <button class="confirm-btn cancel" onclick="closeManualModal()">Cancelar</button>
+      <button class="confirm-btn ok" id="man-enviar" onclick="enviarPedidoManual()">Criar pedido</button>
     </div>
   </div>
 </div>
