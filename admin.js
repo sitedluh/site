@@ -238,8 +238,10 @@ function addItem(id){
   tbody.appendChild(tr);
 }
 
-// datalist para autocomplete nos inputs existentes
+// datalist para autocomplete nos inputs existentes (fallback — hoje o elemento
+// já vem no admin.html; só cria se não existir, senão duplicaria o ID)
 (function(){
+  if(document.getElementById('produtos-datalist'))return;
   const dl=document.createElement('datalist');dl.id='produtos-datalist';document.body.appendChild(dl);
 })();
 
@@ -845,7 +847,7 @@ function buildManualRow(){
   const tr=document.createElement('tr');
   tr.innerHTML=`
     <td style="padding:7px 0">
-      ${buildProdutoSelect('manual','')}
+      <input class="inp-nome" list="produtos-datalist" placeholder="Digite pra filtrar o produto..." autocomplete="off" oninput="manualProdutoInput(this)" style="${IS}width:100%">
       <input class="inp-rech" placeholder="Recheios (opcional)" style="${IS}width:100%;margin-top:4px">
     </td>
     <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcManual()" style="${IS}width:52px;text-align:center"></td>
@@ -855,6 +857,17 @@ function buildManualRow(){
   return tr;
 }
 function addManualItem(){document.getElementById('manual-itens-body').appendChild(buildManualRow());}
+
+// Autocomplete do input de texto do pedido manual: quando o valor digitado bate
+// exatamente com um produto do catálogo, preenche o preço unitário sozinho.
+// Produto fora do catálogo é permitido (preço manual) — só não preenche o preço.
+function manualProdutoInput(el){
+  if(_produtosMap[el.value]!==undefined){
+    const unitInput=el.closest('tr').querySelector('.inp-unit');
+    if(unitInput)unitInput.value=(_produtosMap[el.value]||0).toFixed(2);
+  }
+  recalcManual();
+}
 
 function manualToggleEndereco(){
   const ehEntrega=document.getElementById('man-entrega').value==='Entrega em endereço';
