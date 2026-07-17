@@ -1,7 +1,7 @@
 
 // ── CONFIG ──────────────────────────────────────────────
 const CFG = {
-  token: 'c2df9327-a40c-4716-9f59-c40620d691ef',
+  token: '35459f2f-eb0a-4fe4-8cf2-4a1a21eaed4d',
   docId: 'Wq8ktEEI3N',
   // Reconstrução do Coda (CODA-PLANO.md): a fila agora é a table "Fila Cozinha",
   // lida por NOME de coluna (useColumnNames=true no fetch) — sem IDs c-... que
