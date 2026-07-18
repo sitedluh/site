@@ -217,14 +217,13 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       Voltar ao cardápio
     </button>
-    <div class="ck-section"><h3>Resumo do pedido</h3><div id="order-review"></div></div>
     <div class="ck-section">
       <h3>Seus dados</h3>
-      <div class="form-row" id="frow-nome"><label>Nome completo *</label><input type="text" id="f-nome" placeholder="Seu nome" autocomplete="name"><div class="form-error-msg">Informe seu nome</div></div>
+      <div class="form-row" id="frow-nome"><label>Nome completo *</label><input type="text" id="f-nome" placeholder="Seu nome" autocomplete="name" oninput="atualizarResumoPedido()"><div class="form-error-msg">Informe seu nome</div></div>
       <div class="form-row saved-field" id="frow-tel">
         <label>WhatsApp *</label>
         <div class="tel-wrap">
-          <input type="tel" id="f-tel" placeholder="(38) 9 9999-9999" autocomplete="tel" oninput="maskPhone(this);saveUserData();updateTelStatus()">
+          <input type="tel" id="f-tel" placeholder="(38) 9 9999-9999" autocomplete="tel" oninput="maskPhone(this);saveUserData();updateTelStatus();atualizarResumoPedido()">
           <span class="tel-status" id="tel-status"></span>
         </div>
         <div class="form-error-msg">Informe seu WhatsApp</div>
@@ -251,7 +250,7 @@
           </div>
           <div class="form-row" id="frow-num" style="margin-bottom:0">
             <label>Número *</label>
-            <input type="text" id="f-num" placeholder="Ex: 123" oninput="saveUserData()">
+            <input type="text" id="f-num" placeholder="Ex: 123" oninput="saveUserData();atualizarResumoPedido()">
             <div class="form-error-msg">Número obrigatório</div>
           </div>
         </div>
@@ -310,10 +309,11 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="form-row">
         <div><label>Data desejada *</label><input type="date" id="f-data" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"></div>
-        <div class="form-row" id="frow-hora" style="margin-bottom:0"><label>Horário desejado *</label><select id="f-hora" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"><option value="">Selecione uma data primeiro</option></select><div id="f-hora-status" style="font-size:13px;color:var(--text-muted,#888);margin-top:6px"></div><div class="form-error-msg">Selecione um horário disponível entre 08:00 e 19:00</div><div id="f-hora-esgotado" style="display:none;font-size:13px;color:#a33;margin-top:8px;padding:10px 12px;background:#fdf0ee;border-radius:8px;border-left:3px solid #c0392b"><div style="margin-bottom:8px">Não conseguimos mais encomendas pra hoje 😔</div><button type="button" onclick="falarComAtendenteEsgotado()" style="width:100%;border:0;border-radius:var(--radius-sm);padding:10px 14px;font-size:14px;font-weight:600;background:var(--accent);color:#fff;cursor:pointer">💬 Falar com atendente</button></div></div>
+        <div class="form-row" id="frow-hora" style="margin-bottom:0"><label>Horário desejado *</label><select id="f-hora" onchange="atualizarResumoPedido()" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"><option value="">Selecione uma data primeiro</option></select><div id="f-hora-status" style="font-size:13px;color:var(--text-muted,#888);margin-top:6px"></div><div class="form-error-msg">Selecione um horário disponível entre 08:00 e 19:00</div><div id="f-hora-esgotado" style="display:none;font-size:13px;color:#a33;margin-top:8px;padding:10px 12px;background:#fdf0ee;border-radius:8px;border-left:3px solid #c0392b"><div style="margin-bottom:8px">Não conseguimos mais encomendas pra hoje 😔</div><button type="button" onclick="falarComAtendenteEsgotado()" style="width:100%;border:0;border-radius:var(--radius-sm);padding:10px 14px;font-size:14px;font-weight:600;background:var(--accent);color:#fff;cursor:pointer">💬 Falar com atendente</button></div></div>
       </div>
-      <div class="form-row"><label>Observações</label><textarea id="f-obs" placeholder="Alergias, preferências, detalhes..."></textarea></div>
+      <div class="form-row"><label>Observações</label><textarea id="f-obs" placeholder="Alergias, preferências, detalhes..." oninput="atualizarResumoPedido()"></textarea></div>
     </div>
+    <div class="ck-section"><h3>Resumo do pedido</h3><div id="order-review"></div></div>
     <button class="btn-wpp" onclick="finalizar()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       Enviar Pedido

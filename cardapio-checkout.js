@@ -10,29 +10,6 @@ function goCheckout(){
   if(floatBtn)floatBtn.style.display='none';
   const profile=document.querySelector('.profile');
   if(profile)profile.style.display='none';
-  const items=Object.values(cart).filter(i=>i.qty>0);
-  const topperCount=items.filter(i=>topperPorProduto[i.id]?.quero).length;
-  const topperExtra=topperCount*20;
-  const taxaEntrega=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0);
-  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperExtra+taxaEntrega;
-  document.getElementById('order-review').innerHTML=`<div class="order-review">
-    ${items.map(i=>{
-      let linhas=`<div class="order-review-item"><span>${i.nome} · ${i.qty} unid.</span><span>${fmtBRL(i.valorUnit*i.qty)}</span></div>`;
-      if((isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios){
-        const rotulo=isBolo(i.tipo)?'Bolo':'Pacote';
-        i.recheios.forEach((r,idx)=>{
-          linhas+=`<div style="font-size:12px;color:#666;padding:2px 0 2px 12px">${rotulo} ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}</div>`;
-        });
-      }
-      if(topperPorProduto[i.id]?.quero){
-        linhas+=`<div class="order-review-item" style="font-size:12px;color:var(--accent)"><span>  └ Topper personalizado</span><span>${fmtBRL(20)}</span></div>`;
-      }
-      return linhas;
-    }).join('')}
-    ${topperExtra>0?`<div class="order-review-item" style="font-size:13px;color:var(--text2)"><span>Toppers (${topperCount}x)</span><span>${fmtBRL(topperExtra)}</span></div>`:''}
-    ${taxaEntrega>0?`<div class="order-review-item" style="font-size:13px;color:var(--text2)"><span>🛵 Taxa de entrega</span><span>${fmtBRL(taxaEntrega)}</span></div>`:''}
-    <div class="order-review-total"><span>Total</span><span>${fmtBRL(total)}</span></div>
-  </div>`;
   document.getElementById('catalog-page').classList.add('hidden');
   document.getElementById('checkout-page').classList.add('active');
   // Injeta/atualiza barra de steps
@@ -41,13 +18,13 @@ function goCheckout(){
     bar = document.createElement('div');
     bar.id = 'checkout-steps-bar';
     bar.innerHTML = `
-    <div class="cstep" data-step="0"><span class="cstep-num">1</span><span class="cstep-label">Resumo</span></div>
+    <div class="cstep" data-step="0"><span class="cstep-num">1</span><span class="cstep-label">Dados</span></div>
     <div class="cstep-line"></div>
-    <div class="cstep" data-step="1"><span class="cstep-num">2</span><span class="cstep-label">Dados</span></div>
+    <div class="cstep" data-step="1"><span class="cstep-num">2</span><span class="cstep-label">Entrega</span></div>
     <div class="cstep-line"></div>
-    <div class="cstep" data-step="2"><span class="cstep-num">3</span><span class="cstep-label">Entrega</span></div>
+    <div class="cstep" data-step="2"><span class="cstep-num">3</span><span class="cstep-label">Pagamento</span></div>
     <div class="cstep-line"></div>
-    <div class="cstep" data-step="3"><span class="cstep-num">4</span><span class="cstep-label">Pagamento</span></div>
+    <div class="cstep" data-step="3"><span class="cstep-num">4</span><span class="cstep-label">Resumo</span></div>
   `;
     const checkoutPage = document.getElementById('checkout-page');
     if (checkoutPage) checkoutPage.insertBefore(bar, checkoutPage.firstChild);
@@ -66,6 +43,10 @@ function goCheckout(){
   // Pré-preenche nome se logado
   const fNome=document.getElementById('f-nome');
   if(fNome&&!fNome.value&&window._fbUser)fNome.value=window._fbUser.displayName||'';
+  // loadUserData()/pré-preenchimento de nome acima mexem em campos via .value direto (sem
+  // disparar 'input'), então o resumo precisa de uma atualização explícita aqui no final —
+  // garante que ele já abra refletindo os dados salvos/pré-preenchidos.
+  atualizarResumoPedido();
 }
 
 function showCatalog(){
@@ -125,11 +106,20 @@ function selecionarEntradaPct(el,pct){document.querySelectorAll('#rg-entrada-pct
 // Espelha no front a regra do worker (deveCobrarTotalAntecipado): pedidos com Total < R$100
 // E entrega em até 1 dia da data do pedido são cobrados o TOTAL de uma vez. Aproximação por
 // dia de calendário — o worker é a fonte de verdade real (cálculo por timestamp completo).
-function calculaCobrancaAntecipada(){
+// Calcula itens/total/taxa do carrinho uma única vez — reaproveitado por atualizarEntrada(),
+// calculaCobrancaAntecipada() e atualizarResumoPedido() pra não duplicar essa fórmula de novo
+// a cada função (mesma conta que finalizar()/_doFinalizar() faz na hora de enviar o pedido).
+function calcTotaisPedido(){
   const items=Object.values(cart).filter(i=>i.qty>0);
-  const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
-  const taxaFrete=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
-  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
+  const topperCount=items.filter(i=>topperPorProduto[i.id]?.quero).length;
+  const topperExtra=topperCount*20;
+  const taxaEntrega=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
+  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperExtra+taxaEntrega;
+  return {items,topperCount,topperExtra,taxaEntrega,total};
+}
+
+function calculaCobrancaAntecipada(){
+  const {total}=calcTotaisPedido();
   const dataVal=document.getElementById('f-data')?.value;
   if(!dataVal||total<=0||total>=100)return false;
   const hoje=new Date();hoje.setHours(0,0,0,0);
@@ -162,10 +152,7 @@ function aplicarCobrancaAntecipada(){
 }
 
 function atualizarEntrada(){
-  const items=Object.values(cart).filter(i=>i.qty>0);
-  const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
-  const taxaFrete=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
-  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
+  const {total}=calcTotaisPedido();
   // Regra "pedido pequeno + última hora" pode forçar 100% antes de calcular os valores
   aplicarCobrancaAntecipada();
   const raw=document.getElementById('f-entrada-pct')?.value||'';
@@ -177,6 +164,7 @@ function atualizarEntrada(){
     if(lblPct)lblPct.textContent='—';
     if(elVal)elVal.textContent='—';
     if(elResto)elResto.textContent='—';
+    atualizarResumoPedido();
     return;
   }
   const pct=parseInt(raw,10)/100;
@@ -185,6 +173,92 @@ function atualizarEntrada(){
   if(lblPct)lblPct.textContent=Math.round(pct*100)+'%';
   if(elVal)elVal.textContent=fmtBRL(entrada);
   if(elResto)elResto.textContent=fmtBRL(Math.max(0,resto));
+  // Toda mudança que passa por aqui (troca de entrega/pagamento, % de entrada, taxa de frete,
+  // data) também deve refletir no resumo final — atualizarEntrada() é o hub natural pra isso.
+  atualizarResumoPedido();
+}
+
+// Monta o resumo completo do pedido em #order-review: itens do carrinho (como já fazia),
+// + dados do cliente, entrega, pagamento/entrada/restante, data/hora e observações. A seção
+// de Resumo agora fica por último na página (depois dos campos que ela resume), então isso
+// precisa ser recalculado a cada edição relevante, não só uma vez em goCheckout().
+// Reaproveita calcTotaisPedido() (mesma fórmula usada em atualizarEntrada/finalizar) e os
+// valores de entrada/restante já calculados e exibidos por atualizarEntrada() — não recalcula
+// essa parte de novo, só lê o que já está na tela. NÃO chama atualizarEntrada() daqui (ela é
+// quem chama esta função no final) pra não entrar em recursão.
+function atualizarResumoPedido(){
+  const el=document.getElementById('order-review');
+  if(!el)return;
+  const {items,topperCount,topperExtra,taxaEntrega,total}=calcTotaisPedido();
+
+  const nome=document.getElementById('f-nome')?.value.trim()||'';
+  const tel=document.getElementById('f-tel')?.value.trim()||'';
+  const entrega=getRadio('rg-entrega');
+  const cep=document.getElementById('f-cep')?.value.trim()||'';
+  const rua=document.getElementById('f-rua')?.value.trim()||'';
+  const num=document.getElementById('f-num')?.value.trim()||'';
+  const bairro=document.getElementById('f-bairro')?.value.trim()||'';
+  const pagamento=getRadio('rg-pgto');
+  const dataVal=document.getElementById('f-data')?.value||'';
+  const horaVal=document.getElementById('f-hora')?.value||'';
+  const obs=document.getElementById('f-obs')?.value.trim()||'';
+  const entradaPct=document.getElementById('f-entrada-pct')?.value||'';
+  const entradaTxt=document.getElementById('entrada-val')?.textContent||'—';
+  const restoTxt=document.getElementById('entrada-resto')?.textContent||'—';
+
+  // Linha genérica label:valor — campo vazio vira "—" (nunca some a linha toda, exceto
+  // observações, que só aparece se preenchida).
+  const linha=(label,val)=>`<div class="order-review-item"><span>${label}</span><span>${(val&&String(val).trim())||'—'}</span></div>`;
+
+  const itensHtml = items.length ? items.map(i=>{
+    let linhas=`<div class="order-review-item"><span>${i.nome} · ${i.qty} unid.</span><span>${fmtBRL(i.valorUnit*i.qty)}</span></div>`;
+    if((isBolo(i.tipo)||isPacote(i.tipo))&&i.recheios){
+      const rotulo=isBolo(i.tipo)?'Bolo':'Pacote';
+      i.recheios.forEach((r,idx)=>{
+        linhas+=`<div style="font-size:12px;color:#666;padding:2px 0 2px 12px">${rotulo} ${idx+1}: ${r.length?r.join(' + '):'sem recheio'}</div>`;
+      });
+    }
+    if(topperPorProduto[i.id]?.quero){
+      linhas+=`<div class="order-review-item" style="font-size:12px;color:var(--accent)"><span>  └ Topper personalizado</span><span>${fmtBRL(20)}</span></div>`;
+    }
+    return linhas;
+  }).join('') : `<div class="order-review-item" style="color:var(--text3)"><span>Nenhum item no carrinho</span><span></span></div>`;
+
+  const entregaTxt = entrega==='Entrega em endereço'
+    ? ([rua,num,bairro,cep].filter(Boolean).join(', ')||'endereço não preenchido')
+    : 'Retirada no local';
+
+  const dataTxt = dataVal ? dataVal.split('-').reverse().join('/') : '';
+
+  let pagamentoLinhas;
+  if(pagamento==='Dinheiro'){
+    pagamentoLinhas = linha('Pagamento','Dinheiro — tudo na entrega/retirada');
+  }else{
+    pagamentoLinhas = linha('Pagamento',pagamento);
+    if(entradaPct==='50'||entradaPct==='100'){
+      pagamentoLinhas += linha(`Entrada (${entradaPct}%)`,entradaTxt);
+      if(entradaPct==='50') pagamentoLinhas += linha('Restante na entrega/retirada',restoTxt);
+    }
+  }
+
+  const secao=(titulo)=>`<div style="border-top:1px solid var(--border);margin:12px 0 8px;padding-top:10px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">${titulo}</div>`;
+
+  el.innerHTML = `<div class="order-review">
+    ${itensHtml}
+    ${topperExtra>0?`<div class="order-review-item" style="font-size:13px;color:var(--text2)"><span>Toppers (${topperCount}x)</span><span>${fmtBRL(topperExtra)}</span></div>`:''}
+    ${taxaEntrega>0?`<div class="order-review-item" style="font-size:13px;color:var(--text2)"><span>🛵 Taxa de entrega</span><span>${fmtBRL(taxaEntrega)}</span></div>`:''}
+    <div class="order-review-total"><span>Total</span><span>${fmtBRL(total)}</span></div>
+    ${secao('Seus dados')}
+    ${linha('Nome',nome)}
+    ${linha('WhatsApp',tel)}
+    ${secao('Entrega')}
+    ${linha('Entrega',entregaTxt)}
+    ${secao('Pagamento & agendamento')}
+    ${pagamentoLinhas}
+    ${linha('Data desejada',dataTxt)}
+    ${linha('Horário',horaVal)}
+    ${obs?linha('Observações',obs):''}
+  </div>`;
 }
 function getRadio(groupId){const a=document.querySelector('#'+groupId+' .radio-opt.active');return a?a.dataset.val:'';}
 // Carrega os horários disponíveis (slots fixos de 15 em 15 min, 08:00–19:00) para a data
@@ -991,6 +1065,10 @@ async function calcDeliveryFee() {
     if(box) box.style.display = 'block';
   } finally {
     if(loading) loading.style.display = 'none';
+    // Taxa de entrega mudou (ou foi zerada) em qualquer um dos caminhos acima — recalcula
+    // entrada/restante com o novo total e atualiza o resumo (atualizarEntrada() chama
+    // atualizarResumoPedido() no final).
+    atualizarEntrada();
   }
 }
 
@@ -1018,6 +1096,10 @@ function forcarRetirada() {
   const fEntrada = document.getElementById('f-entrada-pct');
   if (fEntrada) fEntrada.value = '';
   document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o => o.classList.remove('active'));
+  // selectRadio() já chamou atualizarEntrada() (que já atualizaria o resumo) ANTES de
+  // forcarRetirada() zerar a entrada acima — sem isso o resumo ficaria com a entrada antiga
+  // por um instante ao trocar pra Dinheiro.
+  atualizarResumoPedido();
 }
 function liberarEntrega() {
   document.querySelectorAll('#rg-entrega .radio-opt').forEach(o => {
@@ -1039,6 +1121,7 @@ function onCepInput(el){
   const cep=el.value.replace(/\D/g,'');
   if(cep.length===8) fetchCep(cep);
   saveUserData();
+  atualizarResumoPedido();
 }
 
 async function fetchCep(cep){
