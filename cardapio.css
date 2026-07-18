@@ -364,8 +364,13 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .checkout-page.active{display:block}
 .catalog-page.hidden{display:none}
 .back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);font-size:14px;margin-bottom:1.5rem;padding:0}
-.ck-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:.75rem}
+.ck-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:.75rem;display:none}
+.ck-section.active{display:block}
 .ck-section h3{font-family:'Playfair Display',serif;font-size:16px;font-weight:500;color:var(--text);margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+.ck-nav{display:flex;gap:10px;margin-top:1rem}
+.ck-nav .btn-wpp{margin-top:0}
+.ck-back-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:none;border:1px solid var(--border);color:var(--text2);font-size:14px;border-radius:var(--radius);padding:14px 18px;cursor:pointer;flex-shrink:0}
+.ck-back-btn:hover{background:var(--surface2)}
 .form-row{margin-bottom:.875rem}
 .form-row:last-child{margin-bottom:0}
 .form-row label{display:block;font-size:13px;color:var(--text2);margin-bottom:5px;font-weight:500}
@@ -378,11 +383,8 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .radio-group{display:flex;flex-wrap:wrap;gap:8px}
 .radio-opt{border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;cursor:pointer;font-size:13px;color:var(--text2);background:var(--surface);user-select:none;transition:all .15s}
 .radio-opt.active{border-color:var(--accent);color:var(--accent);background:var(--accent-light);font-weight:500}
-/* ── Slider de entrada ── */
+/* ── Entrada (botões 50%/100%) ── */
 .entrada-box{background:var(--surface2,#fdf6f3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-top:4px}
-.entrada-slider{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:linear-gradient(to right,var(--accent) 0%,var(--accent) 50%,var(--border) 50%,var(--border) 100%);outline:none;cursor:pointer}
-.entrada-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.entrada-marks{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-top:4px;padding:0 2px}
 .entrada-vals{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)}
 .entrada-val-item{text-align:center}
 .entrada-val-item .lbl{font-size:11px;color:var(--text2);margin-bottom:2px}
@@ -638,6 +640,13 @@ body.checkout-active .cats-row{display:none!important}
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  pointer-events: none;
+  cursor: default;
+}
+.cstep.active,
+.cstep.done {
+  pointer-events: auto;
+  cursor: pointer;
 }
 .cstep-num {
   width: 28px;

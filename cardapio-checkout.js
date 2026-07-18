@@ -1,3 +1,5 @@
+let _ckStep = 0; // índice do step atual do wizard: 0=Dados,1=Entrega,2=Pagamento,3=Resumo
+
 function goCheckout(){
   closeDrawer();
   // Exige login antes de finalizar
@@ -18,19 +20,19 @@ function goCheckout(){
     bar = document.createElement('div');
     bar.id = 'checkout-steps-bar';
     bar.innerHTML = `
-    <div class="cstep" data-step="0"><span class="cstep-num">1</span><span class="cstep-label">Dados</span></div>
+    <div class="cstep" data-step="0" onclick="ckGoToStep(0)"><span class="cstep-num">1</span><span class="cstep-label">Dados</span></div>
     <div class="cstep-line"></div>
-    <div class="cstep" data-step="1"><span class="cstep-num">2</span><span class="cstep-label">Entrega</span></div>
+    <div class="cstep" data-step="1" onclick="ckGoToStep(1)"><span class="cstep-num">2</span><span class="cstep-label">Entrega</span></div>
     <div class="cstep-line"></div>
-    <div class="cstep" data-step="2"><span class="cstep-num">3</span><span class="cstep-label">Pagamento</span></div>
+    <div class="cstep" data-step="2" onclick="ckGoToStep(2)"><span class="cstep-num">3</span><span class="cstep-label">Pagamento</span></div>
     <div class="cstep-line"></div>
-    <div class="cstep" data-step="3"><span class="cstep-num">4</span><span class="cstep-label">Resumo</span></div>
+    <div class="cstep" data-step="3" onclick="ckGoToStep(3)"><span class="cstep-num">4</span><span class="cstep-label">Resumo</span></div>
   `;
     const checkoutPage = document.getElementById('checkout-page');
     if (checkoutPage) checkoutPage.insertBefore(bar, checkoutPage.firstChild);
   }
-  setCheckoutStep(0);
-  initCheckoutStepObserver();
+  _ckStep = 0;
+  ckRenderStep();
   document.body.classList.add('checkout-active');
   window.scrollTo(0,0);
   // Nenhuma opção de entrada vem pré-selecionada — escolha obrigatória do cliente
@@ -50,10 +52,6 @@ function goCheckout(){
 }
 
 function showCatalog(){
-  if (window._checkoutStepObserver) {
-    window._checkoutStepObserver.disconnect();
-    window._checkoutStepObserver = null;
-  }
   document.getElementById('checkout-page').classList.remove('active');
   document.getElementById('catalog-page').classList.remove('hidden');
   document.body.classList.remove('checkout-active');
@@ -70,22 +68,47 @@ function setCheckoutStep(idx) {
   });
 }
 
-function initCheckoutStepObserver() {
-  if (window._checkoutStepObserver) window._checkoutStepObserver.disconnect();
-  requestAnimationFrame(() => {
-    const sections = Array.from(document.querySelectorAll('#checkout-page .ck-section'));
-    if (!sections.length) return;
-    window._checkoutStepObserver = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter(e => e.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (visible.length) {
-        const idx = sections.indexOf(visible[0].target);
-        if (idx >= 0) setCheckoutStep(idx);
-      }
-    }, { threshold: 0.3 });
-    sections.forEach(el => window._checkoutStepObserver.observe(el));
-  });
+// Mostra só a .ck-section do índice _ckStep (as outras ficam com display:none via CSS,
+// classe .active controla isso), atualiza a barra de steps e, ao chegar no Resumo (último
+// step), garante que #order-review está com os dados mais recentes. Sempre rola pro topo
+// da página — troca de step, não abertura inicial do checkout, por isso smooth aqui.
+function ckRenderStep(opts){
+  const sections = Array.from(document.querySelectorAll('#checkout-page .ck-section'));
+  if (!sections.length) return;
+  sections.forEach((el, i) => el.classList.toggle('active', i === _ckStep));
+  setCheckoutStep(_ckStep);
+  if (_ckStep === sections.length - 1) atualizarResumoPedido();
+  if (!(opts && opts.skipScrollTop)) window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// Avança pro próximo step SE o step atual passar na validação correspondente (ver
+// validateDadosStep/validateEntregaStep/validatePagamentoStep, extraídas de validate() pra
+// serem reaproveitadas aqui sem duplicar a lógica de validação). Nunca passa do último índice.
+function ckNext(){
+  const sections = Array.from(document.querySelectorAll('#checkout-page .ck-section'));
+  const maxIdx = sections.length - 1;
+  let ok = true;
+  if (_ckStep === 0) ok = validateDadosStep();
+  else if (_ckStep === 1) ok = validateEntregaStep();
+  else if (_ckStep === 2) ok = validatePagamentoStep(false);
+  if (!ok) return;
+  _ckStep = Math.min(maxIdx, _ckStep + 1);
+  ckRenderStep();
+}
+
+// Volta um step sem validar nada (voltar nunca deve ser bloqueado).
+function ckBack(){
+  _ckStep = Math.max(0, _ckStep - 1);
+  ckRenderStep();
+}
+
+// Clique num .cstep da barra — só permite ir pra um step já visitado/atual (idx<=_ckStep),
+// nunca pular pra frente sem passar pela validação de ckNext().
+function ckGoToStep(idx){
+  if (idx <= _ckStep) {
+    _ckStep = idx;
+    ckRenderStep();
+  }
 }
 
 // ── BOTÃO VOLTAR DO CELULAR ──
@@ -96,7 +119,12 @@ function goCheckoutPushState(){
 window.addEventListener('popstate',(e)=>{
   const ckPage=document.getElementById('checkout-page');
   if(ckPage&&ckPage.classList.contains('active')){
-    showCatalog();
+    if(_ckStep>0){
+      ckBack();
+      goCheckoutPushState();
+    }else{
+      showCatalog();
+    }
   }
 });
 function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');if(groupId==='rg-entrega'){document.getElementById('row-end').style.display=el.dataset.val==='Entrega em endereço'?'block':'none';saveUserData();if(el.dataset.val==='Entrega em endereço'&&document.getElementById('f-cep')?.value)calcDeliveryFee();}atualizarEntrada();}
@@ -359,11 +387,11 @@ async function carregarHorarios(dataStr){
   horaEl.disabled=false;
   if(statusEl)statusEl.textContent=Object.keys(cheios).length?'Alguns horários estão cheios e não podem ser selecionados — escolha outro horário disponível.':(ehHoje&&_minHojeAtual?`Pra hoje, conseguimos a partir das ${_minHojeAtual} ⏰`:'');
 }
-// 'skipHora' pula a validação do campo de horário — usado pelo fluxo "Falar com atendente"
-// (dia esgotado hoje: não existe horário válido pra escolher, mas o resto do form precisa
-// estar completo do mesmo jeito que no envio normal).
-function validate(skipHora){
-  let ok=true;
+// Helper compartilhado pelos 3 blocos de validação abaixo: marca/desmarca erro visual numa
+// row e guarda a primeira row com erro (pra scroll/focus). Cada validateXStep() cria seu
+// próprio firstErrorEl local (escopado só aos campos daquele bloco) e faz seu próprio
+// scroll+focus no final — assim ckNext() foca certinho no primeiro erro DAQUELE step.
+function _markErrorFactory(){
   let firstErrorEl=null;
   const markError=(rowEl,hasError)=>{
     if(!rowEl)return;
@@ -374,12 +402,52 @@ function validate(skipHora){
       rowEl.classList.remove('error');
     }
   };
+  return {markError,getFirstErrorEl:()=>firstErrorEl};
+}
+// stepIdx (opcional): se o erro pertence a um step diferente do atual (ex.: validate()
+// rodando tudo de uma vez a partir do Resumo e achando um erro lá atrás em Dados/Entrega),
+// a seção com erro está com display:none — sem navegar até ela primeiro, scrollIntoView/focus
+// não fazem nada visível e o cliente clica "Enviar Pedido" sem entender por que não vai.
+function _focusFirstError(firstErrorEl,stepIdx){
+  if(!firstErrorEl)return;
+  if(typeof stepIdx==='number'&&stepIdx!==_ckStep){
+    _ckStep=stepIdx;
+    ckRenderStep({skipScrollTop:true});
+  }
+  firstErrorEl.scrollIntoView({behavior:'smooth',block:'center'});
+  const campo=firstErrorEl.querySelector('input,select,textarea');
+  if(campo)campo.focus({preventScroll:true});
+}
+
+// Cada bloco "core" abaixo faz só a marcação de erro (sem scroll/focus) e devolve {ok,el}
+// (el = primeira row com erro DAQUELE bloco, ou null). Os wrappers públicos validateXStep()
+// chamam o core + focam o próprio erro (uso isolado por ckNext(), validando só o step atual).
+// validate() (mais abaixo) chama os 3 cores diretamente pra sempre marcar/limpar erro em TODO
+// o form de uma vez (como sempre fez), mas só foca o PRIMEIRO erro entre todos os blocos.
+
+// Step "Dados": nome + WhatsApp.
+function _validateDadosStepCore(){
+  let ok=true;
+  const {markError,getFirstErrorEl}=_markErrorFactory();
   [['frow-nome','f-nome'],['frow-tel','f-tel']].forEach(([row,field])=>{
     const el=document.getElementById(field),rowEl=document.getElementById(row);
     const invalido=!el||!el.value.trim();
     markError(rowEl,invalido);
     if(invalido)ok=false;
   });
+  return {ok,el:getFirstErrorEl()};
+}
+function validateDadosStep(){
+  const r=_validateDadosStepCore();
+  _focusFirstError(r.el,0);
+  return r.ok;
+}
+
+// Step "Entrega": endereço completo, só quando a opção escolhida é "Entrega em endereço"
+// (retirada no local não tem campo nenhum pra validar aqui).
+function _validateEntregaStepCore(){
+  let ok=true;
+  const {markError,getFirstErrorEl}=_markErrorFactory();
   if(getRadio('rg-entrega')==='Entrega em endereço'){
     [['frow-cep','f-cep'],['frow-num','f-num'],['frow-rua','f-rua'],['frow-bairro','f-bairro']].forEach(([row,field])=>{
       const el=document.getElementById(field),rowEl=document.getElementById(row);
@@ -388,6 +456,19 @@ function validate(skipHora){
       if(invalido)ok=false;
     });
   }
+  return {ok,el:getFirstErrorEl()};
+}
+function validateEntregaStep(){
+  const r=_validateEntregaStepCore();
+  _focusFirstError(r.el,1);
+  return r.ok;
+}
+
+// Step "Pagamento & Agendamento": horário desejado (respeita skipHora, usado pelo fluxo
+// "Falar com atendente" quando o dia está esgotado) + valor de entrada.
+function _validatePagamentoStepCore(skipHora){
+  let ok=true;
+  const {markError,getFirstErrorEl}=_markErrorFactory();
   // Horário desejado: obrigatório e somente entre 08:00 e 19:00
   const horaRow=document.getElementById('frow-hora');
   const horaEl=document.getElementById('f-hora');
@@ -434,11 +515,28 @@ function validate(skipHora){
     if(entradaInvalida)ok=false;
   }
 
-  if(firstErrorEl){
-    firstErrorEl.scrollIntoView({behavior:'smooth',block:'center'});
-    const campo=firstErrorEl.querySelector('input,select,textarea');
-    if(campo)campo.focus({preventScroll:true});
-  }
+  return {ok,el:getFirstErrorEl()};
+}
+function validatePagamentoStep(skipHora){
+  const r=_validatePagamentoStepCore(skipHora);
+  _focusFirstError(r.el,2);
+  return r.ok;
+}
+
+// Valida o form INTEIRO de uma vez — rede de segurança final antes de enviar (chamada por
+// finalizar() e falarComAtendenteEsgotado(skipHora=true), exatamente como antes). Sempre roda
+// os 3 blocos (marca/limpa erro em TODO o form, igual ao comportamento antigo — não teria
+// como o usuário corrigir um campo de um step já visitado e ver o erro sumir se a gente parasse
+// no primeiro bloco com erro), mas só foca/rola pro PRIMEIRO campo inválido entre todos os
+// steps, na ordem Dados → Entrega → Pagamento.
+function validate(skipHora){
+  const rDados=_validateDadosStepCore();
+  const rEntrega=_validateEntregaStepCore();
+  const rPagamento=_validatePagamentoStepCore(skipHora);
+  const ok=rDados.ok&&rEntrega.ok&&rPagamento.ok;
+  if(rDados.el)_focusFirstError(rDados.el,0);
+  else if(rEntrega.el)_focusFirstError(rEntrega.el,1);
+  else if(rPagamento.el)_focusFirstError(rPagamento.el,2);
   return ok;
 }
 let _enviandoPedido=false;
