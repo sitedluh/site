@@ -19,6 +19,7 @@ function showToast(msg){
 }
 function maskPhone(input){
   let v=input.value.replace(/\D/g,'');
+  if((v.length===12||v.length===13)&&v.startsWith('55'))v=v.slice(2);
   if(v.length>11)v=v.slice(0,11);
   if(v.length<=10){ v=v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3'); }
   else{ v=v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3'); }
