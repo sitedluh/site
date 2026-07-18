@@ -418,6 +418,20 @@
   </div>
 </div>
 
+<!-- MODAL VALIDAÇÃO DO CHECKOUT (avisa bem visível o que falta preencher ao clicar Continuar) -->
+<div class="modal-overlay" id="ck-validation-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ Falta preencher</div>
+      <div class="modal-subtitle">Antes de continuar, dá uma olhada nisso:</div>
+    </div>
+    <div class="modal-body" id="ck-validation-msg"></div>
+    <div class="modal-footer">
+      <button class="modal-btn-next" onclick="closeCkValidationModal()">Entendi</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOGIN REQUIRED MODAL -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-modal">

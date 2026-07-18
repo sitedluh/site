@@ -35,6 +35,7 @@ Rows PAI (pedido) — colunas:
 | `ID Pedido` | Fórmula: `Format("PED-{1}", RowId(thisRow))` | identificador estável usado por webhook/bot |
 | `Comprovante` | Texto/Link | |
 | `Link de Pagamento` | Texto/Link | |
+| `Telegram Msg ID` | Texto | `chatId:messageId` da notificação original no tópico Pendentes — usada por `sincronizarBotaoTelegram()` pra editar essa mensagem (trocar o botão "Confirmar Estoque") quando o pedido é confirmado por fora do Telegram (admin/Coda). Sem essa coluna, a escrita/leitura falha silenciosa e a mensagem original nunca é atualizada. |
 
 Rows ITEM (mesma table) — colunas adicionais:
 

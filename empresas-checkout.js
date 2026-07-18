@@ -91,9 +91,32 @@ function ckNext(){
   if (_ckStep === 0) ok = validateDadosStep();
   else if (_ckStep === 1) ok = validateEntregaStep();
   else if (_ckStep === 2) ok = validatePagamentoStep(false);
-  if (!ok) return;
+  if (!ok) { ckShowValidationPopup(); return; }
   _ckStep = Math.min(maxIdx, _ckStep + 1);
   ckRenderStep();
+}
+
+// Cliente clicando "Continuar" sem preencher tudo (ex.: sem escolher a entrada) só tinha o
+// textinho vermelho discreto embaixo do campo — fácil de não notar. validateXStep() já marcou
+// os campos com .error e focou o primeiro (ver _focusFirstError); aqui a gente junta as
+// mensagens de erro JÁ VISÍVEIS do step atual e escancara num popup, impossível de ignorar.
+function ckShowValidationPopup(){
+  const sections = Array.from(document.querySelectorAll('#checkout-page .ck-section'));
+  const section = sections[_ckStep];
+  if (!section) return;
+  const msgs = Array.from(section.querySelectorAll('.form-row.error .form-error-msg'))
+    .map(el => el.textContent.trim())
+    .filter(Boolean);
+  const corpo = document.getElementById('ck-validation-msg');
+  if (corpo) {
+    corpo.innerHTML = msgs.length
+      ? '<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--text)">' + msgs.map(m => `<li>${m}</li>`).join('') + '</ul>'
+      : '<p style="font-size:14px;color:var(--text)">Preencha os campos obrigatórios pra continuar.</p>';
+  }
+  document.getElementById('ck-validation-overlay')?.classList.add('open');
+}
+function closeCkValidationModal(){
+  document.getElementById('ck-validation-overlay')?.classList.remove('open');
 }
 
 // Volta um step sem validar nada (voltar nunca deve ser bloqueado).
