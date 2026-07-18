@@ -276,28 +276,33 @@
       <div class="form-row"><label>Pagamento *</label>
         <div class="radio-group" id="rg-pgto">
           <div class="radio-opt active" data-val="PIX" onclick="selectRadio(this,'rg-pgto');liberarEntrega()">PIX</div>
-          <div class="radio-opt" data-val="Cartão de crédito" onclick="selectRadio(this,'rg-pgto')">Crédito</div>
-          <div class="radio-opt" data-val="Cartão de débito" onclick="selectRadio(this,'rg-pgto')">Débito</div>
+          <div class="radio-opt" data-val="Cartão de crédito" onclick="selectRadio(this,'rg-pgto');liberarEntrega()">Crédito</div>
+          <div class="radio-opt" data-val="Cartão de débito" onclick="selectRadio(this,'rg-pgto');liberarEntrega()">Débito</div>
           <div class="radio-opt" data-val="Dinheiro" onclick="selectRadio(this,'rg-pgto');forcarRetirada()">Dinheiro</div>
         </div>
       </div>
       <div class="form-row" id="row-entrada">
         <label>Valor de entrada</label>
         <div class="entrada-box">
-          <input type="range" id="f-entrada-pct" class="entrada-slider" min="50" max="100" step="5" value="50" oninput="atualizarEntrada()">
-          <div class="entrada-marks"><span>50%</span><span>75%</span><span>100%</span></div>
+          <input type="hidden" id="f-entrada-pct" value="">
+          <div class="radio-group" id="rg-entrada-pct">
+            <div class="radio-opt" data-val="50" onclick="selecionarEntradaPct(this,50)">Entrada de 50%<br><span style="font-weight:400;opacity:.75">+ restante na entrega</span></div>
+            <div class="radio-opt" data-val="100" onclick="selecionarEntradaPct(this,100)">Pagar Valor Total<br><span style="font-weight:400;opacity:.75">sem restante</span></div>
+          </div>
           <div class="entrada-vals">
             <div class="entrada-val-item">
-              <div class="lbl">Entrada agora (<span id="entrada-pct-label">50%</span>)</div>
-              <div class="val" id="entrada-val">R$ 0,00</div>
+              <div class="lbl">Entrada agora (<span id="entrada-pct-label">—</span>)</div>
+              <div class="val" id="entrada-val">—</div>
             </div>
             <div style="font-size:20px;color:var(--border)">+</div>
             <div class="entrada-val-item resto">
               <div class="lbl">Restante na entrega/retirada</div>
-              <div class="val" id="entrada-resto">R$ 0,00</div>
+              <div class="val" id="entrada-resto">—</div>
             </div>
           </div>
+          <div id="entrada-antecipada-note" style="display:none;font-size:12px;color:var(--text2);margin-top:8px;padding:6px 10px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--accent)">Pedidos pequenos com entrega em até 1 dia são pagos integralmente no ato — evita ficar com saldo a receber tão em cima da entrega.</div>
         </div>
+        <div class="form-error-msg">Escolha uma forma de pagamento da entrada acima</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="form-row">
         <div><label>Data desejada *</label><input type="date" id="f-data" style="width:100%;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-size:15px;color:var(--text);background:var(--surface2);outline:none;-webkit-appearance:none"></div>

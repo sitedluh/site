@@ -402,6 +402,7 @@ function statusCardHtml(p,status){
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
   const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
   const podePagarRetirada=status==='Confirmado — Esperando pagamento';
+  const podeMarcarEntregue=!['Entregue — Esperando restante','Finalizado','Cancelado'].includes(status);
   return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
     <div class="sc-info">
       <div class="sc-nome">${esc(p.cliente||'—')}${p.tipoCliente==='Empresa'?' <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dbeafe;color:#1e40af;vertical-align:middle">🏢 Empresa</span>':''}</div>
@@ -417,6 +418,7 @@ function statusCardHtml(p,status){
       <div class="sc-cobranca-row">
         <button class="btn-cobrar-total-adm" onclick="cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
         <button class="btn-cobrar-entrada-adm" onclick="cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
+        ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
       </div>
     </div>
     <div class="sc-actions">
@@ -513,6 +515,10 @@ function cobrarTotalAdmin(rowId){
 
 function cobrarEntradaAdmin(rowId){
   window.open(`${WORKER}/cobrar-entrada?rowId=${enc(rowId)}`,'_blank');
+}
+
+function marcarEntregueAdmin(rowId){
+  window.open(`${WORKER}/marcar-entregue?rowId=${enc(rowId)}`,'_blank');
 }
 
 async function atualizarStatus(rowId,sel){

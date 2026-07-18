@@ -108,6 +108,8 @@
   .btn-cobrar-total-adm:hover{background:#563b7e}
   .btn-cobrar-entrada-adm{background:#2563a8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
   .btn-cobrar-entrada-adm:hover{background:#1d4f87}
+  .btn-marcar-entregue-adm{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+  .btn-marcar-entregue-adm:hover{background:#0c5d56}
   .itens-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
   /* Editar itens (qualquer status) */
@@ -157,7 +159,7 @@
     .btn-cobrar-restante{width:100%;justify-content:center}
     .btn-pagar-retirada{width:100%;justify-content:center}
     .sc-cobranca-row{width:100%}
-    .btn-cobrar-total-adm,.btn-cobrar-entrada-adm{flex:1;width:100%;justify-content:center}
+    .btn-cobrar-total-adm,.btn-cobrar-entrada-adm,.btn-marcar-entregue-adm{flex:1;width:100%;justify-content:center}
   }
 
   /* ── Pedido manual (modal ➕ no header) ── */

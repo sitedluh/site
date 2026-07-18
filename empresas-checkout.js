@@ -56,10 +56,10 @@ function goCheckout(){
   initCheckoutStepObserver();
   document.body.classList.add('checkout-active');
   window.scrollTo(0,0);
-  // Reseta seleção de entrada para 50% e recalcula
+  // Nenhuma opção de entrada vem pré-selecionada — escolha obrigatória do cliente
   const fEntradaPct=document.getElementById('f-entrada-pct');
-  if(fEntradaPct)fEntradaPct.value=50;
-  document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o=>o.classList.toggle('active',o.dataset.val==='50'));
+  if(fEntradaPct)fEntradaPct.value='';
+  document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o=>o.classList.remove('active'));
   atualizarEntrada();
   loadUserData();
   goCheckoutPushState();
@@ -122,18 +122,69 @@ function selectRadio(el,groupId){document.querySelectorAll('#'+groupId+' .radio-
 
 function selecionarEntradaPct(el,pct){document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active');const f=document.getElementById('f-entrada-pct');if(f)f.value=pct;atualizarEntrada();}
 
+// Espelha no front a regra do worker (deveCobrarTotalAntecipado): pedidos com Total < R$100
+// E entrega em até 1 dia da data do pedido são cobrados o TOTAL de uma vez. Aproximação por
+// dia de calendário — o worker é a fonte de verdade real (cálculo por timestamp completo).
+function calculaCobrancaAntecipada(){
+  const items=Object.values(cart).filter(i=>i.qty>0);
+  const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
+  const taxaFrete=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
+  const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
+  const dataVal=document.getElementById('f-data')?.value;
+  if(!dataVal||total<=0||total>=100)return false;
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const dataEsc=new Date(dataVal+'T00:00:00');
+  const diffDias=Math.round((dataEsc-hoje)/86400000);
+  return diffDias>=0&&diffDias<=1;
+}
+
+// Aplica (ou desfaz) a regra "pedido pequeno + última hora". Quando ativa: força
+// "Pagar Valor Total", desabilita visualmente "Entrada de 50%" e mostra a nota. Mexe no DOM
+// direto (sem chamar atualizarEntrada/selecionarEntradaPct) pra não recursar. Não roda quando
+// paga em Dinheiro (a seção fica escondida de qualquer forma). Quando inativa, só reabilita o
+// botão de 50% — NÃO re-seleciona nada (a escolha continua manual/obrigatória).
+function aplicarCobrancaAntecipada(){
+  const grupo=document.getElementById('rg-entrada-pct');
+  const btn50=grupo?grupo.querySelector('.radio-opt[data-val="50"]'):null;
+  const btn100=grupo?grupo.querySelector('.radio-opt[data-val="100"]'):null;
+  const f=document.getElementById('f-entrada-pct');
+  const nota=document.getElementById('entrada-antecipada-note');
+  const ativa=getRadio('rg-pgto')!=='Dinheiro'&&calculaCobrancaAntecipada();
+  if(ativa){
+    if(f)f.value='100';
+    if(btn50){btn50.classList.remove('active');btn50.style.opacity='0.4';btn50.style.pointerEvents='none';btn50.title='Pedido pequeno com entrega em até 1 dia é pago integralmente no ato';}
+    if(btn100)btn100.classList.add('active');
+    if(nota)nota.style.display='block';
+  }else{
+    if(btn50){btn50.style.opacity='';btn50.style.pointerEvents='';btn50.title='';}
+    if(nota)nota.style.display='none';
+  }
+}
+
 function atualizarEntrada(){
   const items=Object.values(cart).filter(i=>i.qty>0);
   const topperBonus=items.filter(i=>topperPorProduto[i.id]?.quero).length*20;
   const taxaFrete=getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0;
   const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
-  const slider=document.getElementById('f-entrada-pct');
-  const pct=parseInt(slider?.value||50)/100;
+  // Regra "pedido pequeno + última hora" pode forçar 100% antes de calcular os valores
+  aplicarCobrancaAntecipada();
+  const raw=document.getElementById('f-entrada-pct')?.value||'';
+  const lblPct=document.getElementById('entrada-pct-label');
+  const elVal=document.getElementById('entrada-val');
+  const elResto=document.getElementById('entrada-resto');
+  // Sem escolha ainda: placeholder em vez de assumir 50% por padrão
+  if(raw!=='50'&&raw!=='100'){
+    if(lblPct)lblPct.textContent='—';
+    if(elVal)elVal.textContent='—';
+    if(elResto)elResto.textContent='—';
+    return;
+  }
+  const pct=parseInt(raw,10)/100;
   const entrada=Math.round(total*pct*100)/100;
   const resto=Math.round((total-entrada)*100)/100;
-  if(document.getElementById('entrada-pct-label'))document.getElementById('entrada-pct-label').textContent=Math.round(pct*100)+'%';
-  if(document.getElementById('entrada-val'))document.getElementById('entrada-val').textContent=fmtBRL(entrada);
-  if(document.getElementById('entrada-resto'))document.getElementById('entrada-resto').textContent=fmtBRL(Math.max(0,resto));
+  if(lblPct)lblPct.textContent=Math.round(pct*100)+'%';
+  if(elVal)elVal.textContent=fmtBRL(entrada);
+  if(elResto)elResto.textContent=fmtBRL(Math.max(0,resto));
 }
 function getRadio(groupId){const a=document.querySelector('#'+groupId+' .radio-opt.active');return a?a.dataset.val:'';}
 // Carrega os horários disponíveis (slots fixos de 15 em 15 min, 08:00–19:00) para a data
@@ -297,6 +348,18 @@ function validate(skipHora){
     if(horaInvalida)ok=false;
   }
 
+  // Valor de entrada: obrigatório escolher — EXCETO quando paga em Dinheiro (nesse caso a
+  // seção fica escondida e o cliente paga tudo na retirada, sem cobrança online).
+  const entradaRow=document.getElementById('row-entrada');
+  if(getRadio('rg-pgto')==='Dinheiro'){
+    markError(entradaRow,false);
+  }else{
+    const entradaPctVal=document.getElementById('f-entrada-pct')?.value||'';
+    const entradaInvalida=entradaPctVal!=='50'&&entradaPctVal!=='100';
+    markError(entradaRow,entradaInvalida);
+    if(entradaInvalida)ok=false;
+  }
+
   if(firstErrorEl){
     firstErrorEl.scrollIntoView({behavior:'smooth',block:'center'});
     const campo=firstErrorEl.querySelector('input,select,textarea');
@@ -412,7 +475,10 @@ async function _doFinalizar(){
     const topperBonus=Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length*20;
     const taxaFrete=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0);
     const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
-    const entradaPct=parseInt(document.getElementById('f-entrada-pct')?.value||50)/100;
+    // Dinheiro paga tudo na retirada (entrada 0, restante = total). Sem fallback pra 50%:
+    // se por algum motivo chegou vazio aqui (validação deveria ter barrado), vira 0 —
+    // nunca vira silenciosamente 50%.
+    const entradaPct=pagamento==='Dinheiro'?0:(parseInt(document.getElementById('f-entrada-pct')?.value||0,10)/100);
     const entradaVal=Math.round(total*entradaPct*100)/100;
     const restoVal=Math.round((total-entradaVal)*100)/100;
     const horaVal=document.getElementById('f-hora')?.value||'';
@@ -947,6 +1013,12 @@ function forcarRetirada() {
   });
   const note = document.getElementById('dinheiro-note');
   if (note) note.style.display = 'block';
+  // Dinheiro = paga tudo na retirada: esconde a seção de entrada e limpa a seleção
+  const rowEntrada = document.getElementById('row-entrada');
+  if (rowEntrada) rowEntrada.style.display = 'none';
+  const fEntrada = document.getElementById('f-entrada-pct');
+  if (fEntrada) fEntrada.value = '';
+  document.querySelectorAll('#rg-entrada-pct .radio-opt').forEach(o => o.classList.remove('active'));
 }
 function liberarEntrega() {
   document.querySelectorAll('#rg-entrega .radio-opt').forEach(o => {
@@ -956,6 +1028,10 @@ function liberarEntrega() {
   });
   const note = document.getElementById('dinheiro-note');
   if (note) note.style.display = 'none';
+  // Volta a mostrar a seção de entrada (sem opção pré-selecionada) e recalcula
+  const rowEntrada = document.getElementById('row-entrada');
+  if (rowEntrada) rowEntrada.style.display = '';
+  atualizarEntrada();
 }
 // ──────────────────────────────────────────────────────────
 
@@ -1068,7 +1144,7 @@ document.addEventListener('click', e=>{
   const hoje=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   dataEl.value=hoje;
   dataEl.min=hoje;
-  dataEl.addEventListener('change',()=>carregarHorarios(dataEl.value));
+  dataEl.addEventListener('change',()=>{carregarHorarios(dataEl.value);atualizarEntrada();});
   carregarHorarios(dataEl.value);
 })();
 
