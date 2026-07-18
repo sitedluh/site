@@ -81,6 +81,25 @@ O worker cria a row da fila diretamente em 2 momentos: entrada paga (webhook, `P
 
 `Dias` (select: Domingo, Segunda, Terça, Quarta, Quinta, Sexta, Sábado), `Limite` (número).
 
+### 6. `Festas Site` (2026-07, criada à parte das 5 tables originais)
+
+Table PRÓPRIA pra leads de orçamento de festa (`festas.html`), 1 row por lead — **sem** pai/subrows, sem preço, sem InfinitePay, sem Fila Cozinha, sem o ciclo de vida `STATUS_OPTS` dos pedidos normais. Substitui o reaproveitamento antigo de `Pedidos Site` (`Tipo Cliente='Festa'`) — motivo em `HISTORICO.md`.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `Cliente` | Texto | |
+| `WhatsApp` | Texto | |
+| `Tipo Evento` | Texto | |
+| `Nº Convidados` | Número | |
+| `Local Evento` | Texto | |
+| `Data Desejada` | Data | |
+| `Hora` | Hora | |
+| `Serviços Desejados` | Texto (multiline) | worker grava um serviço por linha, prefixado "• " |
+| `Observações` | Texto (multiline) | |
+| `Status` | Select: `Novo`, `Em Contato`, `Orçado`, `Fechado`, `Perdido` | default `Novo`; worker grava explícito na criação, não confia no default do Coda |
+
+Criada e escrita pelo worker via `POST /novo-orcamento-festa` (constante `TABLE_FESTAS`), chamada por `festas.js`. Notifica o grupo Telegram de Festas (`TG_CHAT_FESTAS`), sem tópicos.
+
 ## Fases
 
 1. ✅ **Tables criadas** (via IA do Coda). Atenção aos ajustes pendentes da fase 3.

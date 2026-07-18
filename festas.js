@@ -99,37 +99,24 @@ function _montarMsg(d){
   return msg;
 }
 
-/* ── Monta payload do Coda (mesma forma do /novo-pedido do cardápio) ── */
+/* ── Monta payload da rota /novo-orcamento-festa (2026-07: tabela PRÓPRIA
+   "Festas Site" no Coda, separada de Pedidos Site — 1 row por lead, sem
+   pai/subrows/preço/InfinitePay/Fila Cozinha. Antes este orçamento reaproveitava
+   Pedidos Site com Tipo Cliente='Festa'; trocado por decisão do usuário após um
+   bug de roteamento de notificação Telegram — ver HISTORICO.md). O shape abaixo
+   é basicamente o mesmo que _coletar() já devolve, só repassado 1:1. ── */
 function _montarPayload(d){
-  // Row pai na tabela Orçamentos. Colunas EXTRAS de festa exigem existir no Coda
-  // (senão a escrita falha SILENCIOSAMENTE): 'Tipo Cliente' com Option 'Festa',
-  // 'Tipo Evento', 'Nº Convidados', 'Local Evento'.
-  const paiCells=[
-    {column:'Cliente',        value:d.nome},
-    {column:'WhatsApp',       value:d.tel},
-    {column:'Tipo Cliente',   value:'Festa'},
-    {column:'Tipo Evento',    value:d.tipoEvento},
-    {column:'Nº Convidados',  value:d.numConvidados?Number(d.numConvidados)||d.numConvidados:''},
-    {column:'Local Evento',   value:d.local},
-    {column:'Endereço',       value:d.local},
-    {column:'Data Desejada',  value:d.data},
-    {column:'Hora',           value:d.hora},
-    {column:'Observações',    value:d.obs},
-    {column:'Total',          value:0},   // a orçar pelo atendente
-    {column:'Entrada',        value:0},
-    {column:'Restante',       value:0}
-  ];
-  // Serviços desejados viram subrows (itens filhos), valor 0 até o atendente orçar.
-  const subrows=d.servicos.map(s=>([
-    {column:'Produto',     value:s},
-    {column:'Quantidade',  value:1},
-    {column:'Valor Unit',  value:0},
-    {column:'Cliente',     value:d.nome},
-    {column:'WhatsApp',    value:d.tel},
-    {column:'Data Desejada',value:d.data},
-    {column:'Observações', value:d.obs}
-  ]));
-  return {pai:paiCells, subrows, tipoCliente:'Festa', taxaFrete:0};
+  return {
+    nome: d.nome,
+    tel: d.tel,
+    tipoEvento: d.tipoEvento,
+    numConvidados: d.numConvidados,
+    local: d.local,
+    data: d.data,
+    hora: d.hora,
+    servicos: d.servicos,
+    obs: d.obs
+  };
 }
 
 /* ── Envio ── */
@@ -152,7 +139,7 @@ async function enviarOrcamento(){
     const to=setTimeout(()=>ctrl.abort(),15000);
     let res,json;
     try{
-      res=await fetch(`${CONFIG.WORKER_URL}/novo-pedido`,{
+      res=await fetch(`${CONFIG.WORKER_URL}/novo-orcamento-festa`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify(_montarPayload(d)),
