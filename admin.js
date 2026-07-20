@@ -130,15 +130,50 @@ function toggleCardMenu(btn){
   if(!dd)return;
   const wasOpen=dd.classList.contains('open');
   closeAllCardMenus();
-  if(!wasOpen)dd.classList.add('open');
+  if(!wasOpen){
+    dd.classList.add('open');
+    posicionarCardMenu(btn,dd);
+  }
+}
+// .card tem overflow:hidden (cantos arredondados etc — não mexer nisso), então o dropdown
+// usa position:fixed (CSS) + posição calculada aqui em vez de depender do fluxo normal,
+// senão fica cortado quando o card está perto do fim da lista/tela.
+function posicionarCardMenu(btn,dd){
+  const rect=btn.getBoundingClientRect();
+  const GAP=6;
+  // altura estimada antes de medir (dropdown acabou de ganhar .open) — mede de fato em seguida
+  const ddH=dd.offsetHeight||220;
+  const ddW=dd.offsetWidth||220;
+  const spaceBelow=window.innerHeight-rect.bottom;
+  const abrePraCima=spaceBelow<ddH+GAP&&rect.top>spaceBelow;
+  if(abrePraCima){
+    dd.style.top='';
+    dd.style.bottom=(window.innerHeight-rect.top+GAP)+'px';
+  }else{
+    dd.style.bottom='';
+    dd.style.top=(rect.bottom+GAP)+'px';
+  }
+  let left=rect.right-ddW;
+  if(left<GAP)left=GAP;
+  const maxLeft=window.innerWidth-ddW-GAP;
+  if(left>maxLeft)left=Math.max(GAP,maxLeft);
+  dd.style.left=left+'px';
+  dd.style.right='';
 }
 function closeAllCardMenus(){
-  document.querySelectorAll('.card-menu-dropdown.open').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.card-menu-dropdown.open').forEach(el=>{
+    el.classList.remove('open');
+    el.style.top='';el.style.bottom='';el.style.left='';el.style.right='';
+  });
 }
 // Clique fora de qualquer menu aberto fecha todos (padrão dropdown/kebab menu).
 document.addEventListener('click',(e)=>{
   if(!e.target.closest('.card-menu-wrap'))closeAllCardMenus();
 });
+// Posição é calculada só na abertura (fixed) — scroll/resize desalinhariam o dropdown
+// do botão, então é mais simples fechar do que recalcular ao vivo.
+window.addEventListener('resize',closeAllCardMenus);
+window.addEventListener('scroll',closeAllCardMenus,true);
 
 function cardPedido(p){
   const id=p.idPedido;
