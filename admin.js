@@ -115,6 +115,26 @@ function trocaProduto(sel,id){
 
 const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
 
+// ── MENU "MAIS AÇÕES" (☰) ────────────────────────────────────────────────────
+// Card com muitos botões (Confirmar, Editar itens, Avisar cliente, Cobrar, Apagar...)
+// ficava poluído — só "Detalhes" e o ☰ ficam sempre visíveis; o resto mora aqui dentro.
+const ICON_MENU='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>';
+
+function toggleCardMenu(btn){
+  const dd=btn.closest('.card-menu-wrap')?.querySelector('.card-menu-dropdown');
+  if(!dd)return;
+  const wasOpen=dd.classList.contains('open');
+  closeAllCardMenus();
+  if(!wasOpen)dd.classList.add('open');
+}
+function closeAllCardMenus(){
+  document.querySelectorAll('.card-menu-dropdown.open').forEach(el=>el.classList.remove('open'));
+}
+// Clique fora de qualquer menu aberto fecha todos (padrão dropdown/kebab menu).
+document.addEventListener('click',(e)=>{
+  if(!e.target.closest('.card-menu-wrap'))closeAllCardMenus();
+});
+
 function cardPedido(p){
   const id=p.idPedido;
   const st=p.status||'Aguardando confirmação';
@@ -188,22 +208,27 @@ function cardPedido(p){
       </div>
     </div>
     <div class="card-footer">
-      <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId||'')}','${esc(p.cliente)}',this)">
-        🗑️ Apagar
-      </button>
-      <button class="btn-editar-itens" onclick="abrirEditItens('${esc(p.rowId||'')}')">
-        ✏️ Editar itens
-      </button>
       <button class="btn-detalhes" onclick="abrirDetalhesPedido('${esc(p.rowId||'')}')">
         📋 Detalhes/Imprimir
       </button>
-      <button onclick="notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
-        📱 Avisar cliente
-      </button>
-      <button class="btn-confirmar" onclick="confirmarEstoque('${esc(id)}')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Confirmar e cobrar
-      </button>
+      <div class="card-menu-wrap">
+        <button class="card-menu-btn" onclick="toggleCardMenu(this)" title="Mais ações">${ICON_MENU}</button>
+        <div class="card-menu-dropdown">
+          <button class="btn-confirmar" onclick="closeAllCardMenus();confirmarEstoque('${esc(id)}')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Confirmar e cobrar
+          </button>
+          <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId||'')}')">
+            ✏️ Editar itens
+          </button>
+          <button onclick="closeAllCardMenus();notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
+            📱 Avisar cliente
+          </button>
+          <button class="btn-apagar" onclick="closeAllCardMenus();abrirConfirmApagar('${esc(p.rowId||'')}','${esc(p.cliente)}',this)">
+            🗑️ Apagar
+          </button>
+        </div>
+      </div>
     </div>
   </div>`;
 }
@@ -519,21 +544,24 @@ function statusCardHtml(p,status){
         <span class="sc-badge ${cls}">${esc(status)}</span>
         ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${psEntregue?'#d1fae5':'#fef3c7'};color:${psEntregue?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
       </div>
-      ${podeRestante?`<button class="btn-cobrar-restante" onclick="cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
-      ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
-      <div class="sc-cobranca-row">
-        <button class="btn-cobrar-total-adm" onclick="cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
-        <button class="btn-cobrar-entrada-adm" onclick="cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
-        ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
-      </div>
     </div>
     <div class="sc-actions">
       ${buildStatusSelect(p.rowId,status)}
       <div class="sc-actions-row">
-        <button class="btn-editar-itens" onclick="abrirEditItens('${esc(p.rowId)}')">✏️ Itens</button>
         <button class="btn-detalhes" onclick="abrirDetalhesPedido('${esc(p.rowId)}')">📋 Detalhes/Imprimir</button>
-        ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
-        <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
+        <div class="card-menu-wrap">
+          <button class="card-menu-btn" onclick="toggleCardMenu(this)" title="Mais ações">${ICON_MENU}</button>
+          <div class="card-menu-dropdown">
+            ${podeRestante?`<button class="btn-cobrar-restante" onclick="closeAllCardMenus();cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
+            ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="closeAllCardMenus();abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
+            <button class="btn-cobrar-total-adm" onclick="closeAllCardMenus();cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
+            <button class="btn-cobrar-entrada-adm" onclick="closeAllCardMenus();cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
+            ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="closeAllCardMenus();marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
+            <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId)}')">✏️ Editar itens</button>
+            ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="closeAllCardMenus();abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
+            <button class="btn-apagar" onclick="closeAllCardMenus();abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>`;
