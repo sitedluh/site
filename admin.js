@@ -38,6 +38,10 @@ let _produtosMap  = {};
 // itens do modal "Detalhes/Imprimir" por categoria (ver agruparItensPorTipo()).
 let _produtosTipoPorId   = {};
 let _produtosTipoPorNome = {};
+// nome → id do produto — usado pra recuperar o Row ID Produto quando o admin troca/adiciona
+// um item pelo select (que só carrega o NOME), assim a categoria continua batendo certo
+// depois de editado (ver agruparItensPorTipo/salvarDetalhesPedido).
+let _produtosIdPorNome = {};
 
 // Carrega o catálogo de produtos (usado nos selects) e recarrega os pedidos.
 // A lista de pedidos em si vem SEMPRE de carregarStatus() — fetch ÚNICO que
@@ -55,6 +59,7 @@ async function carregarPedidos(){
     _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
     _produtosTipoPorId=Object.fromEntries(lista.filter(p=>p.tipo).map(p=>[p.id,p.tipo]));
     _produtosTipoPorNome=Object.fromEntries(lista.filter(p=>p.tipo).map(p=>[String(p.nome||'').toLowerCase(),p.tipo]));
+    _produtosIdPorNome=Object.fromEntries(lista.map(p=>[String(p.nome||'').toLowerCase(),p.id]));
     const dl=document.getElementById('produtos-datalist');
     if(dl)dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
     _estoqueSig=null; // refresh manual força re-render da aba Estoque
@@ -108,9 +113,9 @@ function trocaProduto(sel,id){
   const unitInput=row.querySelector('.inp-unit');
   console.log('[trocaProduto] unitInput encontrado:',!!unitInput);
   if(unitInput)unitInput.value=preco;
-  // id 'edit' = modal "Editar itens"; 'manual' = modal "Pedido manual";
-  // qualquer outro id é card da aba Estoque (tbody itens-body-<id>).
-  if(id==='edit'){recalcEdit();}else if(id==='manual'){recalcManual();}else{recalcCard(id);}
+  // id 'edit' = modal "Editar itens"; 'manual' = modal "Pedido manual"; 'detalhe' = modal
+  // "Detalhes" (edição completa); qualquer outro id é card da aba Estoque (tbody itens-body-<id>).
+  if(id==='edit'){recalcEdit();}else if(id==='manual'){recalcManual();}else if(id==='detalhe'){recalcDetalheItens();}else{recalcCard(id);}
 }
 
 const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
@@ -295,74 +300,322 @@ function agruparItensPorTipo(itens){
 }
 
 let _detalhesRowId=null;
+let _detalhesSnap=null; // estado no momento de abrir — usado só pra montar o resumo de alterações
+
+function maskPhoneAdmin(input){
+  let v=input.value.replace(/\D/g,'');
+  if((v.length===12||v.length===13)&&v.startsWith('55'))v=v.slice(2);
+  if(v.length>11)v=v.slice(0,11);
+  if(v.length<=10){v=v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');}
+  else{v=v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');}
+  input.value=v.replace(/-$/,'');
+}
 
 function abrirDetalhesPedido(rowId){
   const p=_pedidosCache[rowId];
   if(!p){showToast('Pedido não encontrado — atualize a lista');return;}
   _detalhesRowId=rowId;
+  const itensEditaveis=(p.itens||[]).filter(i=>!String(i.produto||'').startsWith('🛵'));
   const taxaItem=(p.itens||[]).find(i=>String(i.produto||'').startsWith('🛵'));
-  const grupos=agruparItensPorTipo(p.itens);
-  const itensHtml=grupos.map(g=>`
-    <div class="detalhes-cat-title">${esc(g.tipo)}</div>
-    ${g.itens.map(i=>`<div class="detalhes-item-row"><span><span class="qty">${i.quantidade}x</span>${esc(i.produto)}${i.recheios?` <span style="color:var(--text3);font-size:12px">(${esc(i.recheios)})</span>`:''}</span><span>${fmtBRL(i.valorItem)}</span></div>`).join('')}
-  `).join('');
-  const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
-  const restante=p.restante||Math.round((total-(p.valorPago||0))*100)/100;
+  _detalhesSnap={
+    cliente:p.cliente||'',telefone:p.telefone||'',entrega:p.entrega||'',endereco:p.endereco||'',
+    pagamento:p.pagamento||'',data:p.data||'',hora:p.hora||'',obs:p.obs||'',
+    taxa:taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0):0,
+    itens:itensEditaveis.map(i=>({produto:String(i.produto||'').trim(),quantidade:Number(i.quantidade||1),valorUnit:Number(i.valorUnit||0)})),
+  };
+  const isEntrega=p.entrega==='Entrega em endereço';
+  const pagamentosPadrao=['PIX','Cartão de crédito','Cartão de débito','Dinheiro'];
+  const pagamentoAtual=p.pagamento||'';
   document.getElementById('detalhes-body').innerHTML=`
-    <div class="detalhes-info-row"><span>Cliente</span><b>${esc(p.cliente||'—')}${p.tipoCliente==='Empresa'?' 🏢 Empresa':''}</b></div>
-    <div class="detalhes-info-row"><span>WhatsApp</span><b>${esc(p.telefone||'—')}</b></div>
-    <div class="detalhes-info-row"><span>Entrega</span><b>${esc(p.entrega||'—')}</b></div>
-    ${p.endereco?`<div class="detalhes-info-row"><span>Endereço</span><b>${esc(p.endereco)}</b></div>`:''}
-    <div class="detalhes-info-row"><span>Data/Hora</span><b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
-    <div class="detalhes-info-row"><span>Pagamento</span><b>${esc(p.pagamento||'—')}</b></div>
-    <div class="detalhes-info-row"><span>Status</span><b>${esc(p.status||'—')}</b></div>
-    ${p.obs?`<div class="detalhes-info-row"><span>Observações</span><b>${esc(p.obs)}</b></div>`:''}
-    ${itensHtml}
-    ${taxaItem?`<div class="detalhes-item-row"><span>🛵 Taxa de entrega</span><span>${fmtBRL(taxaItem.valorItem)}</span></div>`:''}
+    <div class="manual-grid">
+      <label>Cliente<input id="dt-cliente" value="${esc(p.cliente||'')}"></label>
+      <label>WhatsApp<input id="dt-tel" value="${esc(p.telefone||'')}" oninput="maskPhoneAdmin(this)"></label>
+      <label>Entrega
+        <select id="dt-entrega" onchange="_dtToggleEndereco()">
+          <option value="Retirada no local" ${!isEntrega?'selected':''}>🏪 Retirada no local</option>
+          <option value="Entrega em endereço" ${isEntrega?'selected':''}>🛵 Entrega em endereço</option>
+        </select>
+      </label>
+      <label id="dt-end-wrap" style="display:${isEntrega?'flex':'none'};grid-column:1/-1">Endereço<input id="dt-endereco" value="${esc(p.endereco||'')}"></label>
+      <label>Pagamento
+        <select id="dt-pagamento">
+          ${pagamentosPadrao.map(op=>`<option ${pagamentoAtual===op?'selected':''}>${op}</option>`).join('')}
+          ${pagamentoAtual&&!pagamentosPadrao.includes(pagamentoAtual)?`<option selected>${esc(pagamentoAtual)}</option>`:''}
+        </select>
+      </label>
+      <label>Data<input id="dt-data" type="date" value="${esc(p.data||'')}"></label>
+      <label>Hora<input id="dt-hora" type="time" value="${esc(p.hora||'')}"></label>
+    </div>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px">Observações
+      <textarea id="dt-obs" rows="2" style="border:1px solid #e8e0d8;border-radius:6px;padding:7px 8px;font-size:13px;font-family:inherit;background:#fff;color:var(--text);resize:vertical">${esc(p.obs||'')}</textarea>
+    </label>
+    <div class="itens-titulo" style="margin:4px 0 6px">Itens</div>
+    <div class="itens-table-wrap">
+      <table style="width:100%;border-collapse:collapse">
+        <tbody id="detalhes-itens-body"></tbody>
+      </table>
+    </div>
+    <button type="button" onclick="addDetalheItem()" class="edit-add-btn">+ Adicionar item</button>
+    <div class="edit-frete-row">
+      <label for="dt-frete">🛵 Taxa de entrega (R$)</label>
+      <input id="dt-frete" type="number" min="0" step="0.01" value="${_detalhesSnap.taxa.toFixed(2)}" oninput="recalcDetalheItens()">
+    </div>
     <div class="detalhes-totais">
       <div>Pago: <b>${fmtBRL(p.valorPago||0)}</b></div>
-      ${restante>0?`<div>Restante: <b>${fmtBRL(restante)}</b></div>`:''}
-      <div class="tot-final">Total: ${fmtBRL(total)}</div>
+      <div class="tot-final">Total: <span id="detalhes-total-live">${fmtBRL(p.total||0)}</span></div>
     </div>
   `;
+  // Cabeçalho de categoria + linhas do grupo, tudo na mesma tbody (mantém o agrupamento
+  // visual já usado no resto do admin/painel, mas agora com botão de editar por item).
+  const grupos=agruparItensPorTipo(itensEditaveis);
+  const tbody=document.getElementById('detalhes-itens-body');
+  grupos.forEach(g=>{
+    const trCat=document.createElement('tr');
+    trCat.innerHTML=`<td colspan="5" style="padding-top:12px"><div class="detalhes-cat-title" style="margin:0 0 4px">${esc(g.tipo)}</div></td>`;
+    tbody.appendChild(trCat);
+    g.itens.forEach(i=>tbody.appendChild(buildDetalheItemRow(i)));
+  });
+  if(!itensEditaveis.length)addDetalheItem();
+  _dtToggleEndereco();
   document.getElementById('detalhes-overlay').classList.add('open');
+}
+
+function _dtToggleEndereco(){
+  const sel=document.getElementById('dt-entrega');
+  const wrap=document.getElementById('dt-end-wrap');
+  if(sel&&wrap)wrap.style.display=sel.value==='Entrega em endereço'?'flex':'none';
+}
+
+// Cada linha nasce em modo "visualização" (texto + preço + ✏️) — só vira um formulário
+// editável (select de produto/qtd/valor) quando o ✏️ é clicado. É o "botão de edição por
+// item": dá pra conferir o pedido inteiro rapidinho e editar só o que precisar.
+function buildDetalheItemRow(i){
+  const tr=document.createElement('tr');
+  tr.dataset.produto=(i&&i.produto)||'';
+  tr.dataset.qty=i?(i.quantidade||1):1;
+  tr.dataset.unit=i?Number(i.valorUnit||0):0;
+  tr.dataset.recheios=(i&&i.recheios)||'';
+  tr.dataset.topoinfo=(i&&i.topoInfo)||'';
+  tr.style.borderTop='1px solid var(--border)';
+  renderDetalheItemView(tr);
+  return tr;
+}
+
+function renderDetalheItemView(tr){
+  const qty=tr.dataset.qty,unit=Number(tr.dataset.unit)||0,nome=tr.dataset.produto,rech=tr.dataset.recheios;
+  const sub=Math.round((parseFloat(qty)||0)*unit*100)/100;
+  tr.innerHTML=`
+    <td colspan="3" style="padding:6px 0;font-size:13.5px">
+      <span style="color:var(--text3);margin-right:6px">${qty}x</span>${esc(nome)}${rech?` <span style="color:var(--text3);font-size:12px">(${esc(rech)})</span>`:''}
+    </td>
+    <td style="padding:6px 0;text-align:right;font-size:13px;font-weight:600;white-space:nowrap">${fmtBRL(sub)}</td>
+    <td style="padding:6px 0 6px 8px;text-align:right">
+      <button type="button" onclick="renderDetalheItemEdit(this.closest('tr'))" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0" title="Editar item">✏️</button>
+    </td>`;
+}
+
+function renderDetalheItemEdit(tr){
+  tr.innerHTML=`
+    <td style="padding:6px 0">${buildProdutoSelect('detalhe',tr.dataset.produto)}</td>
+    <td style="padding:6px 4px;text-align:center"><input class="inp-qty" type="number" value="${tr.dataset.qty}" min="0.1" step="0.1" oninput="recalcDetalheItens()" style="${IS}width:52px;text-align:center"></td>
+    <td style="padding:6px 4px;text-align:center"><input class="inp-unit" type="number" value="${Number(tr.dataset.unit).toFixed(2)}" min="0" step="0.01" oninput="recalcDetalheItens()" style="${IS}width:72px;text-align:center"></td>
+    <td class="td-sub" style="padding:6px 0 6px 4px;text-align:right;font-size:13px;font-weight:600">${fmtBRL((parseFloat(tr.dataset.qty)||0)*(Number(tr.dataset.unit)||0))}</td>
+    <td style="padding:6px 0 6px 8px"><button type="button" onclick="this.closest('tr').remove();recalcDetalheItens()" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0" title="Remover">×</button></td>`;
+  recalcDetalheItens();
+}
+
+function addDetalheItem(){
+  const tbody=document.getElementById('detalhes-itens-body');
+  if(!tbody)return;
+  const tr=buildDetalheItemRow(null);
+  renderDetalheItemEdit(tr); // item novo já nasce editável — não faz sentido "ver" um item vazio
+  tbody.appendChild(tr);
+}
+
+function recalcDetalheItens(){
+  let total=0;
+  document.querySelectorAll('#detalhes-itens-body tr').forEach(tr=>{
+    const qtyInp=tr.querySelector('.inp-qty'),unitInp=tr.querySelector('.inp-unit');
+    let qty,unit;
+    if(qtyInp&&unitInp){
+      qty=parseFloat(qtyInp.value)||0;unit=parseFloat(unitInp.value)||0;
+      const td=tr.querySelector('.td-sub');
+      if(td)td.textContent=fmtBRL(Math.round(qty*unit*100)/100);
+    }else if(tr.dataset.qty!==undefined){
+      qty=parseFloat(tr.dataset.qty)||0;unit=parseFloat(tr.dataset.unit)||0;
+    }else{
+      return; // linha de cabeçalho de categoria — sem qty/unit
+    }
+    total+=Math.round(qty*unit*100)/100;
+  });
+  total+=parseFloat(document.getElementById('dt-frete')?.value)||0;
+  const el=document.getElementById('detalhes-total-live');
+  if(el)el.textContent=fmtBRL(Math.round(total*100)/100);
 }
 
 function closeDetalhesModal(){
   document.getElementById('detalhes-overlay').classList.remove('open');
-  _detalhesRowId=null;
+  _detalhesRowId=null;_detalhesSnap=null;
 }
 
-// Recibo térmico — mesmo layout/CSS (#print-area, classes p-*) do painel-pedidos.js,
-// só trocando a fonte dos dados (aqui vem do /pedidos-pendentes já em cache) e agrupando
-// os itens por categoria em vez de listar em ordem de inserção.
-function imprimirDetalhesPedido(){
+// Lê o estado ATUAL do modal (campos do pedido + itens — linha em modo visualização usa o
+// dataset, linha em edição usa os inputs) num objeto normalizado. Usado tanto por
+// salvarDetalhesPedido() quanto por imprimirDetalhesPedido() — a impressão sempre reflete
+// o que está na tela, mesmo com edições ainda não salvas.
+function _coletarEstadoDetalhes(){
+  const itens=[];
+  document.querySelectorAll('#detalhes-itens-body tr').forEach(tr=>{
+    const qtyInp=tr.querySelector('.inp-qty'),unitInp=tr.querySelector('.inp-unit');
+    let produto,qty,unit,recheios,topoInfo;
+    if(qtyInp&&unitInp){
+      const sel=tr.querySelector('select,.inp-nome');
+      produto=sel?String(sel.value||'').trim():'';
+      if(produto==='__outro__')produto='';
+      qty=parseFloat(qtyInp.value)||0;
+      unit=parseFloat(unitInp.value)||0;
+      recheios=tr.dataset.recheios||'';
+      topoInfo=tr.dataset.topoinfo||'';
+    }else if(tr.dataset.produto!==undefined){
+      produto=tr.dataset.produto;
+      qty=parseFloat(tr.dataset.qty)||0;
+      unit=parseFloat(tr.dataset.unit)||0;
+      recheios=tr.dataset.recheios||'';
+      topoInfo=tr.dataset.topoinfo||'';
+    }else{
+      return; // cabeçalho de categoria
+    }
+    if(!produto||qty<=0)return;
+    const nomeBusca=String(produto).replace(/^🎀 Topper — /,'').toLowerCase();
+    itens.push({
+      produto,quantidade:qty,valorUnit:unit,valorItem:Math.round(qty*unit*100)/100,
+      recheios,topoInfo,rowIdProduto:_produtosIdPorNome[nomeBusca]||'',
+    });
+  });
+  const taxa=Math.max(0,parseFloat(document.getElementById('dt-frete')?.value)||0);
+  const total=Math.round((itens.reduce((s,i)=>s+i.valorItem,0)+taxa)*100)/100;
+  return{
+    cliente:(document.getElementById('dt-cliente')?.value||'').trim(),
+    telefone:(document.getElementById('dt-tel')?.value||'').trim(),
+    entrega:document.getElementById('dt-entrega')?.value||'',
+    endereco:(document.getElementById('dt-endereco')?.value||'').trim(),
+    pagamento:document.getElementById('dt-pagamento')?.value||'',
+    data:document.getElementById('dt-data')?.value||'',
+    hora:document.getElementById('dt-hora')?.value||'',
+    obs:(document.getElementById('dt-obs')?.value||'').trim(),
+    itens,taxa,total,
+  };
+}
+
+// Resumo legível de tudo que mudou (campos do pedido + itens/taxa) — vira o texto do
+// aviso Telegram/cliente. Comparação de itens é por descrição ordenada (simples, mas
+// suficiente pra decidir SE mudou algo e mostrar antes/depois pro atendente conferir).
+function _montarResumoDetalhes(estado){
+  const partes=[];
+  const campos=[
+    ['cliente','Cliente'],['telefone','WhatsApp'],['entrega','Entrega'],['endereco','Endereço'],
+    ['pagamento','Pagamento'],['data','Data'],['hora','Hora'],['obs','Observações'],
+  ];
+  campos.forEach(([chave,rotulo])=>{
+    const antes=String(_detalhesSnap[chave]||'').trim();
+    const depois=String(estado[chave]||'').trim();
+    if(antes!==depois)partes.push(`${rotulo}: ${antes||'—'} → ${depois||'—'}`);
+  });
+  const descreve=i=>`${_fmtQty(i.quantidade)}x ${i.produto} (${fmtBRL(i.valorUnit)})`;
+  const itensAntes=(_detalhesSnap.itens||[]).map(descreve).sort().join(' | ');
+  const itensDepois=estado.itens.map(descreve).sort().join(' | ');
+  if(itensAntes!==itensDepois)partes.push(`Itens:\nAntes: ${itensAntes||'—'}\nDepois: ${itensDepois||'—'}`);
+  if(Math.round(Number(_detalhesSnap.taxa)*100)!==Math.round(Number(estado.taxa)*100)){
+    partes.push(`🛵 Taxa de entrega: ${fmtBRL(_detalhesSnap.taxa)} → ${fmtBRL(estado.taxa)}`);
+  }
+  if(!partes.length)return '';
+  return `Pedido de ${estado.cliente||_detalhesSnap.cliente||'—'}\n`+partes.join('\n');
+}
+
+async function salvarDetalhesPedido(){
   const p=_pedidosCache[_detalhesRowId];
-  if(!p)return;
-  const taxaItem=(p.itens||[]).find(i=>String(i.produto||'').startsWith('🛵'));
-  const grupos=agruparItensPorTipo(p.itens);
+  if(!p){closeDetalhesModal();return;}
+  const estado=_coletarEstadoDetalhes();
+  if(!estado.itens.length){showToast('O pedido precisa de pelo menos 1 item.');return;}
+  if(!estado.cliente){showToast('Informe o nome do cliente.');return;}
+  const alteracoesResumo=_montarResumoDetalhes(estado);
+  const notificar=!!alteracoesResumo;
+  const ctx=[
+    {column:'Cliente',value:estado.cliente},
+    {column:'WhatsApp',value:estado.telefone},
+    {column:'Entrega',value:estado.entrega},
+    {column:'Pagamento',value:estado.pagamento},
+    {column:'Data Desejada',value:estado.data},
+    {column:'Hora',value:estado.hora},
+  ];
+  const subrows=estado.itens.map(i=>[
+    {column:'Produto',value:i.produto},
+    {column:'Quantidade',value:i.quantidade},
+    {column:'Valor Unit',value:i.valorUnit},
+    ...(i.rowIdProduto?[{column:'Row ID Produto',value:i.rowIdProduto}]:[]),
+    ...(i.recheios?[{column:'Recheios',value:i.recheios}]:[]),
+    ...(i.topoInfo?[{column:'Topo Info',value:i.topoInfo}]:[]),
+    ...ctx,
+  ]);
+  const pai=[
+    {column:'Total',value:estado.total},
+    {column:'Cliente',value:estado.cliente},
+    {column:'WhatsApp',value:estado.telefone},
+    {column:'Entrega',value:estado.entrega},
+    {column:'Endereço',value:estado.entrega==='Entrega em endereço'?estado.endereco:''},
+    {column:'Pagamento',value:estado.pagamento},
+    {column:'Data Desejada',value:estado.data},
+    {column:'Hora',value:estado.hora},
+    {column:'Observações',value:estado.obs},
+  ];
+  const btn=document.getElementById('detalhes-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  try{
+    const res=await fetch(`${WORKER}/editar-pedido`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({paiId:_detalhesRowId,pai,subrows,taxaFrete:estado.taxa,origem:'admin',alteracoesResumo,notificar})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao salvar no Coda');
+    const novoTotal=(d.novoTotal!=null)?d.novoTotal:estado.total;
+    const aviso=notificar?' · cliente e Telegram avisados':' · nenhuma alteração a comunicar';
+    showToast(`Pedido atualizado ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}${aviso}`);
+    closeDetalhesModal();
+    _estoqueSig=null;
+    carregarStatus();
+  }catch(e){
+    showToast('Erro ao salvar: '+e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='💾 Salvar alterações';}
+  }
+}
+
+// Recibo térmico — mesmo layout/CSS (#print-area, classes p-*) do painel-pedidos.js.
+// Lê do estado ATUAL do modal (não do cache) — reflete edições ainda não salvas.
+function imprimirDetalhesPedido(){
+  const estado=_coletarEstadoDetalhes();
+  if(!estado.itens.length)return;
+  const grupos=agruparItensPorTipo(estado.itens);
   const itensHtml=grupos.map(g=>`
     <div class="p-section">${esc(g.tipo)}</div>
     ${g.itens.map(i=>`<div class="p-item">${i.quantidade}x ${esc(i.produto)}${i.recheios?` (${esc(i.recheios)})`:''}</div>`).join('')}
   `).join('');
-  const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
-  const isEntrega=String(p.entrega||'').toLowerCase().includes('entrega');
+  const isEntrega=estado.entrega==='Entrega em endereço';
   document.getElementById('print-area').innerHTML=`
     <div class="p-logo">D'Luh Festas 🍰</div>
     <div class="p-sub">Salgados &amp; Doces para festas</div>
     <div class="p-div"></div>
-    <div class="p-row"><span class="p-label">Cliente:</span><span>${esc(p.cliente)}</span></div>
-    <div class="p-row"><span class="p-label">Fone:</span><span>${esc(p.telefone||'—')}</span></div>
+    <div class="p-row"><span class="p-label">Cliente:</span><span>${esc(estado.cliente)}</span></div>
+    <div class="p-row"><span class="p-label">Fone:</span><span>${esc(estado.telefone||'—')}</span></div>
     <div class="p-row"><span class="p-label">Tipo:</span><span>${isEntrega?'🛵 ENTREGA':'🛍️ RETIRADA'}</span></div>
-    ${p.endereco?`<div class="p-row"><span class="p-label">Endereço:</span><span>${esc(p.endereco)}</span></div>`:''}
-    <div class="p-row"><span class="p-label">Data/Hora:</span><span>${fmtData(p.data)}${p.hora?' '+esc(p.hora):''}</span></div>
+    ${estado.endereco?`<div class="p-row"><span class="p-label">Endereço:</span><span>${esc(estado.endereco)}</span></div>`:''}
+    <div class="p-row"><span class="p-label">Data/Hora:</span><span>${fmtData(estado.data)}${estado.hora?' '+esc(estado.hora):''}</span></div>
     <div class="p-div"></div>
     <div class="p-section">PEDIDO:</div>
     ${itensHtml}
-    ${taxaItem?`<div class="p-item">🛵 Taxa de entrega</div>`:''}
+    ${estado.taxa>0?`<div class="p-item">🛵 Taxa de entrega</div>`:''}
     <div class="p-div"></div>
-    <div class="p-total">Total: ${esc(fmtBRL(total))}</div>
-    ${p.obs?`<div class="p-div"></div><div class="p-item">Obs: ${esc(p.obs)}</div>`:''}
+    <div class="p-total">Total: ${esc(fmtBRL(estado.total))}</div>
+    ${estado.obs?`<div class="p-div"></div><div class="p-item">Obs: ${esc(estado.obs)}</div>`:''}
     <div class="p-div"></div>
     <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
   `;

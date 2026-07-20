@@ -154,14 +154,16 @@
   </div>
 </div>
 
-<!-- DETALHES COMPLETOS DO PEDIDO + IMPRIMIR (itens agrupados por categoria) -->
+<!-- DETALHES COMPLETOS DO PEDIDO — editar tudo (produtos + dados) + imprimir -->
 <div class="confirm-overlay" id="detalhes-overlay">
   <div class="edit-box">
     <div class="edit-title">📋 Detalhes do pedido</div>
+    <div class="edit-sub">Edite o que precisar — produtos, quantidades, valores, dados do cliente, entrega, pagamento, data/hora e observações.</div>
     <div id="detalhes-body"></div>
     <div class="confirm-actions" style="margin-top:16px">
       <button class="confirm-btn cancel" onclick="closeDetalhesModal()">Fechar</button>
-      <button class="confirm-btn ok" id="detalhes-print-btn" onclick="imprimirDetalhesPedido()">🖨️ Imprimir</button>
+      <button class="confirm-btn cancel" id="detalhes-print-btn" onclick="imprimirDetalhesPedido()">🖨️ Imprimir</button>
+      <button class="confirm-btn ok" id="detalhes-save-btn" onclick="salvarDetalhesPedido()">💾 Salvar</button>
     </div>
   </div>
 </div>
