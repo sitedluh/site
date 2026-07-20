@@ -264,6 +264,7 @@ let _sbPollPaiId=null; // ID (Coda) do pedido recém-criado — rastreia ESSE pe
 let _sbPollNaoAchou=0; // tentativas seguidas sem achar _sbPollPaiId na listagem (consistência eventual do Coda)
 let _sbPollLinkPagamento=null; // link de cobrança já avisado ao cliente (persistido pra reconstruir o botão "Pagar agora" após reload)
 let _sbPollEntradaValor=null; // valor cobrado já avisado ao cliente (idem)
+let _sbPollRestante=null; // restante conhecido do pedido — usado pra não reoferecer "Pagar agora" quando já não há mais nada a pagar (persistido pra sobreviver a reload)
 let _sbPollSemLink=0; // ciclos seguidos em "Confirmado" sem Link de Pagamento (espera o link ser gerado)
 let _sbPollAvisoSemLink=false; // já avisou a confirmação sem link (persistido pra não repetir após reload)
 
@@ -289,6 +290,7 @@ function sbSalvarSessao(){
       status:_sbPollUltimoStatus,
       linkPagamento:_sbPollLinkPagamento,
       entrada:_sbPollEntradaValor,
+      restante:_sbPollRestante,
       avisoSemLink:_sbPollAvisoSemLink,
       ts:Date.now(),
       mensagens,
@@ -339,7 +341,7 @@ function sbRestaurarHistorico(){
 function sbLimparSessao(){
   try{localStorage.removeItem(SB_SESSAO_KEY);}catch(_){}
   sbLimparHistorico();
-  _sbPollTel=null;_sbPollPaiId=null;_sbPollWaUrl=null;_sbPollUltimoStatus=null;_sbPollLinkPagamento=null;_sbPollEntradaValor=null;
+  _sbPollTel=null;_sbPollPaiId=null;_sbPollWaUrl=null;_sbPollUltimoStatus=null;_sbPollLinkPagamento=null;_sbPollEntradaValor=null;_sbPollRestante=null;
 }
 function sbRestaurarSessao(){
   let sessao=null;
@@ -360,7 +362,10 @@ function sbRestaurarSessao(){
   msgs.innerHTML='';
   sessao.mensagens.forEach(m=>sbAddMsg(m.quem,m.texto));
   msgs.dataset.iniciado='1';
-  if(sessao.status==='Confirmado — Esperando pagamento'&&sessao.linkPagamento){
+  // sessao.restante pode não existir em sessões salvas antes desse campo existir —
+  // nesse caso (undefined) não bloqueia, pra não quebrar sessões antigas em curso;
+  // só bloqueia quando sabemos explicitamente que não falta mais nada (restante<=0).
+  if(sessao.status==='Confirmado — Esperando pagamento'&&sessao.linkPagamento&&(sessao.restante===undefined||sessao.restante===null||sessao.restante>0)){
     sbBotoes([
       {label:'💳 Pagar agora',onClick:()=>window.open(sessao.linkPagamento,'_blank')},
       {label:'🛵 Pagar tudo na entrega',onClick:()=>sbPagarNaEntrega()},
@@ -385,6 +390,7 @@ function sbRestaurarSessao(){
     :(sessao.status||'Aguardando confirmação');
   _sbPollLinkPagamento=sessao.linkPagamento||null;
   _sbPollEntradaValor=sessao.entrada||null;
+  _sbPollRestante=(sessao.restante===undefined)?null:sessao.restante;
   _sbPollAvisoSemLink=!!sessao.avisoSemLink;
   _sbPollSemLink=0;
   _sbPollFalhas=0;
@@ -404,6 +410,7 @@ function sbIniciarAcompanhamento(tel,waUrl,paiId){
   _sbPollNaoAchou=0;
   _sbPollLinkPagamento=null;
   _sbPollEntradaValor=null;
+  _sbPollRestante=null;
   _sbPollSemLink=0;
   _sbPollAvisoSemLink=false;
   sbSalvarSessao(); // grava já de início, pra um reload logo após o pedido não perder o resumo
@@ -487,6 +494,15 @@ async function sbChecarStatusPedido(){
       atual=pedidos[0]; // sem ID pra rastrear — mais recente da lista (worker já ordena assim)
     }
     if(atual.status===_sbPollUltimoStatus)return;
+    _sbPollRestante=(atual.restante===undefined||atual.restante===null)?null:Number(atual.restante);
+    if(atual.status==='Confirmado — Esperando pagamento'&&_sbPollRestante!==null&&_sbPollRestante<=0){
+      // Já não há mais nada a pagar (ex.: pagamento total feito no ato do pedido) —
+      // não oferece cobrança, só registra a transição e segue acompanhando em silêncio
+      // até o status virar "Pago — Em produção".
+      _sbPollSemLink=0;
+      _sbPollUltimoStatus=atual.status;
+      return;
+    }
     if(atual.status==='Confirmado — Esperando pagamento'){
       if(!atual.linkPagamento){
         // Link ainda sendo gerado — espera alguns ciclos. Se não vier (ex.: confirmação
@@ -591,11 +607,20 @@ async function sbAtualizarStatusManual(){
     if(!atual||atual.status==='Aguardando confirmação'||atual.status==='Verificando Estoque'){
       sbAddMsg('bot','⏳ Seu pedido ainda está sendo verificado pela nossa equipe. Assim que houver novidade, te aviso aqui!');
       sbBotoes([{label:'🔄 Atualizar status',onClick:()=>sbAtualizarStatusManual()}]);
+    }else if(atual.status==='Confirmado — Esperando pagamento'&&Number(atual.restante)<=0){
+      // Já não há mais nada a pagar (ex.: pagamento total feito no ato do pedido) —
+      // não oferece cobrança.
+      _sbPollUltimoStatus=atual.status;
+      _sbPollRestante=Number(atual.restante)||0;
+      sbAddMsg('bot','Estoque confirmado! ✅ Seu pagamento já está completo — é só aguardar, assim que a produção começar eu te aviso por aqui!');
+      sbFimOpcoes();
+      sbSalvarSessao();
     }else if(atual.status==='Confirmado — Esperando pagamento'&&atual.linkPagamento){
       const entradaNum=parseFloat(atual.entrada)||parseFloat(atual.total)||0;
       _sbPollLinkPagamento=atual.linkPagamento;
       _sbPollEntradaValor=entradaNum;
       _sbPollUltimoStatus=atual.status;
+      _sbPollRestante=(atual.restante===undefined||atual.restante===null)?null:Number(atual.restante);
       sbAddMsg('bot',`Estoque confirmado! ✅ Pra garantir seu pedido, é só fazer o pagamento de ${fmtBRL(entradaNum)}:`);
       sbAddMsg('bot','Assim que o pagamento cair, eu confirmo aqui pra você. 💳');
       sbBotoes([
@@ -808,7 +833,7 @@ async function sbStatusConsultar(tel){
       // um bloco separado abaixo — para que a associação visual seja imediata.
       // Usa appendChild direto (não sbBotoes) para que sbLimparBotoes() não
       // remova esses botões quando os controles de navegação aparecerem depois.
-      if(p.status==='Confirmado — Esperando pagamento'&&p.linkPagamento){
+      if(p.status==='Confirmado — Esperando pagamento'&&p.linkPagamento&&p.restante>0){
         const pagarBtn=document.createElement('button');
         pagarBtn.className='sb-btn-opcao';
         pagarBtn.style.cssText='margin-top:8px;display:block;width:100%';

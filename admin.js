@@ -507,8 +507,11 @@ function _coletarEstadoDetalhes(){
 }
 
 // Resumo legível de tudo que mudou (campos do pedido + itens/taxa) — vira o texto do
-// aviso Telegram/cliente. Comparação de itens é por descrição ordenada (simples, mas
-// suficiente pra decidir SE mudou algo e mostrar antes/depois pro atendente conferir).
+// aviso Telegram/cliente (esse último chega como mensagem real de WhatsApp pro cliente
+// final, via worker /editar-pedido → alteracoesResumo, então precisa ser limpo e sem
+// jargão de diff). Itens: em vez de comparar item a item (gera ruído "antes/depois"
+// confuso quando não havia nada antes), só detecta SE a lista mudou e mostra a lista
+// ATUAL inteira, agrupada por categoria (mesma agruparItensPorTipo() do recibo/edição).
 function _montarResumoDetalhes(estado){
   const partes=[];
   const campos=[
@@ -518,17 +521,31 @@ function _montarResumoDetalhes(estado){
   campos.forEach(([chave,rotulo])=>{
     const antes=String(_detalhesSnap[chave]||'').trim();
     const depois=String(estado[chave]||'').trim();
-    if(antes!==depois)partes.push(`${rotulo}: ${antes||'—'} → ${depois||'—'}`);
+    if(antes===depois)return;
+    if(!antes)partes.push(`${rotulo}: ${depois}`);
+    else if(!depois)partes.push(`${rotulo} removido (era: ${antes})`);
+    else partes.push(`${rotulo}: ${antes} → ${depois}`);
   });
-  const descreve=i=>`${_fmtQty(i.quantidade)}x ${i.produto} (${fmtBRL(i.valorUnit)})`;
-  const itensAntes=(_detalhesSnap.itens||[]).map(descreve).sort().join(' | ');
-  const itensDepois=estado.itens.map(descreve).sort().join(' | ');
-  if(itensAntes!==itensDepois)partes.push(`Itens:\nAntes: ${itensAntes||'—'}\nDepois: ${itensDepois||'—'}`);
-  if(Math.round(Number(_detalhesSnap.taxa)*100)!==Math.round(Number(estado.taxa)*100)){
-    partes.push(`🛵 Taxa de entrega: ${fmtBRL(_detalhesSnap.taxa)} → ${fmtBRL(estado.taxa)}`);
+
+  const descreve=i=>`${_fmtQty(i.quantidade)}x ${i.produto} — ${fmtBRL(i.valorUnit)}`;
+  const itensAntes=(_detalhesSnap.itens||[]).map(descreve).sort().join('|');
+  const itensDepois=(estado.itens||[]).map(descreve).sort().join('|');
+  if(itensAntes!==itensDepois&&estado.itens.length){
+    const grupos=agruparItensPorTipo(estado.itens);
+    const listaItens=grupos.map(g=>`${g.tipo}:\n`+g.itens.map(i=>`  ${_fmtQty(i.quantidade)}x ${i.produto} — ${fmtBRL(i.valorUnit)}`).join('\n')).join('\n');
+    partes.push(`🛒 Itens do pedido:\n${listaItens}`);
   }
+
+  const taxaAntes=Number(_detalhesSnap.taxa)||0;
+  const taxaDepois=Number(estado.taxa)||0;
+  if(Math.round(taxaAntes*100)!==Math.round(taxaDepois*100)){
+    if(taxaAntes<=0)partes.push(`🛵 Taxa de entrega: ${fmtBRL(taxaDepois)}`);
+    else if(taxaDepois<=0)partes.push(`🛵 Taxa de entrega removida (era ${fmtBRL(taxaAntes)})`);
+    else partes.push(`🛵 Taxa de entrega: ${fmtBRL(taxaAntes)} → ${fmtBRL(taxaDepois)}`);
+  }
+
   if(!partes.length)return '';
-  return `Pedido de ${estado.cliente||_detalhesSnap.cliente||'—'}\n`+partes.join('\n');
+  return `Pedido de ${estado.cliente||_detalhesSnap.cliente||'—'} foi atualizado:\n\n`+partes.join('\n\n');
 }
 
 async function salvarDetalhesPedido(){

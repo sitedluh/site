@@ -134,7 +134,7 @@ function mpCardHtml(p){
   const itensHtml=(p.itens&&p.itens.length)
     ?'<div class="mp-card-itens-lista">'+p.itens.map(i=>{const nome=i.produto||i.nome||'';const qtd=i.qtd||i.quantidade||1;const recheio=i.recheio||i.sabores||'';return '<span class="mp-card-item">'+qtd+'× '+esc(nome)+(recheio?' <em>('+esc(recheio)+')</em>':'')+' </span>';}).join('')+'</div>'
     :'';
-  const podePagar=!!p.linkPagamento&&(p.status==='Confirmado — Esperando pagamento'||p.status==='Entregue — Esperando restante');
+  const podePagar=!!p.linkPagamento&&(p.status==='Confirmado — Esperando pagamento'||p.status==='Entregue — Esperando restante')&&p.restante>0;
   const valorPagar=p.status==='Entregue — Esperando restante'?p.restante:(p.entrada||p.total);
   const podeCancelar=MP_PODE_CANCELAR.includes(p.status);
   // Enquanto o POST de cancelamento já foi enviado mas o Coda ainda não refletiu o
