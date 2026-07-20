@@ -34,6 +34,10 @@ function showToast(msg){
 // Catálogo completo de produtos
 let _produtosList = [];
 let _produtosMap  = {};
+// id/nome → Tipo do produto (Salgado Frito, Assado, Doce...) — usado só pra agrupar os
+// itens do modal "Detalhes/Imprimir" por categoria (ver agruparItensPorTipo()).
+let _produtosTipoPorId   = {};
+let _produtosTipoPorNome = {};
 
 // Carrega o catálogo de produtos (usado nos selects) e recarrega os pedidos.
 // A lista de pedidos em si vem SEMPRE de carregarStatus() — fetch ÚNICO que
@@ -49,6 +53,8 @@ async function carregarPedidos(){
     const lista=prodData.produtos||[];
     _produtosList=lista.map(p=>p.nome);
     _produtosMap=Object.fromEntries(lista.map(p=>[p.nome,p.valorUnit]));
+    _produtosTipoPorId=Object.fromEntries(lista.filter(p=>p.tipo).map(p=>[p.id,p.tipo]));
+    _produtosTipoPorNome=Object.fromEntries(lista.filter(p=>p.tipo).map(p=>[String(p.nome||'').toLowerCase(),p.tipo]));
     const dl=document.getElementById('produtos-datalist');
     if(dl)dl.innerHTML=_produtosList.map(n=>`<option value="${esc(n)}">`).join('');
     _estoqueSig=null; // refresh manual força re-render da aba Estoque
@@ -188,6 +194,9 @@ function cardPedido(p){
       <button class="btn-editar-itens" onclick="abrirEditItens('${esc(p.rowId||'')}')">
         ✏️ Editar itens
       </button>
+      <button class="btn-detalhes" onclick="abrirDetalhesPedido('${esc(p.rowId||'')}')">
+        📋 Detalhes/Imprimir
+      </button>
       <button onclick="notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
         📱 Avisar cliente
       </button>
@@ -236,6 +245,103 @@ function addItem(id){
     <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">R$ 0,00</td>
     <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0">×</button></td>`;
   tbody.appendChild(tr);
+}
+
+// ── DETALHES DO PEDIDO (itens agrupados por categoria) + IMPRESSÃO ──────────
+// "Categoria" = coluna Tipo dos Produtos Site (Salgado Frito, Assado, Doce...).
+
+const SEM_CATEGORIA = 'Outros';
+
+// Mesma lógica de agrupamento que o worker já usa em pbCriarRowFila() pro texto da
+// Fila Cozinha: casa primeiro por rowIdProduto (sobrevive a rename do produto), cai
+// pro nome, e sem achar nenhum dos dois joga em "Outros" em vez de sumir do pedido.
+// Taxa de entrega (produto começando com 🛵) fica de fora do agrupamento — sempre
+// mostrada à parte, como já era no card de edição de itens.
+function agruparItensPorTipo(itens){
+  const grupos=new Map();
+  (itens||[]).forEach(i=>{
+    if(String(i.produto||'').startsWith('🛵'))return;
+    const nomeBusca=String(i.produto||'').replace(/^🎀 Topper — /,'').toLowerCase();
+    const tipo=_produtosTipoPorId[i.rowIdProduto]||_produtosTipoPorNome[nomeBusca]||SEM_CATEGORIA;
+    if(!grupos.has(tipo))grupos.set(tipo,[]);
+    grupos.get(tipo).push(i);
+  });
+  return Array.from(grupos.entries()).map(([tipo,itensDoTipo])=>({tipo,itens:itensDoTipo}));
+}
+
+let _detalhesRowId=null;
+
+function abrirDetalhesPedido(rowId){
+  const p=_pedidosCache[rowId];
+  if(!p){showToast('Pedido não encontrado — atualize a lista');return;}
+  _detalhesRowId=rowId;
+  const taxaItem=(p.itens||[]).find(i=>String(i.produto||'').startsWith('🛵'));
+  const grupos=agruparItensPorTipo(p.itens);
+  const itensHtml=grupos.map(g=>`
+    <div class="detalhes-cat-title">${esc(g.tipo)}</div>
+    ${g.itens.map(i=>`<div class="detalhes-item-row"><span><span class="qty">${i.quantidade}x</span>${esc(i.produto)}${i.recheios?` <span style="color:var(--text3);font-size:12px">(${esc(i.recheios)})</span>`:''}</span><span>${fmtBRL(i.valorItem)}</span></div>`).join('')}
+  `).join('');
+  const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+  const restante=p.restante||Math.round((total-(p.valorPago||0))*100)/100;
+  document.getElementById('detalhes-body').innerHTML=`
+    <div class="detalhes-info-row"><span>Cliente</span><b>${esc(p.cliente||'—')}${p.tipoCliente==='Empresa'?' 🏢 Empresa':''}</b></div>
+    <div class="detalhes-info-row"><span>WhatsApp</span><b>${esc(p.telefone||'—')}</b></div>
+    <div class="detalhes-info-row"><span>Entrega</span><b>${esc(p.entrega||'—')}</b></div>
+    ${p.endereco?`<div class="detalhes-info-row"><span>Endereço</span><b>${esc(p.endereco)}</b></div>`:''}
+    <div class="detalhes-info-row"><span>Data/Hora</span><b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
+    <div class="detalhes-info-row"><span>Pagamento</span><b>${esc(p.pagamento||'—')}</b></div>
+    <div class="detalhes-info-row"><span>Status</span><b>${esc(p.status||'—')}</b></div>
+    ${p.obs?`<div class="detalhes-info-row"><span>Observações</span><b>${esc(p.obs)}</b></div>`:''}
+    ${itensHtml}
+    ${taxaItem?`<div class="detalhes-item-row"><span>🛵 Taxa de entrega</span><span>${fmtBRL(taxaItem.valorItem)}</span></div>`:''}
+    <div class="detalhes-totais">
+      <div>Pago: <b>${fmtBRL(p.valorPago||0)}</b></div>
+      ${restante>0?`<div>Restante: <b>${fmtBRL(restante)}</b></div>`:''}
+      <div class="tot-final">Total: ${fmtBRL(total)}</div>
+    </div>
+  `;
+  document.getElementById('detalhes-overlay').classList.add('open');
+}
+
+function closeDetalhesModal(){
+  document.getElementById('detalhes-overlay').classList.remove('open');
+  _detalhesRowId=null;
+}
+
+// Recibo térmico — mesmo layout/CSS (#print-area, classes p-*) do painel-pedidos.js,
+// só trocando a fonte dos dados (aqui vem do /pedidos-pendentes já em cache) e agrupando
+// os itens por categoria em vez de listar em ordem de inserção.
+function imprimirDetalhesPedido(){
+  const p=_pedidosCache[_detalhesRowId];
+  if(!p)return;
+  const taxaItem=(p.itens||[]).find(i=>String(i.produto||'').startsWith('🛵'));
+  const grupos=agruparItensPorTipo(p.itens);
+  const itensHtml=grupos.map(g=>`
+    <div class="p-section">${esc(g.tipo)}</div>
+    ${g.itens.map(i=>`<div class="p-item">${i.quantidade}x ${esc(i.produto)}${i.recheios?` (${esc(i.recheios)})`:''}</div>`).join('')}
+  `).join('');
+  const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+  const isEntrega=String(p.entrega||'').toLowerCase().includes('entrega');
+  document.getElementById('print-area').innerHTML=`
+    <div class="p-logo">D'Luh Festas 🍰</div>
+    <div class="p-sub">Salgados &amp; Doces para festas</div>
+    <div class="p-div"></div>
+    <div class="p-row"><span class="p-label">Cliente:</span><span>${esc(p.cliente)}</span></div>
+    <div class="p-row"><span class="p-label">Fone:</span><span>${esc(p.telefone||'—')}</span></div>
+    <div class="p-row"><span class="p-label">Tipo:</span><span>${isEntrega?'🛵 ENTREGA':'🛍️ RETIRADA'}</span></div>
+    ${p.endereco?`<div class="p-row"><span class="p-label">Endereço:</span><span>${esc(p.endereco)}</span></div>`:''}
+    <div class="p-row"><span class="p-label">Data/Hora:</span><span>${fmtData(p.data)}${p.hora?' '+esc(p.hora):''}</span></div>
+    <div class="p-div"></div>
+    <div class="p-section">PEDIDO:</div>
+    ${itensHtml}
+    ${taxaItem?`<div class="p-item">🛵 Taxa de entrega</div>`:''}
+    <div class="p-div"></div>
+    <div class="p-total">Total: ${esc(fmtBRL(total))}</div>
+    ${p.obs?`<div class="p-div"></div><div class="p-item">Obs: ${esc(p.obs)}</div>`:''}
+    <div class="p-div"></div>
+    <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
+  `;
+  setTimeout(()=>window.print(),100);
 }
 
 // datalist para autocomplete nos inputs existentes (fallback — hoje o elemento
@@ -425,6 +531,7 @@ function statusCardHtml(p,status){
       ${buildStatusSelect(p.rowId,status)}
       <div class="sc-actions-row">
         <button class="btn-editar-itens" onclick="abrirEditItens('${esc(p.rowId)}')">✏️ Itens</button>
+        <button class="btn-detalhes" onclick="abrirDetalhesPedido('${esc(p.rowId)}')">📋 Detalhes/Imprimir</button>
         ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
         <button class="btn-apagar" onclick="abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
       </div>

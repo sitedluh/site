@@ -154,6 +154,19 @@
   </div>
 </div>
 
+<!-- DETALHES COMPLETOS DO PEDIDO + IMPRIMIR (itens agrupados por categoria) -->
+<div class="confirm-overlay" id="detalhes-overlay">
+  <div class="edit-box">
+    <div class="edit-title">📋 Detalhes do pedido</div>
+    <div id="detalhes-body"></div>
+    <div class="confirm-actions" style="margin-top:16px">
+      <button class="confirm-btn cancel" onclick="closeDetalhesModal()">Fechar</button>
+      <button class="confirm-btn ok" id="detalhes-print-btn" onclick="imprimirDetalhesPedido()">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
+<div id="print-area"></div>
+
 <datalist id="produtos-datalist"></datalist>
 <script src="admin.js"></script>
 <script src="animations.js" defer></script>

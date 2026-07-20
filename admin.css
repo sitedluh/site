@@ -137,6 +137,35 @@
   .confirm-btn.ok{background:var(--accent);color:#fff}
   .confirm-btn:disabled{opacity:.5;cursor:not-allowed}
 
+  /* Modal "Detalhes do pedido" — itens agrupados por categoria (Tipo do produto) */
+  .detalhes-info-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--text2);padding:4px 0;border-bottom:1px dashed var(--border)}
+  .detalhes-info-row b{color:var(--text);font-weight:600}
+  .detalhes-cat-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);margin:14px 0 6px}
+  .detalhes-cat-title:first-of-type{margin-top:16px}
+  .detalhes-item-row{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;color:var(--text);padding:3px 0}
+  .detalhes-item-row .qty{color:var(--text3);margin-right:6px}
+  .detalhes-totais{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--text2)}
+  .detalhes-totais .tot-final{font-size:15px;font-weight:700;color:var(--text)}
+  .btn-detalhes{background:var(--surface);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
+  .btn-detalhes:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* Recibo oculto na tela, visível só na impressão — mesmo padrão do painel-pedidos.css */
+  #print-area{display:none;font-family:'Courier New',monospace;font-size:14px;font-weight:bold;width:72mm;padding:4mm;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print-area .p-logo{text-align:center;font-size:18px;font-weight:900;margin-bottom:2mm}
+  #print-area .p-sub{text-align:center;font-size:12px;font-weight:bold;margin-bottom:3mm}
+  #print-area .p-div{border-top:2px solid #000;margin:2mm 0}
+  #print-area .p-row{display:flex;justify-content:space-between;font-size:13px;font-weight:bold;margin:1.5mm 0}
+  #print-area .p-label{font-weight:900}
+  #print-area .p-section{font-weight:900;margin-top:2mm;font-size:14px;text-decoration:underline}
+  #print-area .p-item{margin-left:2mm;font-size:13px;font-weight:bold}
+  #print-area .p-total{font-size:17px;font-weight:900;text-align:right;margin-top:2mm}
+  #print-area .p-footer{text-align:center;font-size:12px;font-weight:bold;margin-top:3mm}
+  @media print{
+    body>*{display:none!important}
+    #print-area{display:block!important;width:72mm;margin:0;padding:2mm}
+    @page{margin:0;size:80mm auto}
+  }
+
   @media(max-width:600px){
     header{padding:14px 16px;flex-wrap:wrap;gap:10px}
     .header-title{font-size:18px}
