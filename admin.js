@@ -296,6 +296,9 @@ function cardPedido(p){
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             Confirmar e cobrar
           </button>
+          <button onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId||'')}','${esc(p.cliente)}','${esc(p.telefone)}',this)" style="background:none;border:1.5px solid #10b981;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#047857;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
+            💚 Marcar como pago (Pix por fora)
+          </button>
           <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId||'')}')">
             ✏️ Editar itens
           </button>
@@ -877,6 +880,7 @@ function statusCardHtml(p,status){
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
   const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
   const podePagarRetirada=status==='Confirmado — Esperando pagamento';
+  const podePagoTotal=status==='Confirmado — Esperando pagamento';
   const podeMarcarEntregue=!['Entregue — Esperando restante','Finalizado','Cancelado'].includes(status);
   return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
     <div class="sc-info">
@@ -898,6 +902,7 @@ function statusCardHtml(p,status){
           <div class="card-menu-dropdown">
             ${podeRestante?`<button class="btn-cobrar-restante" onclick="closeAllCardMenus();cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
             ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="closeAllCardMenus();abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
+            ${podePagoTotal?`<button class="btn-pago-total" onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💚 Marcar como pago (Pix por fora)</button>`:''}
             <button class="btn-cobrar-total-adm" onclick="closeAllCardMenus();cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
             <button class="btn-cobrar-entrada-adm" onclick="closeAllCardMenus();cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
             ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="closeAllCardMenus();marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
@@ -1053,6 +1058,7 @@ function _confirmOk(){
   if(_pendingAction==='finalizar')return _confirmFinalizarOk();
   if(_pendingAction==='apagar')return _confirmApagarOk();
   if(_pendingAction==='pagar-retirada')return _confirmPagarRetiradaOk();
+  if(_pendingAction==='pago-total')return _confirmPagoTotalOk();
 }
 async function _confirmFinalizarOk(){
   if(!_actionRowId)return;
@@ -1128,6 +1134,41 @@ async function _confirmPagarRetiradaOk(){
     window.open(`https://wa.me/${fone}?text=${encodeURIComponent(msg)}`,'_blank');
     showToast('Confirmado! WhatsApp aberto 💵');
     carregarStatus();
+  }catch(e){
+    showToast('Erro: '+e.message);
+  }finally{
+    okBtn.disabled=false;
+    closeConfirm();
+  }
+}
+
+// ── MARCAR PAGO TOTAL (admin) — Pix por fora, direto pra fila da cozinha ────
+function abrirConfirmPagoTotal(rowId,nomeCliente,telefone,btnEl){
+  if(!rowId){showToast('Pedido ainda não tem linha no Coda — não dá pra marcar como pago.');return;}
+  _pendingAction='pago-total';_actionRowId=rowId;_actionBtnEl=btnEl;_actionTelefone=telefone;
+  document.getElementById('confirm-icon').textContent='💚';
+  document.getElementById('confirm-title').textContent='Marcar como totalmente pago?';
+  document.getElementById('confirm-msg').innerHTML=`Confirmar que <b>${esc(nomeCliente||'cliente')}</b> já pagou o TOTAL do pedido via Pix direto (fora do sistema)?<br>O pedido vai direto pra fila da cozinha e o cliente recebe um aviso confirmando.`;
+  document.getElementById('confirm-ok-btn').textContent='Sim, já foi pago';
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+async function _confirmPagoTotalOk(){
+  if(!_actionRowId)return;
+  const okBtn=document.getElementById('confirm-ok-btn');
+  okBtn.disabled=true;okBtn.textContent='Processando...';
+  const rowId=_actionRowId;
+  try{
+    const res=await fetch(`${WORKER}/marcar-pago-total`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rowId})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.ok===false)throw new Error(data.error||'Falha ao processar');
+    showToast('Pedido confirmado como totalmente pago 💚 Cliente avisado pelo bot.');
+    // carregarPedidos() recarrega Estoque + abas de status — a row pode ter saído
+    // da aba Estoque pendente (se já estava confirmada) ou ganhado status novo.
+    carregarPedidos();
   }catch(e){
     showToast('Erro: '+e.message);
   }finally{
