@@ -880,7 +880,6 @@ function statusCardHtml(p,status){
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
   const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
   const podePagarRetirada=status==='Confirmado — Esperando pagamento';
-  const podePagoTotal=status==='Confirmado — Esperando pagamento';
   const podeMarcarEntregue=!['Entregue — Esperando restante','Finalizado','Cancelado'].includes(status);
   return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
     <div class="sc-info">
@@ -902,7 +901,7 @@ function statusCardHtml(p,status){
           <div class="card-menu-dropdown">
             ${podeRestante?`<button class="btn-cobrar-restante" onclick="closeAllCardMenus();cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
             ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="closeAllCardMenus();abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
-            ${podePagoTotal?`<button class="btn-pago-total" onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💚 Marcar como pago (Pix por fora)</button>`:''}
+            <button class="btn-pago-total" onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💚 Marcar como pago (Pix por fora)</button>
             <button class="btn-cobrar-total-adm" onclick="closeAllCardMenus();cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
             <button class="btn-cobrar-entrada-adm" onclick="closeAllCardMenus();cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
             ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="closeAllCardMenus();marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
