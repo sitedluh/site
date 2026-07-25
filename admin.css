@@ -87,6 +87,9 @@
   .sc-badge.entregue{background:#e2e3e5;color:#383d41}
   .sc-badge.cancelado{background:#f8d7da;color:#721c24}
 
+  .dia-header{font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .dia-header:first-child{margin-top:0}
+
   .status-group{margin-bottom:24px}
   .status-group-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
   .status-group-header .sc-badge{margin-top:0;font-size:12.5px;padding:4px 12px}

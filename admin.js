@@ -21,6 +21,43 @@ function tentarDeepLink(){
 
 function fmtBRL(v){return'R$ '+Number(v||0).toFixed(2).replace('.',',');}
 function fmtData(d){if(!d)return'—';const p=d.split('-');return p.length===3?p.reverse().join('/'):d;}
+
+// Ordena pedidos por data+hora de entrega (ASC). data é ISO "YYYY-MM-DD" e hora é
+// "HH:MM" (às vezes "HH:MM:SS") — ambos ordenam certo por comparação lexicográfica
+// direta de string. Pedidos sem data vão pro final (mantendo a ordem relativa entre
+// eles). Não muta a lista original.
+function ordenarPorDataHora(lista){
+  return [...lista].sort((a,b)=>{
+    const da=a.data||'',db=b.data||'';
+    if(!da&&!db)return 0;
+    if(!da)return 1;   // sem data → final
+    if(!db)return -1;
+    if(da!==db)return da<db?-1:1;
+    const ha=a.hora||'',hb=b.hora||'';
+    if(ha===hb)return 0;
+    if(!ha)return -1;  // dentro do mesmo dia, sem hora vem antes
+    if(!hb)return 1;
+    return ha<hb?-1:1;
+  });
+}
+
+// Recebe a lista JÁ ordenada por ordenarPorDataHora e uma função que monta o HTML de
+// cada card, e devolve o HTML final com um <div class="dia-header"> inserido toda vez
+// que a data muda. Pedidos sem data caem sob um único cabeçalho "Sem data definida" no
+// final (eles já ficam agrupados lá por causa da ordenação).
+function renderComCabecalhoDia(lista,montarCardFn){
+  let html='';
+  let diaAtual=undefined; // sentinela: nunca bate com null nem com string nenhuma
+  for(const p of lista){
+    const data=p.data||null;
+    if(data!==diaAtual){
+      diaAtual=data;
+      html+=data?`<div class="dia-header">Dia ${fmtData(data)}</div>`:'<div class="dia-header">Sem data definida</div>';
+    }
+    html+=montarCardFn(p);
+  }
+  return html;
+}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function enc(s){return encodeURIComponent(s||'');}
 
@@ -79,8 +116,9 @@ function renderPedidos(pedidos){
     main.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum pedido aguardando confirmação.</div>';
     return;
   }
-  main.innerHTML=pedidos.map(p=>cardPedido(p)).join('');
-  pedidos.forEach(p=>recalcCard(p.idPedido));
+  const ordenados=ordenarPorDataHora(pedidos);
+  main.innerHTML=renderComCabecalhoDia(ordenados,p=>cardPedido(p));
+  ordenados.forEach(p=>recalcCard(p.idPedido));
   tentarDeepLink();
 }
 
@@ -824,7 +862,8 @@ function renderStatusList(tabId,lista,statusFixo,emptyMsg){
   const el=document.getElementById('list-'+tabId);
   if(!el)return;
   if(!lista.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📭</div>${emptyMsg||'Nenhum pedido aqui.'}</div>`;return;}
-  el.innerHTML=lista.map(p=>statusCardHtml(p,statusFixo||p.status||'Aguardando confirmação')).join('');
+  const ordenada=ordenarPorDataHora(lista);
+  el.innerHTML=renderComCabecalhoDia(ordenada,p=>statusCardHtml(p,statusFixo||p.status||'Aguardando confirmação'));
 }
 
 function statusCardHtml(p,status){
