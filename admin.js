@@ -834,6 +834,82 @@ function switchTab(tab){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id==='tab-'+tab));
 }
 
+// ── BUSCA GLOBAL (todas as abas/status) ─────────────────────────────────────
+// Usa _pedidosCache (já carregado por carregarStatus() com TODOS os pedidos de
+// TODOS os status) — não faz fetch novo. Reaproveita statusCardHtml/
+// ordenarPorDataHora/renderComCabecalhoDia, os mesmos usados nas abas normais.
+
+// Remove acentos + normaliza caixa, pra "joão" bater com "joao" etc.
+function normalizarBusca(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// Monta uma string única com todos os campos buscáveis de um pedido.
+function textoBuscavelPedido(p){
+  const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+  const totalStr=String(total||'');
+  const partes=[
+    p.cliente,p.telefone,p.idPedido,p.rowId,p.status,p.entrega,p.endereco,p.obs,p.pagamento,
+    fmtBRL(total),totalStr,totalStr.replace('.',','),
+    (p.itens||[]).map(i=>i.produto).join(' ')
+  ];
+  return normalizarBusca(partes.filter(Boolean).join(' '));
+}
+
+let _buscaDebounce=null;
+let _abaAntesDaBusca=null;
+
+function filtrarBusca(valor){
+  clearTimeout(_buscaDebounce);
+  _buscaDebounce=setTimeout(()=>_filtrarBuscaAgora(valor),180);
+}
+
+function _filtrarBuscaAgora(valor){
+  const termo=normalizarBusca(valor);
+  if(!termo.trim()){ limparBusca(); return; }
+
+  // Guarda a aba que estava ativa antes de entrar em modo-busca (só na transição).
+  if(_abaAntesDaBusca===null){
+    const ativa=document.querySelector('.tab-btn.active');
+    _abaAntesDaBusca=ativa?ativa.dataset.tab:'estoque';
+  }
+
+  const resultados=ordenarPorDataHora(
+    Object.values(_pedidosCache).filter(p=>textoBuscavelPedido(p).includes(termo))
+  );
+
+  const resumoEl=document.getElementById('busca-resumo');
+  if(resumoEl)resumoEl.textContent=`${resultados.length} pedido(s) encontrado(s)`;
+
+  const listEl=document.getElementById('list-busca');
+  if(listEl){
+    listEl.innerHTML=resultados.length
+      ?renderComCabecalhoDia(resultados,p=>statusCardHtml(p,p.status||'Aguardando confirmação'))
+      :'<div class="empty"><div class="empty-icon">🔍</div>Nenhum pedido encontrado.</div>';
+  }
+
+  const clearBtn=document.getElementById('busca-clear-btn');
+  if(clearBtn)clearBtn.style.display='';
+
+  const tabsWrap=document.getElementById('tabs-wrap');
+  if(tabsWrap)tabsWrap.style.display='none';
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  const tabBusca=document.getElementById('tab-busca');
+  if(tabBusca)tabBusca.classList.add('active');
+}
+
+function limparBusca(){
+  const input=document.getElementById('busca-input');
+  if(input)input.value='';
+  const clearBtn=document.getElementById('busca-clear-btn');
+  if(clearBtn)clearBtn.style.display='none';
+  const tabsWrap=document.getElementById('tabs-wrap');
+  if(tabsWrap)tabsWrap.style.display='';
+  const aba=_abaAntesDaBusca||'estoque';
+  _abaAntesDaBusca=null;
+  switchTab(aba);
+}
+
 // Mapeamento Pedido Status (tabela Pedidos) → Status do admin
 const PEDIDO_STATUS_MAP = {
   'Entregue':    'Entregue — Esperando restante',
