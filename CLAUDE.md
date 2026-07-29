@@ -108,6 +108,14 @@ Dois transversais:
 - **`ux-researcher`** — pesquisa de UX/benchmark (read-only, web + contexto D'Luh); pesquisa e recomenda, não implementa.
 - **`festas-specialist`** — domínio "Festas" (futura `festas.html` de orçamento de festas completas). Fonte de verdade: `FESTAS-PLANO.md` na raiz — a feature ainda não foi implementada; esse agente é quem implementa e mantém.
 
+Três do domínio **IA de atendimento no WhatsApp** (fonte de verdade: `WHATSAPP-IA-PLANO.md` na raiz — **ainda não implementado**). São os primeiros agentes com `model:` explícito no frontmatter, escolhido pelo nível de exigência de cada um:
+
+- **`whatsapp-ia-specialist`** (`model: opus`) — dono do plano e do serviço de IA que roda no PC ao lado da Evolution: ferramentas/tool calling, máquina de estados do pedido, guardrails de código, painel `atendimento.html`. Opus porque decide arquitetura e mexe no caminho que grava pedido de verdade (dinheiro envolvido).
+- **`ia-local-infra`** (`model: sonnet`) — Ollama, modelo local, faster-whisper, Docker/Tailscale/driver, e o benchmark da Fase 0 no PC (Ryzen 5 5500GT · 16GB · GTX 1050 Ti 4GB). Sonnet porque é trabalho operacional e verificável por medição.
+- **`ia-conversa-designer`** (`model: sonnet`) — persona, system prompt versionado, roteiros e os casos de teste de conversa. Sonnet porque é iteração de redação em alto volume, com risco técnico baixo (as regras que importam são travadas em código, não no prompt).
+
+O bot do **site** (`bot-specialist`, funções `sb*`) e a IA do **WhatsApp** são coisas diferentes — não confundir na hora de delegar.
+
 As regras dentro dos subagentes são **reforços** das deste arquivo, não fonte de verdade paralela — se uma regra mudar aqui, atualize o `.md` do subagente correspondente. **Gotcha:** editar `.claude/agents/*.md` direto no disco só vale em sessão nova (precisa reiniciar); via o comando `/agents` dentro do Claude Code, vale na hora.
 
 **Equipe de marketing (projeto separado):** `marketing/` tem CLAUDE.md, BRAND.md e 5 subagentes próprios (estrategista, social-media, copywriter, SEO local e designer — este gera PNG/MP4 finais via templates + Chrome headless/ffmpeg) — pra usar, abra o Claude Code **direto nessa pasta**. Só produz conteúdo (nunca edita site/Coda) e está no `.gitignore` (não vai pro deploy).
@@ -123,5 +131,6 @@ Changelog completo em `HISTORICO.md` (raiz, **não** carregado automaticamente �
 - Coluna "Pedido Status" (Coda) chega como **array** (multi-select).
 - Adicionar/remover valor em `STATUS_OPTS` exige replicar a Option na coluna "Status" do Coda com o nome **exato** (senão grava silenciosamente errado) — inclui `Cancelado`.
 - `painel-pedidos.html` tem token Coda hardcoded no cliente — não introduzir mais segredos client-side.
+- **IA do WhatsApp:** `BOT_MENU_ATIVO` continua `false` — a IA **substitui** o menu numérico; religar os dois faz eles brigarem pela mesma mensagem. O cérebro roda no PC (não no worker), o worker encaminha em fire-and-forget com timeout, e nenhum pedido é gravado sem confirmação explícita do cliente (`[Feito por IA]` nas Observações). Detalhes em `WHATSAPP-IA-PLANO.md`.
 - `cardapio.html`/`empresas.html` não compartilham código — replicar correções manualmente nos dois.
 - `window._onAuthChange` é atribuído **duas vezes** (um wrapper de cima que chama o legado `initStatusBar`, sem uso real, e a atribuição final na seção "AUTH & HISTÓRICO", que é a que vale). Novos hooks de auth (ex.: `mpInit()`) vão na atribuição **final**, senão nunca executam.
