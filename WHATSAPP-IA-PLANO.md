@@ -1,8 +1,13 @@
 # Plano de implementação — Atendente de IA no WhatsApp (D'Luh Festas)
 
 > Preparado em 2026-07-29. **Fonte de verdade** do domínio "IA de atendimento no WhatsApp".
-> Ainda **não implementado**. Responsáveis: subagentes `whatsapp-ia-specialist` (dono do plano),
-> `ia-local-infra` (PC/modelo/Whisper) e `ia-conversa-designer` (persona, prompt, roteiros).
+> Responsáveis: subagentes `whatsapp-ia-specialist` (dono do plano), `ia-local-infra`
+> (PC/modelo/Whisper) e `ia-conversa-designer` (persona, prompt, roteiros).
+>
+> **Estado (2026-07-29): fases 0 a 4 implementadas.** Código em `ia-atendimento/` (gitignored,
+> roda no PC) + integração no worker. **Nada está no ar ainda** — falta o usuário rodar o setup
+> do PC, preencher `IA_URL`/`IA_KEY`/`IA_WHITELIST`/`TG_THREAD_IA` no worker e dar `wrangler deploy`.
+> Faltam as fases 5 (montagem de pedido), 6 (áudio) e 7 (painel).
 >
 > Decisões já tomadas pelo usuário nesta sessão estão marcadas com **[DECIDIDO]** — não rediscutir
 > sem pedido explícito. O que ainda depende de medição real está em **[ABERTO]**.

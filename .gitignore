@@ -1,10 +1,21 @@
 # Worker Cloudflare — contém credenciais, não vai pro Git
 worker-completo-pronto.js
+wrangler.jsonc
 .wrangler/cache/wrangler-account.json
 .wrangler/
 
 # Equipe de marketing (projeto Claude interno, não vai pro deploy)
 marketing/
+
+# Infra local do WhatsApp (Evolution API no PC da empresa) — contém chaves, não vai pro Git
+evolution/
+
+# Serviço de IA de atendimento (roda no PC da empresa, não é parte do site).
+# Fora do Git de propósito: o repo é servido público pelo GitHub Pages, e aqui
+# vivem o system prompt da IA, os guardrails e o .env com IA_KEY/chave da
+# Evolution. Prompt público = manual de como manipular a atendente.
+# Se um dia quiser versionar isso, use um repositório PRIVADO separado.
+ia-atendimento/
 
 # Dependências e config local — nunca vão pro deploy (GitHub Pages serviria tudo público)
 node_modules/

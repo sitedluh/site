@@ -116,6 +116,8 @@ Três do domínio **IA de atendimento no WhatsApp** (fonte de verdade: `WHATSAPP
 
 O bot do **site** (`bot-specialist`, funções `sb*`) e a IA do **WhatsApp** são coisas diferentes — não confundir na hora de delegar.
 
+**Estado da implementação (2026-07-29):** fases 0–4 do plano feitas. Existe `ia-atendimento/` (gitignored) com o serviço Node sem dependências que roda no PC: `index.js` (HTTP, debounce, fila, turno), `ollama.js` (tool calling), `ferramentas.js` (6 ferramentas de leitura, cache 10min), `guardrails.js` (validação de preço/produto/data em código), `historico.js` (JSON por número), `evolution.js`, `prompt/system.md` (persona "Bia", carregada em runtime), `bench/` (benchmark da Fase 0) e `SETUP.md`. No worker: constantes `IA_ATIVA`/`IA_URL`/`IA_KEY`/`IA_WHITELIST`/`TG_THREAD_IA`, helpers `ia*` (KV `ia_pausado:<waid>` TTL 8h e `ia_global_off`), encaminhamento fire-and-forget nos dois processadores de webhook, comandos `ia off|on [numero]`/`ia status` e callbacks `ia_pausar_`/`ia_retomar_` no Telegram, e as rotas `POST /ia-evento` e `GET /ia-saude`. **Faltam as fases 5 (montagem de pedido), 6 (áudio/Whisper) e 7 (painel `atendimento.html`).**
+
 As regras dentro dos subagentes são **reforços** das deste arquivo, não fonte de verdade paralela — se uma regra mudar aqui, atualize o `.md` do subagente correspondente. **Gotcha:** editar `.claude/agents/*.md` direto no disco só vale em sessão nova (precisa reiniciar); via o comando `/agents` dentro do Claude Code, vale na hora.
 
 **Equipe de marketing (projeto separado):** `marketing/` tem CLAUDE.md, BRAND.md e 5 subagentes próprios (estrategista, social-media, copywriter, SEO local e designer — este gera PNG/MP4 finais via templates + Chrome headless/ffmpeg) — pra usar, abra o Claude Code **direto nessa pasta**. Só produz conteúdo (nunca edita site/Coda) e está no `.gitignore` (não vai pro deploy).
@@ -131,6 +133,7 @@ Changelog completo em `HISTORICO.md` (raiz, **não** carregado automaticamente �
 - Coluna "Pedido Status" (Coda) chega como **array** (multi-select).
 - Adicionar/remover valor em `STATUS_OPTS` exige replicar a Option na coluna "Status" do Coda com o nome **exato** (senão grava silenciosamente errado) — inclui `Cancelado`.
 - `painel-pedidos.html` tem token Coda hardcoded no cliente — não introduzir mais segredos client-side.
+- **`ia-atendimento/` é gitignored** (roda no PC da empresa, não é parte do site; o repo é público pelo Pages e ali vivem o system prompt, os guardrails e o `.env`). Alterações nele não vão pro `git push` — chegam no PC por cópia da pasta.
 - **IA do WhatsApp:** `BOT_MENU_ATIVO` continua `false` — a IA **substitui** o menu numérico; religar os dois faz eles brigarem pela mesma mensagem. O cérebro roda no PC (não no worker), o worker encaminha em fire-and-forget com timeout, e nenhum pedido é gravado sem confirmação explícita do cliente (`[Feito por IA]` nas Observações). Detalhes em `WHATSAPP-IA-PLANO.md`.
 - `cardapio.html`/`empresas.html` não compartilham código — replicar correções manualmente nos dois.
 - `window._onAuthChange` é atribuído **duas vezes** (um wrapper de cima que chama o legado `initStatusBar`, sem uso real, e a atribuição final na seção "AUTH & HISTÓRICO", que é a que vale). Novos hooks de auth (ex.: `mpInit()`) vão na atribuição **final**, senão nunca executam.
