@@ -7,6 +7,10 @@ function goCheckout(){
     showLoginRequired();
     return;
   }
+  // A data pré-preenchida pode ter vencido desde que a página carregou (aba aberta
+  // atravessando a meia-noite, volta do bfcache). Ressincroniza ANTES de mostrar o
+  // checkout — senão o cliente encontra o campo com a data de ontem já preenchida.
+  _sincronizarDataMinima();
   // Esconde elementos desnecessários no checkout (mobile)
   const floatBtn=document.getElementById('cart-float');
   if(floatBtn)floatBtn.style.display='none';
@@ -49,6 +53,34 @@ function goCheckout(){
   // disparar 'input'), então o resumo precisa de uma atualização explícita aqui no final —
   // garante que ele já abra refletindo os dados salvos/pré-preenchidos.
   atualizarResumoPedido();
+  // Modo edição: devolve a data/hora ORIGINAIS do pedido (assíncrono por causa do
+  // carregarHorarios, por isso vem por último e não bloqueia a abertura do checkout).
+  _restaurarDataHoraEdicao();
+}
+
+// ── Edição de pedido: preserva a data/hora ORIGINAIS ──
+// O modal "Editar pedido" joga o cliente no checkout, onde #f-data está com o default
+// "hoje". Sem restaurar, _doFinalizar() reenvia 'Data Desejada' = hoje e o worker
+// REESCREVE a data do pedido (pedido do dia 30 editado no dia 17 virava dia 17 — e a
+// remarcação ainda se propagava pra Fila Cozinha). abrirEditPedidoModal() (bot) grava
+// {dataISO, hora} em dluh_edit_pedido justamente pra isso.
+// Data original já vencida NÃO é restaurada: fica o default de hoje e o cliente escolhe
+// uma nova (a validação de data no passado impede o envio com data velha).
+async function _restaurarDataHoraEdicao(){
+  let ed=null;
+  try{const s=localStorage.getItem('dluh_edit_pedido');ed=s?JSON.parse(s):null;}catch(_){}
+  if(!ed||!ed.dataISO||!/^\d{4}-\d{2}-\d{2}$/.test(ed.dataISO))return;
+  if(ed.dataISO<_dataHojeStr())return; // data original já passou — cliente remarca
+  const dataEl=document.getElementById('f-data');
+  if(!dataEl)return;
+  dataEl.value=ed.dataISO;
+  try{ await carregarHorarios(ed.dataISO); }catch(_){}
+  const horaEl=document.getElementById('f-hora');
+  const horaOrig=String(ed.hora||'').slice(0,5);
+  if(horaEl&&horaOrig&&Array.from(horaEl.options).some(o=>o.value===horaOrig&&!o.disabled)){
+    horaEl.value=horaOrig;
+  }
+  atualizarEntrada();
 }
 
 function showCatalog(){
@@ -500,6 +532,30 @@ function _validatePagamentoStepCore(skipHora){
   const dataValChk=document.getElementById('f-data')?document.getElementById('f-data').value:'';
   const ehDomingo=dataValChk&&new Date(dataValChk+'T00:00:00').getDay()===0;
   const ehHojeChk=dataValChk&&dataValChk===_dataHojeStr();
+
+  // Data desejada: obrigatória, nunca no passado, nunca domingo. O atributo `min` do
+  // <input type="date"> é decorativo aqui (não existe <form>/submit nativo, o envio é
+  // onclick="finalizar()"), então sem esta checagem dava pra mandar pedido pra ontem —
+  // e o campo já vem pré-preenchido com "hoje" do momento do load, que fica velho numa
+  // aba aberta desde ontem (ver _sincronizarDataMinima). Comparação SEMPRE por string
+  // ISO (YYYY-MM-DD ordena lexicograficamente), nunca por new Date, pra não pegar fuso.
+  const dataRow=document.getElementById('frow-data');
+  const dataMsgEl=dataRow?dataRow.querySelector('.form-error-msg'):null;
+  let dataInvalida=false,dataMsg='';
+  if(!dataValChk){
+    dataInvalida=true;
+    dataMsg='Escolha a data desejada da entrega/retirada';
+  }else if(dataValChk<_dataHojeStr()){
+    dataInvalida=true;
+    dataMsg='Essa data já passou — escolha hoje ou uma data futura';
+  }else if(ehDomingo){
+    dataInvalida=true;
+    dataMsg='Não atendemos aos domingos — escolha outro dia';
+  }
+  if(dataMsgEl)dataMsgEl.textContent=dataMsg;
+  markError(dataRow,dataInvalida);
+  if(dataInvalida)ok=false;
+
   if(skipHora){
     if(horaMsgEl)horaMsgEl.textContent='';
     markError(horaRow,false);
@@ -667,6 +723,19 @@ async function _doFinalizar(){
     const bairro=document.getElementById('f-bairro')?.value.trim()||'';
     const endereco=entrega==='Entrega em endereço'?[rua,num,bairro,cep].filter(Boolean).join(', '):'';
     const pagamento=getRadio('rg-pgto'),data=document.getElementById('f-data').value,obs=document.getElementById('f-obs').value.trim();
+    // Trava final anti-"pedido pra data passada": última linha de defesa depois de
+    // validate(). Uma aba que atravessou a meia-noite entre o clique em "Enviar" e este
+    // ponto (ou que voltou do bfcache com o form já validado) ainda chegaria aqui com a
+    // data de ontem. Comparação por string ISO — nada é enviado ao Coda.
+    if(!data||data<_dataHojeStr()){
+      fecharPedidoLoading();
+      _sincronizarDataMinima();
+      showToast('Essa data já passou — confira a data e o horário antes de enviar 📅');
+      _ckStep=2;
+      ckRenderStep();
+      validatePagamentoStep(false);
+      return;
+    }
     const topperBonus=Object.values(cart).filter(i=>topperPorProduto[i.id]?.quero).length*20;
     const taxaFrete=(getRadio('rg-entrega')==='Entrega em endereço'?(_taxaEntregaAtual||0):0);
     const total=items.reduce((s,i)=>s+i.valorUnit*i.qty,0)+topperBonus+taxaFrete;
@@ -1337,17 +1406,41 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#f-end') && !e.target.closest('#end-autocomplete')) closeAutocomplete();
 });
 
-// Pré-preenche data com hoje, define mínimo e carrega os horários disponíveis para a data escolhida
+// Pré-preenche data com hoje, define mínimo e carrega os horários disponíveis para a data escolhida.
+//
+// ATENÇÃO (bug do "pedido pra data passada"): tanto o `min` quanto o valor pré-preenchido
+// eram calculados UMA vez, no load da página. Aba deixada aberta atravessando a meia-noite,
+// volta do bfcache, PWA reaberto → o campo continua com a data do load (que já é ontem) e o
+// cliente nem toca nele, porque "já vem preenchido". Por isso a lógica virou a função
+// _sincronizarDataMinima() abaixo, chamada de novo em pageshow/visibilitychange e no início
+// de goCheckout(). Comparação sempre por string ISO (YYYY-MM-DD), nunca por new Date.
+function _sincronizarDataMinima(){
+  const dataEl=document.getElementById('f-data');
+  if(!dataEl)return;
+  const hoje=_dataHojeStr();
+  if(dataEl.min!==hoje)dataEl.min=hoje;
+  // Só mexe no valor quando ele está vazio ou já venceu — data futura escolhida pelo
+  // cliente (ou restaurada por uma edição de pedido) nunca é sobrescrita aqui.
+  if(!dataEl.value||dataEl.value<hoje){
+    dataEl.value=hoje;
+    carregarHorarios(hoje);
+    if(typeof atualizarEntrada==='function')atualizarEntrada();
+  }
+}
+window._sincronizarDataMinima=_sincronizarDataMinima;
+
 (function(){
   const dataEl=document.getElementById('f-data');
   const horaEl=document.getElementById('f-hora');
   if(!dataEl||!horaEl)return;
-  const now=new Date();
-  const pad=n=>String(n).padStart(2,'0');
-  const hoje=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const hoje=_dataHojeStr();
   dataEl.value=hoje;
   dataEl.min=hoje;
   dataEl.addEventListener('change',()=>{carregarHorarios(dataEl.value);atualizarEntrada();});
   carregarHorarios(dataEl.value);
+  // Página restaurada do bfcache (voltar do WhatsApp/navegador) ou aba trazida de volta
+  // pro primeiro plano: revalida a data antes que o cliente clique em Enviar.
+  window.addEventListener('pageshow',()=>_sincronizarDataMinima());
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden)_sincronizarDataMinima(); });
 })();
 

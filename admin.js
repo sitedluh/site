@@ -289,6 +289,7 @@ function cardPedido(p){
       <button class="btn-detalhes" onclick="abrirDetalhesPedido('${esc(p.rowId||'')}')">
         📋 Detalhes/Imprimir
       </button>
+      <button class="btn-copiar-pedido" onclick="copiarPedido('${esc(p.rowId||'')}',this,event)" title="Copiar dados do pedido">📋</button>
       <div class="card-menu-wrap">
         <button class="card-menu-btn" onclick="toggleCardMenu(this)" title="Mais ações">${ICON_MENU}</button>
         <div class="card-menu-dropdown">
@@ -722,6 +723,115 @@ function imprimirDetalhesPedido(){
   const dl=document.createElement('datalist');dl.id='produtos-datalist';document.body.appendChild(dl);
 })();
 
+// ── COPIAR PEDIDO (📋) — replica FIELMENTE o formato da mensagem automática que o
+// worker manda pro cliente no WhatsApp assim que o pedido é fechado no site (ver
+// worker-completo-pronto.js, bloco "linhasCliente" logo após /novo-pedido). Só a
+// 1ª linha (saudação) e a última ("Lembrando: pra que seu pedido entre na fila...")
+// ficam de fora — são do fluxo automático, não fazem sentido pro atendente colar
+// numa conversa manual. Todos os campos usados aqui já vêm em /pedidos-pendentes
+// (cliente, data, hora, entrega, endereco, pagamento, entrada, restante, total,
+// itens com recheios/topoInfo, obs) — nenhum precisou de rota nova.
+function montarTextoPedidoCopia(p){
+  const itens=p.itens||[];
+  // Taxa de entrega é sempre a subrow "🛵 ..." — some do agrupamento de itens e
+  // vira a linha "🛵 Entrega — R$ X" à parte, igual o worker faz.
+  const taxaItem=itens.find(i=>String(i.produto||'').startsWith('🛵'));
+  const itensReais=itens.filter(i=>!String(i.produto||'').startsWith('🛵'));
+  const taxa=taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0):0;
+  const total=p.total||itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+
+  const dataHoraTxt=p.data?(fmtData(p.data)+(p.hora?' às '+p.hora:'')):'—';
+  // Mesma regra do worker: só "Entrega em endereço" vira linha de entrega; qualquer
+  // outro valor (incluindo vazio) é tratado como retirada.
+  const entregaTxt=p.entrega==='Entrega em endereço'
+    ?`Entrega — ${p.endereco||'endereço a confirmar'}`
+    :'Retirada no local';
+
+  const entradaNum=Number(p.entrada)||0;
+  const restanteRaw=Number(p.restante)||0;
+  const restanteNum=restanteRaw>0?restanteRaw:Math.max(total-entradaNum,0);
+  let pagamentoDetalhe;
+  if(entradaNum<=0){
+    pagamentoDetalhe=`💵 *Pagamento combinado:* tudo na entrega/retirada — ${fmtBRL(total)}`;
+  }else if(restanteNum<=0){
+    pagamentoDetalhe=`💰 *Pagamento total:* ${fmtBRL(entradaNum)}`;
+  }else{
+    // pct SEMPRE calculado do valor real — nunca cair num fallback de 50%.
+    const pct=total>0?Math.round(entradaNum/total*100):0;
+    pagamentoDetalhe=`💵 *Entrada (${pct}%):* ${fmtBRL(entradaNum)}\n⏳ *Restante na entrega:* ${fmtBRL(restanteNum)}`;
+  }
+
+  const itensTxt=itensReais.map(i=>{
+    const qty=i.quantidade||0;
+    const sub=i.valorItem!=null?Number(i.valorItem):Math.round(qty*Number(i.valorUnit||0)*100)/100;
+    let linha=`• ${qty}x ${i.produto} — ${fmtBRL(sub)}`;
+    if(i.recheios)linha+=`\n   🍰 ${i.recheios}`;
+    if(i.topoInfo)linha+=`\n   🎨 ${String(i.topoInfo).replace(/\n/g,' · ')}`;
+    return linha;
+  }).join('\n');
+  const taxaLinha=taxa>0?`\n🛵 Entrega — ${fmtBRL(taxa)}`:'';
+
+  const linhas=[
+    `👤 *Cliente:* ${p.cliente||'—'}`,
+    `📅 *Data:* ${dataHoraTxt}`,
+    `📦 *Entrega:* ${entregaTxt}`,
+    `💳 *Pagamento:* ${p.pagamento||'(não informado)'}`,
+    pagamentoDetalhe,
+    '',
+    '*Seu pedido:*',
+    `${itensTxt}${taxaLinha}`,
+    '',
+    `*Total:* ${fmtBRL(total)}`,
+  ];
+  if(p.obs)linhas.push(`📝 *Observações:* ${p.obs}`);
+  return linhas.join('\n');
+}
+
+// Clipboard API com fallback pra document.execCommand — o admin às vezes roda em
+// contexto sem navigator.clipboard (http simples, webview antigo etc.).
+async function _copiarTextoClipboard(texto){
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+  }catch(e){/* cai no fallback abaixo */}
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=texto;
+    ta.setAttribute('readonly','');
+    ta.style.position='fixed';ta.style.top='0';ta.style.left='-9999px';ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.focus();ta.select();
+    const ok=document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){
+    return false;
+  }
+}
+
+// Botão 📋 do card — não deixa o clique "vazar" pro card (stopPropagation) e dá
+// feedback visual (ícone vira ✅ por ~2s) além do toast padrão do admin.
+async function copiarPedido(rowId,btnEl,ev){
+  if(ev)ev.stopPropagation();
+  const p=_pedidosCache[rowId];
+  if(!p){showToast('Pedido não encontrado — atualize a lista');return;}
+  const texto=montarTextoPedidoCopia(p);
+  const ok=await _copiarTextoClipboard(texto);
+  if(ok){
+    showToast('Pedido copiado ✅');
+    if(btnEl){
+      const original=btnEl.innerHTML;
+      btnEl.innerHTML='✅';
+      btnEl.classList.add('copiado');
+      setTimeout(()=>{btnEl.innerHTML=original;btnEl.classList.remove('copiado');},2000);
+    }
+  }else{
+    showToast('Não foi possível copiar — copie manualmente');
+  }
+}
+
 function notificarCliente(id){
   const card=document.getElementById(`card-${CSS.escape(id)}`);
   if(!card)return;
@@ -972,6 +1082,7 @@ function statusCardHtml(p,status){
       ${buildStatusSelect(p.rowId,status)}
       <div class="sc-actions-row">
         <button class="btn-detalhes" onclick="abrirDetalhesPedido('${esc(p.rowId)}')">📋 Detalhes/Imprimir</button>
+        <button class="btn-copiar-pedido" onclick="copiarPedido('${esc(p.rowId)}',this,event)" title="Copiar dados do pedido">📋</button>
         <div class="card-menu-wrap">
           <button class="card-menu-btn" onclick="toggleCardMenu(this)" title="Mais ações">${ICON_MENU}</button>
           <div class="card-menu-dropdown">
@@ -1445,12 +1556,22 @@ async function salvarEditItens(){
 // tudo se conecta sozinho: row no Pedidos Site, Telegram com "Confirmar Estoque",
 // ciclo de status, cobrança/pagar-na-retirada, fila da cozinha, avisos no
 // WhatsApp do cliente. Nada é gravado direto no Coda por aqui.
+// "Hoje" no fuso LOCAL, como string ISO YYYY-MM-DD — nunca usar toISOString()
+// pra isso (converte pra UTC e pode voltar/adiantar um dia perto da meia-noite).
+function _hojeISOLocal(){
+  const d=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
 function abrirPedidoManual(){
   if(!_produtosList.length){showToast('Catálogo ainda carregando... tenta de novo em instantes');carregarPedidos();return;}
   document.getElementById('manual-itens-body').innerHTML='';
   addManualItem();
-  const hoje=new Date();
-  document.getElementById('man-data').value=hoje.toISOString().split('T')[0];
+  const hojeISO=_hojeISOLocal();
+  const dataInput=document.getElementById('man-data');
+  dataInput.value=hojeISO;
+  dataInput.min=hojeISO; // trava no calendário — mas a validação real é em enviarPedidoManual()
   document.getElementById('manual-overlay').classList.add('open');
   recalcManual();
 }
@@ -1561,6 +1682,10 @@ async function enviarPedidoManual(){
   if(!nome){showToast('Falta o nome do cliente');return;}
   if(telDigits.length<10||telDigits.length>13){showToast('WhatsApp inválido — DDD + número');return;}
   if(!data){showToast('Falta a data de entrega');return;}
+  // Comparação por STRING ISO (YYYY-MM-DD ordena igual lexicográfica e cronologicamente)
+  // — nunca usar `new Date(data)` aqui: um pedido conseguiu ser registrado pra ontem
+  // porque nenhuma camada validava isso antes.
+  if(data<_hojeISOLocal()){showToast('Essa data já passou — escolha hoje ou uma data futura');return;}
   if(!c.itens.length){showToast('Adicione pelo menos 1 item com produto e quantidade');return;}
   const entrega=document.getElementById('man-entrega').value;
   const endereco=c.ehEntrega?document.getElementById('man-end').value.trim():'';

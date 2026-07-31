@@ -166,6 +166,12 @@
   .card-menu-dropdown.open{display:flex}
   .card-menu-dropdown button{width:100%;margin:0!important;justify-content:flex-start!important;text-align:left;white-space:nowrap}
 
+  /* Copiar dados do pedido (📋) — texto no mesmo formato da mensagem automática que
+     o cliente recebe no WhatsApp ao fechar o pedido (ver montarTextoPedidoCopia). */
+  .btn-copiar-pedido{background:var(--surface);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--radius-sm);width:38px;height:36px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;line-height:1;font-family:'DM Sans',sans-serif}
+  .btn-copiar-pedido:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-copiar-pedido.copiado{border-color:#10b981;color:#047857;background:#ecfdf5}
+
   /* Recibo oculto na tela, visível só na impressão — mesmo padrão do painel-pedidos.css */
   #print-area{display:none;font-family:'Courier New',monospace;font-size:14px;font-weight:bold;width:72mm;padding:4mm;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #print-area .p-logo{text-align:center;font-size:18px;font-weight:900;margin-bottom:2mm}
@@ -192,6 +198,7 @@
     .card-body{padding:12px 14px}
     .card-footer{padding:12px 14px;flex-wrap:nowrap;gap:10px}
     .card-footer>.btn-detalhes{flex:1;justify-content:center}
+    .card-footer>.btn-copiar-pedido{flex:0 0 auto}
     .card-footer>.card-menu-wrap{flex:0 0 auto}
     .itens-table-wrap{margin:0 -14px;padding:0 14px}
     .itens-table-wrap table{min-width:460px}

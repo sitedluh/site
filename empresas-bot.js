@@ -703,6 +703,16 @@ async function sbBuscarEAbrirEdit(paiId,valorPago,pedidoNum){
 let _dluhEditItens=[];
 let _dluhEditPedido=null;
 function _dluhEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// /status-pedido devolve a data já formatada em DD-MM-YYYY (fmtDateBR do worker). O
+// checkout trabalha com YYYY-MM-DD (valor de <input type="date">), então a conversão é
+// feita aqui, por string — nunca por new Date, pra não escorregar de dia por fuso.
+// Aceita também DD/MM/YYYY e ISO já pronto; qualquer outra coisa vira '' (ignorada).
+function _dluhDataParaISO(v){
+  const s=String(v||'').trim().split('T')[0];
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  const m=s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  return m?`${m[3]}-${m[2]}-${m[1]}`:'';
+}
 function abrirEditPedidoModal(pedido){
   // A subrow "🛵 Taxa de Entrega" volta do /status-pedido como se fosse item, mas a
   // taxa é recalculada e reenviada à parte (taxaFrete) no checkout da edição — se ela
@@ -713,7 +723,17 @@ function abrirEditPedidoModal(pedido){
     valor:Number(i.valor||i.valorUnit||i.preco||0),
     recheio:i.recheio||i.sabores||''
   }));
-  _dluhEditPedido={paiId:pedido.rowId||pedido.idPedido||pedido.paiId,valorPago:Number(pedido.pago||pedido.valorPago||0),pedidoNum:pedido.idPedido||pedido.pedidoNum||''};
+  // dataISO/hora: data e horário ORIGINAIS do pedido. Sem eles, o checkout da edição
+  // reenviaria 'Data Desejada' com o default "hoje" e o worker REESCREVERIA a data do
+  // pedido (pedido do dia 30 editado no dia 17 virava dia 17). Ver
+  // _restaurarDataHoraEdicao() no <page>-checkout.js, que lê isso do localStorage.
+  _dluhEditPedido={
+    paiId:pedido.rowId||pedido.idPedido||pedido.paiId,
+    valorPago:Number(pedido.pago||pedido.valorPago||0),
+    pedidoNum:pedido.idPedido||pedido.pedidoNum||'',
+    dataISO:_dluhDataParaISO(pedido.data||pedido.dataDesejada||pedido.dataISO||''),
+    hora:String(pedido.horario||pedido.hora||'').slice(0,5),
+  };
   let modal=document.getElementById('dluh-edit-modal');
   if(!modal){
     modal=document.createElement('div');
