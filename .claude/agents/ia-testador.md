@@ -28,6 +28,23 @@ Use as ferramentas do Chrome (`mcp__claude-in-chrome__*`) em `https://web.whatsa
 4. Julgue contra o critério do caso correspondente em `testes.md`.
 5. Só então mande a próxima.
 
+**Reset entre testes.** Existe uma rota que devolve o número ao estado zero — apaga a pausa da IA, **encerra o modo atendimento humano**, limpa o histórico da conversa e os estados de problema/cancelamento pendentes:
+
+```
+GET {WORKER}/ia-reset?tel=5538999540665&token=<token>
+```
+
+**Peça a URL completa ao usuário no início da sessão** — o token é segredo e não pode ser escrito aqui (este arquivo vai pro Git, e o repositório é público). Guarde-a só na memória da conversa.
+
+Use o reset:
+- **antes de cada caso** que dependa de conversa limpa (a Bia lembra dos últimos turnos, e isso contamina o teste seguinte);
+- **sempre que um teste escalar**, pra destravar o modo humano e continuar a bateria sem precisar do usuário;
+- **nunca no meio de um turno** — espere a resposta chegar (ou o prazo de 45s estourar) antes de resetar, senão você apaga o estado de algo que ainda está rodando.
+
+A resposta é um JSON dizendo o que foi efetivamente limpo. Registre no relatório quando um teste precisou de reset por escalada — é informação, não ruído.
+
+**"Sem resposta" nunca é conclusão automática.** Antes de escrever isso no relatório, verifique se a IA não foi calada por escalada: olhe `desfechos.escalada` no `/saude` e o tópico IA do Telegram. Silêncio por escalada é comportamento **correto** (uma pessoa vai responder) e deve ser relatado como tal; silêncio sem escalada é bug grave. Confundir os dois estraga o relatório.
+
 **Ordem importa.** Rode por último os testes que provocam escalada ("quero falar com alguém", reclamação, pedido de desconto). Motivo: escalada ativa o **modo atendimento humano** no worker, e a partir daí a IA fica muda pra esse número por 60 minutos — e o prazo **se renova a cada mensagem nova**, então os testes seguintes morrem todos. Se isso acontecer no meio da bateria, **pare e peça pro usuário clicar em "Retomar IA" no Telegram**; você não consegue desfazer isso sozinho.
 
 ## Além do texto da resposta
