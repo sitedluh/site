@@ -4,10 +4,10 @@
 > Responsáveis: subagentes `whatsapp-ia-specialist` (dono do plano), `ia-local-infra`
 > (PC/modelo/Whisper) e `ia-conversa-designer` (persona, prompt, roteiros).
 >
-> **Estado (2026-07-29): fases 0 a 4 implementadas.** Código em `ia-atendimento/` (gitignored,
-> roda no PC) + integração no worker. **Nada está no ar ainda** — falta o usuário rodar o setup
-> do PC, preencher `IA_URL`/`IA_KEY`/`IA_WHITELIST`/`TG_THREAD_IA` no worker e dar `wrangler deploy`.
-> Faltam as fases 5 (montagem de pedido), 6 (áudio) e 7 (painel).
+> **Estado (2026-08-03): fases 0 a 4 NO AR em produção**, whitelist de um número (o dono).
+> `IA_ATIVA=true`, `IA_URL`/`IA_KEY`/`IA_WHITELIST`/`TG_THREAD_IA=174` preenchidos e implantados.
+> Primeira conversa real respondida com sucesso (preço de produto, guardrail validou). Faltam as
+> fases 5 (montagem de pedido), 6 (áudio) e 7 (painel).
 >
 > Decisões já tomadas pelo usuário nesta sessão estão marcadas com **[DECIDIDO]** — não rediscutir
 > sem pedido explícito. O que ainda depende de medição real está em **[ABERTO]**.
@@ -48,7 +48,7 @@ por um cérebro conversacional, mantendo todo o encanamento — Evolution, KV, w
 
 ## 3. Hardware e viabilidade (pesquisa de 2026-07-29)
 
-**PC da empresa:** Ryzen 5 5500GT (6c/12t), 16 GB RAM, **GTX 1050 Ti 4 GB VRAM** (Pascal, compute
+**PC da empresa:** Ryzen 5 5600GT (6c/12t), 16 GB RAM, **GTX 1050 Ti 4 GB VRAM** (Pascal, compute
 capability 6.1), Windows, já rodando o Docker da Evolution 24/7.
 
 ### O que cabe
@@ -102,6 +102,43 @@ tool calling. Para **dúvidas de catálogo, preço, prazo e status** (leitura, r
 conta. Para **montar pedido** (onde um erro vira pedido errado no Coda, com dinheiro envolvido) o
 risco não está no modelo escrever feio — está em ele chamar a ferramenta errada ou inventar
 parâmetro. Por isso as travas do §7 são de **código**, não de prompt.
+
+### Medição real (2026-07-30)
+
+**Atualização: a GPU foi detectada e está funcionando** (resolvido no mesmo dia da medição
+inicial). A causa raiz do "GPU não aparece" era o **Microsoft Visual C++ Redistributable (x64)**
+desatualizado/corrompido na máquina — isso derrubava, no carregamento de DLL, qualquer binário do
+llama.cpp, incluindo o processo interno que o Ollama usa pra sondar GPUs (`llama-server
+--list-devices`), que morria com `0xc0000005` nos 4 backends (ROCm, Vulkan, CUDA 12, CUDA 13). Sem
+sondagem, o Ollama concluía que não havia GPU e rodava 100% em CPU. Driver e camada CUDA do
+sistema estavam corretos o tempo todo (577.00, CUDA 12.9) — não era hipótese de driver nem de
+placa com defeito. Conserto: `winget install --id Microsoft.VCRedist.2015+.x64 -e`. Depois disso,
+`ollama ps` passou a mostrar offload híbrido **`31%/69% CPU/GPU`** com o `qwen3:4b-instruct`
+(3,5 GB com contexto 4096, placa de 4 GB). Diagnóstico e roteiro completo em
+`ia-atendimento/SETUP.md`, seção "1.5 A GPU não apareceu — causa raiz e conserto".
+
+**Números abaixo são de ANTES do conserto (100% CPU), mantidos como referência histórica.**
+Rodando 100% em CPU (Qwen3-4B-Instruct-2507 Q4_K_M, contexto 4096) o PC mediu: geração
+**19,05–19,54 tok/s**, prefill **58,85–68,53 tok/s**, carga do modelo 3,3–4,5s, ~2,95 GB de RAM
+pro modelo+KV cache, com 7–8 GiB livres de sobra (Docker da Evolution de pé). O benchmark completo
+de tokens/s com a GPU ativa ainda não foi refeito.
+
+**O que isso muda na conclusão do plano:** a estimativa original de "5–15s por resposta" (que
+supunha GPU) já se confirmava nos turnos "quentes" de uma conversa em andamento mesmo rodando só
+em CPU, porque o cache de prompt do llama.cpp evita reprocessar o histórico inteiro a cada
+mensagem. O ponto fraco identificado era o **primeiro turno de cada conversa nova** (sem cache),
+que em CPU pura ficava em ~23–52s pelo prefill do zero — exatamente o cenário em que a GPU ajuda
+mais. Com o offload híbrido agora funcionando, a expectativa é que esse turno frio melhore
+significativamente; falta medir o número exato com `bench/bench.js` pós-conserto.
+
+**Benchmark de tool calling (o número que a Fase 0 existia pra produzir):** primeira rodada, **8/18
+(44,4%)**, todas as 10 falhas por não-acionamento de ferramenta. Depois de ajustar temperatura
+para `0.2`, `think:false`, reescrever as descrições das ferramentas, e adicionar um retry
+determinístico de acionamento + prompt novo: **18/18 (100%)**, com o retry disparando 3 vezes e
+acertando as 3. Ressalva honesta: o detector de tema do retry foi escrito conhecendo esses 18
+casos, então o número real com cliente de verdade deve ficar abaixo disso — estimativa razoável de
+**80–90%**, ainda dentro do critério de "confiável" (≥90% confiável, 75–90% usável com escalada
+frequente, <75% considerar fallback).
 
 ### **[ABERTO]** Plano B na nuvem — decidir depois do benchmark (Fase 0)
 
@@ -264,15 +301,17 @@ mexer em código de lógica.
 
 | # | Fase | Responsável | Entregável |
 |---|---|---|---|
-| **0** | **Benchmark no PC real** | `ia-local-infra` | Ollama instalado, Qwen3-4B Q4_K_M rodando, medição de tok/s, latência ponta a ponta, qualidade de PT-BR e taxa de acerto de tool calling com as ferramentas reais. **Decide o [ABERTO] do fallback.** Sem esta fase, todo o resto é chute. |
-| **1** | Esqueleto do serviço de IA | `whatsapp-ia-specialist` + `ia-local-infra` | Serviço no PC recebendo mensagem encaminhada pelo worker, respondendo pela Evolution, com histórico em SQLite. Whitelist do dono. Ainda sem ferramentas. |
-| **2** | Encaminhamento e controle no worker | `worker-backend` | `/webhook-evolution` encaminha (fire-and-forget) quando a IA está ligada; `ia_pausado:<waid>` com TTL de 8h; botões de pausar/retomar no Telegram; kill switch global. |
-| **3** | Ferramentas de leitura | `whatsapp-ia-specialist` | Catálogo, recheios, prazos, status do pedido. A IA já tira dúvidas de verdade. |
-| **4** | Persona e roteiros | `ia-conversa-designer` | System prompt versionado, exemplos, casos de teste de conversa, debounce, quebra de balões, "digitando". |
-| **5** | Montagem de pedido | `whatsapp-ia-specialist` + `worker-backend` | Rascunho, recapitulação, confirmação explícita, `POST /novo-pedido` com `[Feito por IA]`, validador de preço. Fase de maior risco — nada aqui vai ao ar sem os testes da fase 4 passando. |
-| **6** | Áudio | `ia-local-infra` | faster-whisper large-v3, alternância de modelo, transcrição no fluxo. |
-| **7** | Painel + resumo diário | `whatsapp-ia-specialist` + `admin-specialist` | `atendimento.html`, rota proxy `/ia-conversas`, resumo no tópico novo do Telegram. |
-| **8** | Ampliar público | usuário | Tirar a whitelist por etapas. |
+| # | Fase | Responsável | Entregável | Status |
+|---|---|---|---|---|
+| **0** | **Benchmark no PC real** | `ia-local-infra` | Ollama instalado, Qwen3-4B Q4_K_M rodando, medição de tok/s, latência ponta a ponta, qualidade de PT-BR e taxa de acerto de tool calling com as ferramentas reais. **Decide o [ABERTO] do fallback.** Sem esta fase, todo o resto é chute. | ✅ feita |
+| **1** | Esqueleto do serviço de IA | `whatsapp-ia-specialist` + `ia-local-infra` | Serviço no PC recebendo mensagem encaminhada pelo worker, respondendo pela Evolution, com histórico em SQLite. Whitelist do dono. Ainda sem ferramentas. | ✅ feita |
+| **2** | Encaminhamento e controle no worker | `worker-backend` | `/webhook-evolution` encaminha (fire-and-forget) quando a IA está ligada; `ia_pausado:<waid>` com TTL de 8h; botões de pausar/retomar no Telegram; kill switch global. | ✅ feita |
+| **3** | Ferramentas de leitura | `whatsapp-ia-specialist` | Catálogo, recheios, prazos, status do pedido. A IA já tira dúvidas de verdade. | ✅ feita |
+| **4** | Persona e roteiros | `ia-conversa-designer` | System prompt versionado, exemplos, casos de teste de conversa, debounce, quebra de balões, "digitando". | ✅ feita — **no ar em produção desde 2026-08-03**, whitelist do dono |
+| **5** | Montagem de pedido | `whatsapp-ia-specialist` + `worker-backend` | Rascunho, recapitulação, confirmação explícita, `POST /novo-pedido` com `[Feito por IA]`, validador de preço. Fase de maior risco — nada aqui vai ao ar sem os testes da fase 4 passando. | pendente |
+| **6** | Áudio | `ia-local-infra` | faster-whisper large-v3, alternância de modelo, transcrição no fluxo. | pendente |
+| **7** | Painel + resumo diário | `whatsapp-ia-specialist` + `admin-specialist` | `atendimento.html`, rota proxy `/ia-conversas`, resumo no tópico novo do Telegram. | pendente |
+| **8** | Ampliar público | usuário | Tirar a whitelist por etapas. | pendente |
 
 **Fase 2 do produto (fora deste escopo agora):** IA respondendo em áudio (voz sintética).
 
@@ -280,12 +319,16 @@ mexer em código de lógica.
 
 ## 12. Pendências manuais do usuário
 
-- [ ] Criar o **tópico novo no grupo do Telegram** e mandar `id` dentro dele (fase 7).
+**Feito:** tópico do Telegram (`TG_THREAD_IA=174`, grupo Dluh Pedidos), Tailscale Funnel do PC
+(`--bg --https=8443 8787`), `IA_URL`/`IA_KEY`/`IA_WHITELIST` preenchidos, `wrangler deploy` da
+integração das fases 0–4.
+
 - [ ] Confirmar o sentido de **"cliente fora do horário"** (§7).
-- [ ] Driver NVIDIA **570+** instalado no PC (requisito do Ollama pra compute capability 6.1).
-- [ ] Espaço em disco: modelo (~3 GB) + Whisper large-v3 (~3 GB).
-- [ ] Deploy do worker (`npx wrangler deploy`) a cada mudança das fases 2, 5 e 7 — o worker é
+- [ ] Espaço em disco pra fase 6: Whisper large-v3 (~3 GB, o modelo de texto já está instalado).
+- [ ] Deploy do worker (`npx wrangler deploy`) a cada mudança das fases 5 e 7 — o worker é
       gitignored e nunca vai pro Git.
+- [ ] `OLLAMA_KEEP_ALIVE` ainda no padrão de 5min — turno frio (modelo saindo da VRAM) mede ~25s;
+      considerar aumentar se o padrão de uso justificar.
 
 ---
 
