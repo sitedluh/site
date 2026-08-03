@@ -240,6 +240,24 @@ determinística, não uma decisão do modelo:
 
 ---
 
+## 6-B. Precisão nunca se troca por velocidade **[DECIDIDO 2026-08-03]**
+
+Regra do dono, sem exceção: **nenhuma otimização de latência pode reduzir a confiabilidade da
+informação dada ao cliente.** Surgiu de uma proposta concreta — cachear o retorno de
+`/horarios-disponiveis` pra economizar 1–3s por consulta repetida — que foi **recusada**, porque
+abriria a chance de oferecer um horário que acabou de ser ocupado.
+
+O que isso proíbe, na prática: cache de disponibilidade de agenda, reaproveitar consulta de status
+entre turnos, pular a validação de preço pra ganhar tempo, reduzir a checagem de data quando o
+cliente "provavelmente" quis dizer o dia óbvio. O que continua permitido: qualquer ganho que não
+toque no dado — prompt menor, menos tokens gerados à toa, cache de catálogo (preço muda por decisão
+da loja, não sozinho), instrumentação, `keep_alive` do modelo.
+
+Se a escolha for entre uma resposta mais lenta e uma resposta mais arriscada, é a lenta. Se alguém
+propuser o contrário, a resposta é esta seção.
+
+---
+
 ## 7. Guardrails — implementados como código, não como prompt **[DECIDIDO]**
 
 | Regra | Como é garantida |
