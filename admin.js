@@ -213,6 +213,36 @@ document.addEventListener('click',(e)=>{
 window.addEventListener('resize',closeAllCardMenus);
 window.addEventListener('scroll',closeAllCardMenus,true);
 
+// ── ALTERAÇÕES PENDENTES (edições do admin ainda não avisadas ao cliente) ───
+// Vem de /pedidos-pendentes: p.alteracoesPendentes (número) + p.alteracoesPendentesLista
+// ([{campo,de,para,ts}], original → atual já consolidado). O envio de verdade é o botão
+// "📣 Notificar alterações", que dispara POST /notificar-alteracoes — ver mais abaixo.
+const CAMPO_ALTERACAO_LABEL={
+  data:'Data',entrega:'Entrega',pagamento:'Pagamento',total:'Total',taxa:'Taxa de entrega',status:'Status',
+};
+function _labelCampoAlteracao(campo){
+  const c=String(campo||'');
+  if(c.startsWith('item:'))return 'Item: '+c.slice(5);
+  return CAMPO_ALTERACAO_LABEL[c]||c;
+}
+function _fmtAlteracoesTooltip(lista){
+  if(!Array.isArray(lista)||!lista.length)return '';
+  return lista.map(a=>`${_labelCampoAlteracao(a.campo)}: ${a.de||'(vazio)'} → ${a.para||'(removido)'}`).join('\n');
+}
+// Badge/pill visível no corpo do card sem precisar abrir o menu ☰.
+function pillAlteracoesPendentes(p){
+  const n=Number(p&&p.alteracoesPendentes)||0;
+  if(n<=0)return '';
+  const tip=_fmtAlteracoesTooltip(p.alteracoesPendentesLista);
+  return `<span class="pill-alteracoes"${tip?` title="${esc(tip)}"`:''}>✏️ ${n} alteraç${n===1?'ão':'ões'} não enviada${n===1?'':'s'}</span>`;
+}
+// Botão do menu ☰ — só existe quando há algo pra mandar (alteracoesPendentes>0).
+function btnNotificarAlteracoesHtml(p){
+  const n=Number(p&&p.alteracoesPendentes)||0;
+  if(n<=0)return '';
+  return `<button class="btn-notificar-alteracoes" onclick="closeAllCardMenus();abrirConfirmNotificarAlteracoes('${esc(p.rowId||'')}','${esc(p.cliente||'')}',${n},this)">📣 Notificar alterações (${n})</button>`;
+}
+
 function cardPedido(p){
   const id=p.idPedido;
   const st=p.status||'Aguardando confirmação';
@@ -251,6 +281,7 @@ function cardPedido(p){
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
         <span class="badge">${esc(st)}</span>
+        ${pillAlteracoesPendentes(p)}
         ${p.rowId?buildStatusSelect(p.rowId,st):''}
       </div>
     </div>
@@ -297,12 +328,13 @@ function cardPedido(p){
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             Confirmar e cobrar
           </button>
-          <button onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId||'')}','${esc(p.cliente)}','${esc(p.telefone)}',this)" style="background:none;border:1.5px solid #10b981;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#047857;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
+          <button class="btn-pago-total" onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId||'')}','${esc(p.cliente)}','${esc(p.telefone)}',this)">
             💚 Marcar como pago (Pix por fora)
           </button>
           <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId||'')}')">
             ✏️ Editar itens
           </button>
+          ${btnNotificarAlteracoesHtml(p)}
           <button onclick="closeAllCardMenus();notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
             📱 Avisar cliente
           </button>
@@ -671,7 +703,13 @@ async function salvarDetalhesPedido(){
     const d=await res.json().catch(()=>({}));
     if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao salvar no Coda');
     const novoTotal=(d.novoTotal!=null)?d.novoTotal:estado.total;
-    const aviso=notificar?' · cliente e Telegram avisados':' · nenhuma alteração a comunicar';
+    // O cliente NÃO é avisado na hora — a edição só entra na fila de "Alterações
+    // Pendentes" (worker) e só sai pro WhatsApp quando o atendente clicar em
+    // "📣 Notificar alterações". O Telegram (canal interno), esse sim, sai sempre.
+    const qtdAlt=Number(d.alteracoesRegistradas)||0;
+    const aviso=qtdAlt>0
+      ?` · Telegram avisado · cliente entra na fila de alterações (${qtdAlt})`
+      :' · Telegram avisado · nenhuma alteração para o cliente';
     showToast(`Pedido atualizado ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}${aviso}`);
     closeDetalhesModal();
     _estoqueSig=null;
@@ -1064,7 +1102,17 @@ function statusCardHtml(p,status){
   const itensResumo=(p.itens||[]).slice(0,2).map(i=>`${i.quantidade}x ${i.produto}`).join(' | ');
   const total=p.total||(p.itens||[]).reduce((s,i)=>s+(Number(i.valorItem)||0),0);
   const restante=Math.round((total-(p.valorPago||0))*100)/100;
-  const podeRestante=status==='Entregue — Esperando restante'&&restante>0;
+  // Mostra "Cobrar restante" em qualquer status NÃO-final (Finalizado/Cancelado são
+  // terminais — ver ciclo de vida do Status no CLAUDE.md) sempre que sobrar saldo em
+  // aberto — não só depois da entrega (ex.: pagamento parcial em "Pago — Em produção").
+  // MAS exige que já tenha entrado dinheiro (ou que o pedido já esteja entregue, caso
+  // do "pagar na retirada", que chega na entrega com Valor Pago = 0): cobrar "restante"
+  // de um pedido em que nada foi pago geraria um link `_restante` do valor TOTAL, com a
+  // mensagem "Seu pedido foi entregue!", sobrescreveria o "Link de Pagamento" da entrada
+  // e, ao ser pago, o webhook levaria o pedido direto pra 'Finalizado' SEM criar a row
+  // na Fila Cozinha (a cozinha nunca veria o pedido). Nesses casos o certo é
+  // "Cobrar Total"/"Cobrar Entrada", que já estão no mesmo menu.
+  const podeRestante=restante>0&&((Number(p.valorPago)||0)>0||status==='Entregue — Esperando restante')&&!['Cancelado','Finalizado'].includes(status);
   const podePagarRetirada=status==='Confirmado — Esperando pagamento';
   const podeMarcarEntregue=!['Entregue — Esperando restante','Finalizado','Cancelado'].includes(status);
   return`<div class="status-card" data-rowid="${esc(p.rowId||'')}">
@@ -1076,6 +1124,7 @@ function statusCardHtml(p,status){
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <span class="sc-badge ${cls}">${esc(status)}</span>
         ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${psEntregue?'#d1fae5':'#fef3c7'};color:${psEntregue?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
+        ${pillAlteracoesPendentes(p)}
       </div>
     </div>
     <div class="sc-actions">
@@ -1086,13 +1135,14 @@ function statusCardHtml(p,status){
         <div class="card-menu-wrap">
           <button class="card-menu-btn" onclick="toggleCardMenu(this)" title="Mais ações">${ICON_MENU}</button>
           <div class="card-menu-dropdown">
-            ${podeRestante?`<button class="btn-cobrar-restante" onclick="closeAllCardMenus();cobrarRestante('${esc(p.idPedido)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
+            ${podeRestante?`<button class="btn-cobrar-restante" onclick="closeAllCardMenus();cobrarRestante('${esc(p.idPedido||p.rowId)}','${esc(p.telefone)}','${esc(p.cliente)}')">💳 Cobrar restante · ${fmtBRL(restante)}</button>`:''}
             ${podePagarRetirada?`<button class="btn-pagar-retirada" onclick="closeAllCardMenus();abrirConfirmPagarRetirada('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💵 Pagar na Retirada</button>`:''}
             <button class="btn-pago-total" onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId)}','${esc(p.cliente)}','${esc(p.telefone)}',this)">💚 Marcar como pago (Pix por fora)</button>
             <button class="btn-cobrar-total-adm" onclick="closeAllCardMenus();cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
             <button class="btn-cobrar-entrada-adm" onclick="closeAllCardMenus();cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
             ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="closeAllCardMenus();marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
             <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId)}')">✏️ Editar itens</button>
+            ${btnNotificarAlteracoesHtml(p)}
             ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="closeAllCardMenus();abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
             <button class="btn-apagar" onclick="closeAllCardMenus();abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
           </div>
@@ -1135,7 +1185,11 @@ async function carregarStatus(){
         fetch(`${WORKER}/atualizar-status`,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({rowId:p.rowId,status:novoStatus})
+          // auto:true — transição disparada pelo PEDIDO_STATUS_MAP, não pelo
+          // atendente. Sem esse campo o worker registraria a mudança na fila de
+          // "Alterações Pendentes" e o card ganharia a pill "✏️ 1 alteração não
+          // enviada" num pedido do qual o cliente já foi avisado (ex.: entrega).
+          body:JSON.stringify({rowId:p.rowId,status:novoStatus,auto:true})
         }).catch(()=>{});
       }
     }
@@ -1245,6 +1299,7 @@ function _confirmOk(){
   if(_pendingAction==='apagar')return _confirmApagarOk();
   if(_pendingAction==='pagar-retirada')return _confirmPagarRetiradaOk();
   if(_pendingAction==='pago-total')return _confirmPagoTotalOk();
+  if(_pendingAction==='notificar-alteracoes')return _confirmNotificarAlteracoesOk();
 }
 async function _confirmFinalizarOk(){
   if(!_actionRowId)return;
@@ -1357,6 +1412,57 @@ async function _confirmPagoTotalOk(){
     carregarPedidos();
   }catch(e){
     showToast('Erro: '+e.message);
+  }finally{
+    okBtn.disabled=false;
+    closeConfirm();
+  }
+}
+
+// ── NOTIFICAR ALTERAÇÕES AO CLIENTE (fila acumulada de edições do admin) ────
+// O cliente NÃO é mais avisado no momento em que o admin salva uma edição —
+// cada edição só acumula "antes → depois" na coluna Alterações Pendentes do
+// Coda (ver salvarDetalhesPedido/salvarEditItens). Esse botão dispara o envio
+// de tudo junto de uma vez (POST /notificar-alteracoes), quando o atendente
+// quiser. Reusa o modal de confirmação compartilhado (mesmo padrão de
+// abrirConfirmPagoTotal/abrirConfirmFinalizar).
+function abrirConfirmNotificarAlteracoes(rowId,nomeCliente,qtd,btnEl){
+  if(!rowId){showToast('Pedido ainda não tem linha no Coda — não dá pra notificar.');return;}
+  _pendingAction='notificar-alteracoes';_actionRowId=rowId;_actionBtnEl=btnEl;
+  document.getElementById('confirm-icon').textContent='📣';
+  document.getElementById('confirm-title').textContent='Notificar alterações ao cliente?';
+  document.getElementById('confirm-msg').innerHTML=`Enviar pelo WhatsApp o resumo das <b>${qtd} alteraç${qtd===1?'ão':'ões'}</b> pendente${qtd===1?'':'s'} no pedido de <b>${esc(nomeCliente||'cliente')}</b>?`;
+  document.getElementById('confirm-ok-btn').textContent='Sim, notificar';
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+async function _confirmNotificarAlteracoesOk(){
+  if(!_actionRowId)return;
+  const okBtn=document.getElementById('confirm-ok-btn');
+  okBtn.disabled=true;okBtn.textContent='Enviando...';
+  const rowId=_actionRowId;
+  try{
+    const res=await fetch(`${WORKER}/notificar-alteracoes`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rowId})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(d&&d.ok){
+      // Sucesso: {ok:true, paiId, enviadas, limpou:true, alteracoesPendentes:0}
+      showToast(`Alterações enviadas ao cliente ✅${d.enviadas?` (${d.enviadas})`:''}`);
+      _estoqueSig=null; // badge some — força re-render
+      carregarStatus();
+    }else if(d&&d.motivo==='sem alterações'){
+      // Nada a enviar (pode ter sido notificado por outra aba/atendente enquanto o
+      // card estava aberto): só avisa e recarrega pra sumir o botão/badge.
+      showToast('Nada pendente para notificar — já foi tudo enviado.');
+      _estoqueSig=null;
+      carregarStatus();
+    }else{
+      // Falha de envio: {ok:false, error, motivo, alteracoesPendentes:<n>} — a fila
+      // NÃO foi limpa no worker, então dá pra tentar de novo (não recarrega o badge).
+      showToast('Erro ao notificar: '+(d&&(d.motivo||d.error)||'falha desconhecida')+' — pode tentar de novo.');
+    }
+  }catch(e){
+    showToast('Erro ao notificar: '+e.message+' — pode tentar de novo.');
   }finally{
     okBtn.disabled=false;
     closeConfirm();
@@ -1539,7 +1645,11 @@ async function salvarEditItens(){
     const d=await res.json().catch(()=>({}));
     if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao salvar edição no Coda');
     const novoTotal=(d.novoTotal!=null)?d.novoTotal:total;
-    const aviso=notificar?' · cliente e Telegram avisados':' · nenhuma alteração a comunicar';
+    // Idem salvarDetalhesPedido(): cliente não é avisado na hora, só entra na fila.
+    const qtdAlt=Number(d.alteracoesRegistradas)||0;
+    const aviso=qtdAlt>0
+      ?` · Telegram avisado · cliente entra na fila de alterações (${qtdAlt})`
+      :' · Telegram avisado · nenhuma alteração para o cliente';
     showToast(`Itens atualizados ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}${aviso}`);
     closeEditModal();
     _estoqueSig=null; // itens mudaram — força re-render da aba Estoque também

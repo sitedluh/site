@@ -123,6 +123,21 @@
   /* Editar itens (qualquer status) */
   .btn-editar-itens{background:var(--surface);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
   .btn-editar-itens:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* Marcar como pago (Pix por fora) — mesma altura/tipografia dos outros itens do
+     card-menu-dropdown (antes vinha com style="" inline só no card de Estoque, e sem
+     nenhuma classe no card de Status — visual inconsistente entre as duas abas). */
+  .btn-pago-total{background:var(--surface);color:#047857;border:1.5px solid #10b981;border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;display:flex;align-items:center;gap:6px}
+  .btn-pago-total:hover{background:#ecfdf5}
+
+  /* Notificar alterações ao cliente (fila de edições do admin ainda não avisadas) */
+  .btn-notificar-alteracoes{background:var(--surface);color:#b45309;border:1.5px solid #f59e0b;border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;display:flex;align-items:center;gap:6px}
+  .btn-notificar-alteracoes:hover{background:#fffbeb}
+  .btn-notificar-alteracoes:disabled{opacity:.6;cursor:not-allowed}
+
+  /* Pill "N alterações não enviadas" — visível no corpo do card sem abrir o ☰,
+     mesma paleta âmbar/atenção já usada nas outras pills do admin. */
+  .pill-alteracoes{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;cursor:default;white-space:nowrap}
   .edit-box{background:var(--surface);border-radius:var(--radius);max-width:580px;width:100%;padding:22px 20px;box-shadow:0 10px 40px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto}
   .edit-title{font-size:16px;font-weight:700;color:var(--text);font-family:'Playfair Display',serif;margin-bottom:4px}
   .edit-sub{font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5}

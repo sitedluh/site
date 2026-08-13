@@ -35,6 +35,7 @@ Rows PAI (pedido) — colunas:
 | `ID Pedido` | Fórmula: `Format("PED-{1}", RowId(thisRow))` | identificador estável usado por webhook/bot |
 | `Comprovante` | Texto/Link | |
 | `Link de Pagamento` | Texto/Link | |
+| `Alterações Pendentes` | Texto (multiline) | **(2026-08-13)** Fila de alterações feitas no admin que o cliente **ainda não** foi avisado. Formato **JSON Lines** (uma linha por alteração): `{"ts":"…","campo":"data","de":"13/08/2026 às 14:30","para":"14/08/2026 às 14:30"}`. `campo` ∈ `data`,`entrega`,`pagamento`,`total`,`taxa`,`status`,`item:<produto>`,`_resumo`. Escrita por `/editar-pedido` e `/atualizar-status` (append, nunca sobrescreve); lida e **limpa** por `POST /notificar-alteracoes`; exposta em `/pedidos-pendentes` como `alteracoesPendentes`/`alteracoesPendentesLista`. Sem a coluna, nada quebra — só nunca fica nada acumulado (o append loga o erro). |
 | `Telegram Msg ID` | Texto | `chatId:messageId` da notificação original no tópico Pendentes — usada por `sincronizarBotaoTelegram()` pra editar essa mensagem (trocar o botão "Confirmar Estoque") quando o pedido é confirmado por fora do Telegram (admin/Coda). Sem essa coluna, a escrita/leitura falha silenciosa e a mensagem original nunca é atualizada. |
 
 Rows ITEM (mesma table) — colunas adicionais:
@@ -67,6 +68,7 @@ Rows ITEM (mesma table) — colunas adicionais:
 | `Valor da Entrega` | Número (moeda) | **campo do pai — não existe mais row filha de taxa** |
 | `Pago?` | Select: `Não pago`, `Só entrada`, `Totalmente pago` | |
 | `Status` | Select: `Pendente`, `Feito`, `Entregue` | o worker (`/pedido-feito`) grava `Feito`; `Entregue` é desfecho legado que o painel também reconhece |
+| `ID Pedido` | Texto | **(2026-08-13)** Cópia do `ID Pedido` da row-pai do `Pedidos Site`, gravada por `pbCriarRowFila`. É por ela que `pbAtualizarFila` reencontra a row na hora de refletir pagamento (`Pago?`/`Valor Pago`). O casamento antigo era só `Cliente`+`Data`+`Hora` e falhava **em silêncio** quando qualquer um dos três divergia — foi assim que "restante pago" deixou de virar `Totalmente pago` na fila. Sem a coluna o worker continua funcionando (cai nos critérios frouxos e alerta no Telegram), mas **com ela o casamento é exato**. |
 
 O worker cria a row da fila diretamente em 2 momentos: entrada paga (webhook, `Pago?='Só entrada'`) e "Pagar na Retirada" (`Pago?='Não pago'`) — já com `Valor da Entrega` preenchido e a taxa FORA do texto/valor dos itens.
 
