@@ -916,7 +916,10 @@ function confirmarEstoque(id){
   const entrada=Math.round(total*pct/100*100)/100;
   const url=`${WORKER}/confirmar-estoque?pedidoId=${enc(id)}&total=${enc(total)}&telefone=${enc(telefone)}&cliente=${enc(cliente)}&entrada=${enc(entrada)}`;
   window.open(url,'_blank');
-  showToast('Abrindo WhatsApp com link de pagamento…');
+  // A rota não redireciona mais pro WhatsApp: o cliente já é avisado
+  // automaticamente na confirmação (detalhamento + link). A aba nova é só a
+  // página de confirmação com o link pra copiar, caso o atendente precise.
+  showToast('Confirmando estoque — o cliente é avisado automaticamente…');
   const ICON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
   setTimeout(()=>{if(btn){btn.disabled=false;btn.innerHTML=ICON+' Confirmar e cobrar';}},6000);
 }
