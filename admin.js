@@ -20,6 +20,9 @@ function tentarDeepLink(){
 }
 
 function fmtBRL(v){return'R$ '+Number(v||0).toFixed(2).replace('.',',');}
+// Mesma formatação de fmtBRL só que sem o prefixo "R$" — usado no input editável de
+// valor pago (registro manual), onde o "R$" já vem fixo fora do <input>.
+function fmtNumBR(v){return Number(v||0).toFixed(2).replace('.',',');}
 function fmtData(d){if(!d)return'—';const p=d.split('-');return p.length===3?p.reverse().join('/'):d;}
 
 // Ordena pedidos por data+hora de entrega (ASC). data é ISO "YYYY-MM-DD" e hora é
@@ -410,6 +413,14 @@ function agruparItensPorTipo(itens){
 
 let _detalhesRowId=null;
 let _detalhesSnap=null; // estado no momento de abrir — usado só pra montar o resumo de alterações
+// Bloco "Pagamento por fora (registro manual)" dentro do modal de Detalhes — ver
+// salvarValorPago() / _dpRecalcular() mais abaixo. _dpTotal é o Total do pedido no
+// momento em que o modal abriu (referência pro cálculo do Restante ao vivo);
+// _dpOriginal é o último "Valor Pago" confirmado pelo worker (o que veio no fetch,
+// ou o que a própria rota devolveu depois de um save bem-sucedido) — usado só pra
+// decidir se o botão "Salvar valor pago" fica habilitado (valor digitado != original).
+let _dpTotal=0;
+let _dpOriginal=0;
 
 function maskPhoneAdmin(input){
   let v=input.value.replace(/\D/g,'');
@@ -470,8 +481,21 @@ function abrirDetalhesPedido(rowId){
       <input id="dt-frete" type="number" min="0" step="0.01" value="${_detalhesSnap.taxa.toFixed(2)}" oninput="recalcDetalheItens()">
     </div>
     <div class="detalhes-totais">
-      <div>Pago: <b>${fmtBRL(p.valorPago||0)}</b></div>
       <div class="tot-final">Total: <span id="detalhes-total-live">${fmtBRL(p.total||0)}</span></div>
+    </div>
+    <div class="dp-pagamento">
+      <div class="dp-titulo">💵 Pagamento por fora (registro manual)</div>
+      <div class="dp-aviso">Só pra corrigir na mão quando o cliente pagou fora do link (dinheiro, Pix direto etc). <b>Não avisa o cliente</b> e <b>não muda o Status</b> do pedido.</div>
+      <div class="dp-grid">
+        <div class="dp-campo"><span class="dp-label">Total</span><b id="dp-total">${fmtBRL(p.total||0)}</b></div>
+        <div class="dp-campo">
+          <label class="dp-label" for="dp-input-pago">Valor já pago</label>
+          <div class="dp-input-wrap"><span>R$</span><input id="dp-input-pago" type="text" inputmode="decimal" value="${fmtNumBR(Number(p.valorPago)||0)}" oninput="_dpRecalcular()"></div>
+        </div>
+        <div class="dp-campo"><span class="dp-label">Restante</span><b id="dp-restante">${fmtBRL(Math.max((Number(p.total)||0)-(Number(p.valorPago)||0),0))}</b></div>
+      </div>
+      <div id="dp-fila-alerta" class="dp-fila-alerta" style="display:none">⚠️ A Fila Cozinha NÃO foi atualizada automaticamente — ajuste manualmente no Coda.</div>
+      <button type="button" id="dp-salvar-btn" class="dp-btn-salvar" onclick="salvarValorPago()" disabled>Salvar valor pago</button>
     </div>
   `;
   // Cabeçalho de categoria + linhas do grupo, tudo na mesma tbody (mantém o agrupamento
@@ -486,6 +510,14 @@ function abrirDetalhesPedido(rowId){
   });
   if(!itensEditaveis.length)addDetalheItem();
   _dtToggleEndereco();
+  // Estado do bloco "Pagamento por fora" — precisa do Total/Valor Pago que vieram
+  // do fetch (não do que está sendo digitado nos itens acima, que ainda não foi
+  // salvo). rowId do pedido PAI já está em _detalhesRowId (setado no topo desta
+  // função) — é ele que salvarValorPago() manda pro worker.
+  _dpTotal=Number(p.total)||0;
+  _dpOriginal=Number(p.valorPago)||0;
+  document.getElementById('dp-fila-alerta').style.display='none';
+  _dpRecalcular();
   document.getElementById('detalhes-overlay').classList.add('open');
 }
 
@@ -565,6 +597,7 @@ function recalcDetalheItens(){
 function closeDetalhesModal(){
   document.getElementById('detalhes-overlay').classList.remove('open');
   _detalhesRowId=null;_detalhesSnap=null;
+  _dpTotal=0;_dpOriginal=0;
 }
 
 // Lê o estado ATUAL do modal (campos do pedido + itens — linha em modo visualização usa o
@@ -752,6 +785,96 @@ function imprimirDetalhesPedido(){
     <div class="p-footer">D'Luh Festas agradece seu pedido! ❤️</div>
   `;
   setTimeout(()=>window.print(),100);
+}
+
+// ── PAGAMENTO POR FORA (registro manual — dentro do modal Detalhes) ─────────
+// Cliente pagou parte/tudo fora do link de pagamento (dinheiro na mão, Pix direto
+// pro número pessoal etc) e a dona quer corrigir o "Valor Pago" sem gerar cobrança
+// nem mexer no Status. POST {WORKER}/registrar-pagamento — contrato: valorPago é o
+// TOTAL acumulado já pago (substitui, não soma); o worker reflete na Fila Cozinha
+// (Pago?/Valor Pago) e anota nas Observações; NÃO muda Status, NÃO avisa o cliente.
+
+// Aceita tanto "150,00"/"1.234,56" (vírgula decimal, ponto de milhar) quanto
+// "150.00" (ponto decimal, sem vírgula) — cobre o que um teclado numérico BR e um
+// copy/paste de outro sistema podem digitar. NaN se não sobrar nada numérico.
+function _dpParseValor(str){
+  let s=String(str||'').trim();
+  if(!s)return NaN;
+  s=s.replace(/[^\d,.\-]/g,'');
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  return parseFloat(s);
+}
+
+// Recalcula o "Restante" ao vivo (sem salvar nada) e liga/desliga o botão —
+// habilitado só quando o valor digitado é numérico, entre 0 e o Total, e DIFERENTE
+// do último valor confirmado pelo worker (_dpOriginal). Mesma validação de faixa
+// que o worker aplica (negativo/maior-que-Total viram erro lá) — checar aqui evita
+// a viagem de rede pro erro óbvio, mas o worker é quem tem a palavra final.
+function _dpRecalcular(){
+  const inp=document.getElementById('dp-input-pago');
+  const btn=document.getElementById('dp-salvar-btn');
+  const restEl=document.getElementById('dp-restante');
+  if(!inp||!btn)return;
+  const val=_dpParseValor(inp.value);
+  const valido=!isNaN(val)&&val>=0&&val<=_dpTotal+0.005; // epsilon pra ponto flutuante
+  if(restEl)restEl.textContent=valido?fmtBRL(Math.max(Math.round((_dpTotal-val)*100)/100,0)):'—';
+  const mudou=valido&&Math.round(val*100)!==Math.round(_dpOriginal*100);
+  btn.disabled=!(valido&&mudou);
+}
+
+async function salvarValorPago(){
+  const rowId=_detalhesRowId;
+  if(!rowId){showToast('Pedido não encontrado — feche e reabra os Detalhes.');return;}
+  const inp=document.getElementById('dp-input-pago');
+  const val=_dpParseValor(inp?inp.value:'');
+  if(isNaN(val)||val<0){showToast('Valor inválido.');return;}
+  const btn=document.getElementById('dp-salvar-btn');
+  const textoOriginal=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='Salvando…';}
+  try{
+    const res=await fetch(`${WORKER}/registrar-pagamento`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rowId,valorPago:val,origem:'admin'})
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao registrar pagamento');
+
+    const novoValorPago=Number(d.valorPago!=null?d.valorPago:val)||0;
+    const novoTotal=d.total!=null?Number(d.total):_dpTotal;
+    const novoRestante=d.restante!=null?Number(d.restante):Math.max(novoTotal-novoValorPago,0);
+
+    if(d.semMudanca){
+      showToast(`Valor pago já estava em ${fmtBRL(novoValorPago)} — nada mudou.`);
+    }else{
+      showToast(`Valor pago atualizado: ${fmtBRL(novoValorPago)} · restante ${fmtBRL(novoRestante)}`
+        +(d.filaAtualizada===false?' · ⚠️ Fila Cozinha NÃO atualizada — ajuste manual no Coda':''));
+    }
+
+    // Alerta fixo no modal quando a Fila Cozinha não foi refletida — a cozinha não
+    // pode trabalhar com o valor errado achando que já está certo.
+    const alertaEl=document.getElementById('dp-fila-alerta');
+    if(alertaEl)alertaEl.style.display=(d.filaAtualizada===false)?'block':'none';
+
+    // Atualiza a tela (Total/Restante do próprio bloco) e o cache local — sem isso
+    // o card por trás do modal (e o botão "💳 Cobrar restante", que depende de
+    // total−valorPago) só refletiria a mudança depois do próximo poll de 30s.
+    _dpTotal=novoTotal;_dpOriginal=novoValorPago;
+    if(inp)inp.value=fmtNumBR(novoValorPago);
+    const totalEl=document.getElementById('dp-total');
+    if(totalEl)totalEl.textContent=fmtBRL(novoTotal);
+    const restEl=document.getElementById('dp-restante');
+    if(restEl)restEl.textContent=fmtBRL(novoRestante);
+    const p=_pedidosCache[rowId];
+    if(p){p.valorPago=novoValorPago;if(d.total!=null)p.total=novoTotal;}
+
+    _estoqueSig=null; // força re-render da aba Estoque também, se o pedido estiver lá
+    carregarStatus();
+  }catch(e){
+    showToast('Erro ao registrar pagamento: '+e.message);
+  }finally{
+    if(btn)btn.textContent=textoOriginal||'Salvar valor pago';
+    _dpRecalcular(); // reavalia o disabled com o _dpOriginal (atualizado ou não)
+  }
 }
 
 // datalist para autocomplete nos inputs existentes (fallback — hoje o elemento

@@ -172,6 +172,28 @@
   .btn-detalhes{background:var(--surface);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
   .btn-detalhes:hover{border-color:var(--accent);color:var(--accent)}
 
+  /* Bloco "Pagamento por fora" (registro manual, dentro do modal Detalhes) — visual
+     de "atenção" (fundo âmbar suave) pra deixar claro que é uma correção manual, não
+     um fluxo automático de cobrança. Some do recibo térmico via a mesma regra
+     `body>*{display:none!important}` do @media print (só #print-area sobrevive, e
+     esse bloco nunca é escrito lá). */
+  .dp-pagamento{margin-top:16px;padding:12px 14px;border:1px solid #f5d9a8;border-radius:var(--radius-sm);background:#fffaf0}
+  .dp-titulo{font-size:12.5px;font-weight:700;color:#92400e;margin-bottom:4px}
+  .dp-aviso{font-size:11.5px;color:#8a6d3b;line-height:1.5;margin-bottom:10px}
+  .dp-aviso b{color:#7a4a00}
+  .dp-grid{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:10px;align-items:end}
+  @media(max-width:480px){.dp-grid{grid-template-columns:1fr}}
+  .dp-campo{display:flex;flex-direction:column;gap:4px}
+  .dp-campo b{font-size:14px;color:var(--text)}
+  .dp-label{font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.3px}
+  .dp-input-wrap{display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:#fff}
+  .dp-input-wrap span{font-size:13px;color:var(--text3);font-weight:600}
+  .dp-input-wrap input{border:none;outline:none;flex:1;font-size:13.5px;font-family:'DM Sans',sans-serif;color:var(--text);min-width:0;background:transparent}
+  .dp-fila-alerta{margin-top:10px;font-size:12px;font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:7px 10px;line-height:1.4}
+  .dp-btn-salvar{margin-top:10px;width:100%;background:#b45309;color:#fff;border:none;border-radius:var(--radius-sm);padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+  .dp-btn-salvar:hover:not(:disabled){background:#92400e}
+  .dp-btn-salvar:disabled{opacity:.45;cursor:not-allowed}
+
   /* Menu "mais ações" (☰) — junta os botões menos usados num dropdown, só Detalhes
      e o próprio ☰ ficam sempre visíveis no card. */
   .card-menu-wrap{position:relative;display:inline-flex}
