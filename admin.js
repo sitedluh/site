@@ -64,6 +64,20 @@ function renderComCabecalhoDia(lista,montarCardFn){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function enc(s){return encodeURIComponent(s||'');}
 
+// Linha "Total / Pago / Falta" visível direto no corpo do card, sem precisar abrir
+// Detalhes — pedido da dona pra ver de cara quanto falta receber. É o pagamento REAL
+// (Valor Pago que já entrou pelo Coda), diferente do bloco Total/Entrada/Restante que
+// já existe no card de Estoque pendente (esse é a SIMULAÇÃO ao vivo da cobrança a
+// partir dos itens sendo editados, recalculada por recalcCard() — não confundir os
+// dois). Cor de destaque enquanto falta receber, verde discreto quando já quitado.
+function linhaPagamentoReal(total,valorPago){
+  const t=Number(total)||0;
+  const pago=Number(valorPago)||0;
+  const falta=Math.max(Math.round((t-pago)*100)/100,0);
+  const quitado=falta<=0;
+  return `<div class="pagamento-real">💰 Total ${fmtBRL(t)} · ✅ Pago ${fmtBRL(pago)} · <span class="${quitado?'pr-ok':'pr-falta'}">⏳ Falta ${fmtBRL(falta)}</span></div>`;
+}
+
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2800);
@@ -281,6 +295,7 @@ function cardPedido(p){
         <div class="card-meta">📱 ${esc(p.telefone)} · <b>${esc(p.entrega||'—')}</b> · <b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
         ${p.pagamento?`<div class="card-meta" style="margin-top:2px">💳 ${esc(p.pagamento)}</div>`:''}
         ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
+        ${(Number(p.valorPago)||0)>0?linhaPagamentoReal(total,p.valorPago):''}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
         <span class="badge">${esc(st)}</span>
@@ -1247,6 +1262,7 @@ function statusCardHtml(p,status){
       <div class="sc-meta">📱 ${esc(p.telefone||'—')} · <b>${esc(p.entrega||'Retirada')}</b> · <b>${fmtData(p.data)}${p.hora?' às '+esc(p.hora):''}</b></div>
       <div class="sc-itens">${esc(itensResumo)}${total?` · ${fmtBRL(total)}`:''}</div>
       ${p.obs?`<div class="card-meta" style="margin-top:2px;color:var(--accent)">📝 ${esc(p.obs)}</div>`:''}
+      ${linhaPagamentoReal(total,p.valorPago)}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <span class="sc-badge ${cls}">${esc(status)}</span>
         ${ps?`<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${psEntregue?'#d1fae5':'#fef3c7'};color:${psEntregue?'#065f46':'#92400e'}">📦 ${esc(ps)}</span>`:''}
@@ -1356,7 +1372,9 @@ async function carregarStatus(){
 function cobrarRestante(pedidoId,telefone,cliente){
   const url=`${WORKER}/cobrar-restante?pedidoId=${enc(pedidoId)}&telefone=${enc(telefone)}&cliente=${enc(cliente)}`;
   window.open(url,'_blank');
-  showToast('Abrindo WhatsApp com link do restante…');
+  // A rota não redireciona mais pro WhatsApp: ela manda a mensagem sozinha pelo bot
+  // da empresa e responde uma página de confirmação com o link pra copiar.
+  showToast('Cobrança enviada ao cliente no WhatsApp — a aba nova traz o link pra copiar…');
 }
 
 function cobrarTotalAdmin(rowId){

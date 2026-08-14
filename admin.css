@@ -138,6 +138,15 @@
   /* Pill "N alterações não enviadas" — visível no corpo do card sem abrir o ☰,
      mesma paleta âmbar/atenção já usada nas outras pills do admin. */
   .pill-alteracoes{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;cursor:default;white-space:nowrap}
+
+  /* Linha "Total / Pago / Falta" — pagamento REAL (Valor Pago vindo do Coda), visível
+     direto no card nas duas abas (Estoque pendente e por status). Não é a simulação
+     Total/Entrada/Restante do card de Estoque (essa recalcula ao vivo a partir dos
+     itens sendo editados) — só o rótulo "Falta"/cor muda pra deixar claro qual é qual. */
+  .pagamento-real{font-size:12.5px;font-weight:600;color:var(--text2);margin-top:5px;line-height:1.5}
+  .pagamento-real .pr-falta{color:#b45309;font-weight:700}
+  .pagamento-real .pr-ok{color:#047857;font-weight:700}
+  @media(max-width:480px){.pagamento-real{font-size:12px}}
   .edit-box{background:var(--surface);border-radius:var(--radius);max-width:580px;width:100%;padding:22px 20px;box-shadow:0 10px 40px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto}
   .edit-title{font-size:16px;font-weight:700;color:var(--text);font-family:'Playfair Display',serif;margin-bottom:4px}
   .edit-sub{font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5}
