@@ -103,6 +103,10 @@ Quatro cruzam `cardapio.html` **e** `empresas.html`, cada um num domínio de JS 
 - **`bot-specialist`** — bot de triagem + "Meus Pedidos" (`<page>-bot.js`/`-meus-pedidos.js`).
 - **`auth-specialist`** — login Firebase/Google + histórico (`<page>-auth.js`).
 
+Um de **operação** (não mexe em código):
+
+- **`lancador-pedidos`** (`model: opus`) — lança pedidos no `admin.html` a partir de texto solto do cliente: preenche o modal de Pedido manual pelo Chrome MCP e, quando mandado, registra/confirma/cobra/marca pagar-na-retirada/entregue. Opus porque grava pedido de verdade (dinheiro envolvido). **Regra de ouro: só salva com autorização explícita** — sem ela, deixa o modal aberto pra conferência. Carrega os gotchas operacionais: a data vem sempre de `new Date()` **no navegador** (o sandbox atrasa e conversas longas atravessam dias), consistência eventual do Coda (~15s, erro na resposta não significa que falhou), `marcarEntregueAdmin()` usa `window.open()` bloqueado pelo Chrome (navegar direto em `/marcar-entregue?rowId=`), e o dicionário "o que o cliente escreve" → nome exato do produto.
+
 Dois transversais:
 
 - **`ux-researcher`** — pesquisa de UX/benchmark (read-only, web + contexto D'Luh); pesquisa e recomenda, não implementa.
@@ -111,7 +115,7 @@ Dois transversais:
 Três do domínio **IA de atendimento no WhatsApp** (fonte de verdade: `WHATSAPP-IA-PLANO.md` na raiz — **ainda não implementado**). São os primeiros agentes com `model:` explícito no frontmatter, escolhido pelo nível de exigência de cada um:
 
 - **`whatsapp-ia-specialist`** (`model: opus`) — dono do plano e do serviço de IA que roda no PC ao lado da Evolution: ferramentas/tool calling, máquina de estados do pedido, guardrails de código, painel `atendimento.html`. Opus porque decide arquitetura e mexe no caminho que grava pedido de verdade (dinheiro envolvido).
-- **`ia-local-infra`** (`model: sonnet`) — Ollama, modelo local, faster-whisper, Docker/Tailscale/driver, e o benchmark da Fase 0 no PC (Ryzen 5 5500GT · 16GB · GTX 1050 Ti 4GB). Sonnet porque é trabalho operacional e verificável por medição.
+- **`ia-local-infra`** (`model: sonnet`) — Ollama, modelo local, faster-whisper, Docker/Tailscale/driver, e o benchmark da Fase 0 no PC (Ryzen 5 5600GT · 16GB DDR4-3200 · GTX 1050 Ti 4GB). Sonnet porque é trabalho operacional e verificável por medição.
 - **`ia-conversa-designer`** (`model: sonnet`) — persona, system prompt versionado, roteiros e os casos de teste de conversa. Sonnet porque é iteração de redação em alto volume, com risco técnico baixo (as regras que importam são travadas em código, não no prompt).
 
 - **`ia-testador`** (`model: sonnet`) — conversa com a Bia pelo **WhatsApp Web** (Chrome MCP) como se fosse cliente, julga cada resposta contra `prompt/testes.md` e devolve relatório de defeitos já classificado por camada (prompt / guardrail / ferramenta / modelo). **Não edita nada** — só reporta. Sonnet porque o critério de aprovação está escrito; o trabalho é executar e comparar. Roda em sessão própria, e o usuário traz o relatório pro chat principal.
