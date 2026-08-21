@@ -155,22 +155,16 @@ function trocaProduto(sel,id){
   const val=sel.value;
   if(!val)return;
   if(val==='__outro__'){
-    // Troca select por campo de texto livre
     const td=sel.closest('td');
     td.innerHTML=`<input class="inp-nome" value="" placeholder="Nome do produto" list="produtos-datalist" style="${IS}width:100%">`;
     td.querySelector('.inp-nome').focus();
     return;
   }
-  // Preenche preço unitário do produto selecionado
   const preco=(_produtosMap[val]||0).toFixed(2);
-  console.log('[trocaProduto]',val,'→',preco,'| map keys:',Object.keys(_produtosMap).slice(0,3));
   const row=sel.closest('tr');
   const unitInput=row.querySelector('.inp-unit');
-  console.log('[trocaProduto] unitInput encontrado:',!!unitInput);
   if(unitInput)unitInput.value=preco;
-  // id 'edit' = modal "Editar itens"; 'manual' = modal "Pedido manual"; 'detalhe' = modal
-  // "Detalhes" (edição completa); qualquer outro id é card da aba Estoque (tbody itens-body-<id>).
-  if(id==='edit'){recalcEdit();}else if(id==='manual'){recalcManual();}else if(id==='detalhe'){recalcDetalheItens();}else{recalcCard(id);}
+  if(id==='manual'){recalcManual();}else{recalcDetalheItens();}
 }
 
 const IS='border:1px solid #e8e0d8;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;background:#fff;';
@@ -263,29 +257,21 @@ function btnNotificarAlteracoesHtml(p){
 function cardPedido(p){
   const id=p.idPedido;
   const st=p.status||'Aguardando confirmação';
-  const total=p.total||p.itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
+  const total=Number(p.total)||p.itens.reduce((s,i)=>s+(Number(i.valorItem)||0),0);
 
   // Taxa de entrega sempre por último
   const sortedItens=[...(p.itens||[])].sort((a,b)=>
     (a.produto.startsWith('🛵')?1:0)-(b.produto.startsWith('🛵')?1:0));
 
-  const rows=sortedItens.map((i,idx)=>`
-    <tr data-idx="${idx}" style="border-top:1px solid var(--border)">
-      <td style="padding:7px 0">
-        ${buildProdutoSelect(id,i.produto)}
+  const rows=sortedItens.map(i=>`
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:7px 0;font-size:13.5px">${esc(i.produto)}
         ${i.recheios?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(i.recheios)}</div>`:''}
         ${i.topoInfo?`<div style="font-size:11px;color:var(--text3);margin-top:2px">🎨 ${esc(i.topoInfo.replace(/\n/g,' · '))}</div>`:''}
       </td>
-      <td style="padding:7px 4px;text-align:center">
-        <input class="inp-qty" type="number" value="${i.quantidade||1}" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center">
-      </td>
-      <td style="padding:7px 4px;text-align:center">
-        <input class="inp-unit" type="number" value="${Number(i.valorUnit||0).toFixed(2)}" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center">
-      </td>
+      <td style="padding:7px 4px;text-align:center;color:var(--text2);font-size:13px">${i.quantidade||1}</td>
+      <td style="padding:7px 4px;text-align:center;color:var(--text2);font-size:13px">${fmtBRL(i.valorUnit||0)}</td>
       <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600;white-space:nowrap">${fmtBRL(i.valorItem)}</td>
-      <td style="padding:7px 0 7px 8px">
-        <button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0" title="Remover">×</button>
-      </td>
     </tr>`).join('');
 
   return`<div class="card" id="card-${esc(id)}" data-id="${esc(id)}" data-rowid="${esc(p.rowId||'')}" data-cliente="${esc(p.cliente)}" data-telefone="${esc(p.telefone)}">
@@ -304,7 +290,7 @@ function cardPedido(p){
       </div>
     </div>
     <div class="card-body">
-      <div class="itens-titulo" style="margin-bottom:6px">Itens &mdash; <span style="font-weight:400;font-size:11px;color:var(--text3)">edite se precisar trocar produto</span></div>
+      <div class="itens-titulo" style="margin-bottom:6px">Itens</div>
       <div class="itens-table-wrap">
       <table style="width:100%;border-collapse:collapse">
         <thead>
@@ -313,13 +299,11 @@ function cardPedido(p){
             <th style="text-align:center;padding-bottom:4px;font-weight:600;width:60px">Qtd</th>
             <th style="text-align:center;padding-bottom:4px;font-weight:600;width:80px">Unit</th>
             <th style="text-align:right;padding-bottom:4px;font-weight:600;width:90px">Subtotal</th>
-            <th style="width:30px"></th>
           </tr>
         </thead>
-        <tbody id="itens-body-${esc(id)}">${rows}</tbody>
+        <tbody>${rows}</tbody>
       </table>
       </div>
-      <button onclick="addItem('${esc(id)}')" style="background:none;border:1px dashed var(--border);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--text3);cursor:pointer;width:100%;margin-top:8px;font-family:inherit">+ Adicionar item</button>
 
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:12px">
         <div style="display:flex;align-items:center;gap:5px">
@@ -349,9 +333,6 @@ function cardPedido(p){
           <button class="btn-pago-total" onclick="closeAllCardMenus();abrirConfirmPagoTotal('${esc(p.rowId||'')}','${esc(p.cliente)}','${esc(p.telefone)}',this)">
             💚 Marcar como pago (Pix por fora)
           </button>
-          <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId||'')}')">
-            ✏️ Editar itens
-          </button>
           ${btnNotificarAlteracoesHtml(p)}
           <button onclick="closeAllCardMenus();notificarCliente('${esc(id)}')" style="background:none;border:1.5px solid #25d366;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;color:#128c7e;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap">
             📱 Avisar cliente
@@ -366,17 +347,10 @@ function cardPedido(p){
 }
 
 function recalcCard(id){
-  const tbody=document.getElementById(`itens-body-${id}`);
-  if(!tbody)return;
-  let total=0;
-  tbody.querySelectorAll('tr[data-idx]').forEach(row=>{
-    const qty=parseFloat(row.querySelector('.inp-qty')?.value)||0;
-    const unit=parseFloat(row.querySelector('.inp-unit')?.value)||0;
-    const sub=Math.round(qty*unit*100)/100;
-    total+=sub;
-    const td=row.querySelector('.td-sub');
-    if(td)td.textContent=fmtBRL(sub);
-  });
+  const card=document.getElementById(`card-${id}`);
+  if(!card)return;
+  const p=_pedidosCache[card.dataset.rowid];
+  const total=p?(Number(p.total)||0):0;
   const pct=parseInt(document.getElementById(`pct-${id}`)?.value)||50;
   const entrada=Math.round(total*pct/100*100)/100;
   const restante=Math.round((total-entrada)*100)/100;
@@ -386,22 +360,6 @@ function recalcCard(id){
   if(elT)elT.textContent=fmtBRL(total);
   if(elE)elE.textContent=fmtBRL(entrada);
   if(elR)elR.textContent=fmtBRL(restante);
-}
-
-function addItem(id){
-  const tbody=document.getElementById(`itens-body-${id}`);
-  if(!tbody)return;
-  const idx=tbody.querySelectorAll('tr').length;
-  const tr=document.createElement('tr');
-  tr.setAttribute('data-idx',idx);
-  tr.style.borderTop='1px solid var(--border)';
-  tr.innerHTML=`
-    <td style="padding:7px 0">${buildProdutoSelect(id,'')}</td>
-    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="1" min="0.1" step="0.1" oninput="recalcCard('${id}')" style="${IS}width:52px;text-align:center"></td>
-    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="0.00" min="0" step="0.01" oninput="recalcCard('${id}')" style="${IS}width:72px;text-align:center"></td>
-    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600">R$ 0,00</td>
-    <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcCard('${id}')" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0">×</button></td>`;
-  tbody.appendChild(tr);
 }
 
 // ── DETALHES DO PEDIDO (itens agrupados por categoria) + IMPRESSÃO ──────────
@@ -1011,21 +969,17 @@ async function copiarPedido(rowId,btnEl,ev){
 function notificarCliente(id){
   const card=document.getElementById(`card-${CSS.escape(id)}`);
   if(!card)return;
-  const cliente=card.dataset.cliente||'';
-  const telefone=card.dataset.telefone||'';
-  const tbody=document.getElementById(`itens-body-${id}`);
+  const p=_pedidosCache[card.dataset.rowid];
+  if(!p){showToast('Pedido não encontrado — atualize a lista');return;}
+  const cliente=p.cliente||'';
+  const telefone=p.telefone||'';
+  const total=Number(p.total)||0;
+  const itensReais=(p.itens||[]).filter(i=>!String(i.produto||'').startsWith('🛵'));
   let itensMsg='';
-  let total=0;
-  if(tbody){
-    tbody.querySelectorAll('tr[data-idx]').forEach(row=>{
-      const nome=row.querySelector('.inp-nome')?.value||'';
-      const qty=parseFloat(row.querySelector('.inp-qty')?.value)||0;
-      const unit=parseFloat(row.querySelector('.inp-unit')?.value)||0;
-      const sub=Math.round(qty*unit*100)/100;
-      total+=sub;
-      if(nome)itensMsg+=`\n• ${qty}x ${nome} = ${fmtBRL(sub)}`;
-    });
-  }
+  itensReais.forEach(i=>{
+    const sub=Math.round((Number(i.quantidade)||0)*(Number(i.valorUnit)||0)*100)/100;
+    if(i.produto)itensMsg+=`\n• ${i.quantidade}x ${i.produto} = ${fmtBRL(sub)}`;
+  });
   const pct=parseInt(document.getElementById(`pct-${id}`)?.value)||50;
   const entrada=Math.round(total*pct/100*100)/100;
   const restante=Math.round((total-entrada)*100)/100;
@@ -1041,22 +995,12 @@ function confirmarEstoque(id){
   if(btn){btn.disabled=true;btn.textContent='Processando…';}
   const telefone=card.dataset.telefone||'';
   const cliente=card.dataset.cliente||'';
-  const tbody=document.getElementById(`itens-body-${id}`);
-  let total=0;
-  if(tbody){
-    tbody.querySelectorAll('tr[data-idx]').forEach(row=>{
-      const qty=parseFloat(row.querySelector('.inp-qty')?.value)||0;
-      const unit=parseFloat(row.querySelector('.inp-unit')?.value)||0;
-      total+=Math.round(qty*unit*100)/100;
-    });
-  }
+  const p=_pedidosCache[card.dataset.rowid];
+  const total=p?(Number(p.total)||0):0;
   const pct=parseInt(document.getElementById(`pct-${id}`)?.value)||50;
   const entrada=Math.round(total*pct/100*100)/100;
   const url=`${WORKER}/confirmar-estoque?pedidoId=${enc(id)}&total=${enc(total)}&telefone=${enc(telefone)}&cliente=${enc(cliente)}&entrada=${enc(entrada)}`;
   window.open(url,'_blank');
-  // A rota não redireciona mais pro WhatsApp: o cliente já é avisado
-  // automaticamente na confirmação (detalhamento + link). A aba nova é só a
-  // página de confirmação com o link pra copiar, caso o atendente precise.
   showToast('Confirmando estoque — o cliente é avisado automaticamente…');
   const ICON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
   setTimeout(()=>{if(btn){btn.disabled=false;btn.innerHTML=ICON+' Confirmar e cobrar';}},6000);
@@ -1283,7 +1227,6 @@ function statusCardHtml(p,status){
             <button class="btn-cobrar-total-adm" onclick="closeAllCardMenus();cobrarTotalAdmin('${esc(p.rowId)}')">💰 Cobrar Total</button>
             <button class="btn-cobrar-entrada-adm" onclick="closeAllCardMenus();cobrarEntradaAdmin('${esc(p.rowId)}')">💵 Cobrar Entrada</button>
             ${podeMarcarEntregue?`<button class="btn-marcar-entregue-adm" onclick="closeAllCardMenus();marcarEntregueAdmin('${esc(p.rowId)}')">🚚 Entregue</button>`:''}
-            <button class="btn-editar-itens" onclick="closeAllCardMenus();abrirEditItens('${esc(p.rowId)}')">✏️ Editar itens</button>
             ${btnNotificarAlteracoesHtml(p)}
             ${status!=='Finalizado'?`<button class="btn-finalizar" onclick="closeAllCardMenus();abrirConfirmFinalizar('${esc(p.rowId)}','${esc(p.cliente)}',this)">✅ Finalizar</button>`:''}
             <button class="btn-apagar" onclick="closeAllCardMenus();abrirConfirmApagar('${esc(p.rowId)}','${esc(p.cliente)}',this)">🗑️ Apagar</button>
@@ -1565,7 +1508,7 @@ async function _confirmPagoTotalOk(){
 // ── NOTIFICAR ALTERAÇÕES AO CLIENTE (fila acumulada de edições do admin) ────
 // O cliente NÃO é mais avisado no momento em que o admin salva uma edição —
 // cada edição só acumula "antes → depois" na coluna Alterações Pendentes do
-// Coda (ver salvarDetalhesPedido/salvarEditItens). Esse botão dispara o envio
+// Coda (ver salvarDetalhesPedido). Esse botão dispara o envio
 // de tudo junto de uma vez (POST /notificar-alteracoes), quando o atendente
 // quiser. Reusa o modal de confirmação compartilhado (mesmo padrão de
 // abrirConfirmPagoTotal/abrirConfirmFinalizar).
@@ -1613,197 +1556,8 @@ async function _confirmNotificarAlteracoesOk(){
   }
 }
 
-// ── EDITAR ITENS (admin — disponível em QUALQUER status) ────────────────────
-// Reusa o POST /editar-pedido do worker enviando origem:'admin': o worker então
-// não restringe pela lista EDITAVEIS e NÃO rebaixa o Status do pedido (o gating
-// por status continua valendo pro cliente via bot/Meus Pedidos).
-// ⚠️ A subrow "🛵 Taxa de Entrega" NUNCA vai como item: aqui ela vira o campo
-// taxaFrete (o worker tem o mesmo filtro do outro lado — sem isso a entrega
-// entraria duplicada no pedido editado).
-let _editRowId=null;
-// Snapshot dos itens editáveis no momento da abertura — base do diff no salvar.
-let _editSnap=[];
-let _editSnapTaxa=0;
-let _editSnapCliente='';
-
-function abrirEditItens(rowId){
-  const p=_pedidosCache[rowId];
-  if(!p){showToast('Pedido ainda não carregou — tente de novo em instantes.');return;}
-  _editRowId=rowId;
-  const itens=p.itens||[];
-  const taxaItem=itens.find(i=>String(i.produto||'').includes('Taxa de Entrega'));
-  const editaveis=itens.filter(i=>!String(i.produto||'').includes('Taxa de Entrega'));
-  // Guarda o estado ANTES da edição (nome/qtd/valor de cada item + taxa).
-  _editSnap=editaveis.map(i=>({
-    produto:String(i.produto||'').trim(),
-    quantidade:Number(i.quantidade||1),
-    valorUnit:Number(i.valorUnit||0),
-  }));
-  _editSnapTaxa=taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0):0;
-  _editSnapCliente=p.cliente||'';
-  document.getElementById('edit-sub').innerHTML=
-    `<b>${esc(p.cliente||'—')}</b> · 📱 ${esc(p.telefone||'—')} · status atual: <b>${esc(p.status||'Aguardando confirmação')}</b>`;
-  const tbody=document.getElementById('edit-itens-body');
-  tbody.innerHTML='';
-  editaveis.forEach((i,idx)=>tbody.appendChild(buildEditRow(i,idx)));
-  if(!editaveis.length)addEditItem();
-  document.getElementById('edit-frete').value=taxaItem?Number(taxaItem.valorItem||taxaItem.valorUnit||0).toFixed(2):'0.00';
-  document.getElementById('edit-pago').textContent=(p.valorPago||0)>0?` · já pago: ${fmtBRL(p.valorPago)}`:'';
-  recalcEdit();
-  document.getElementById('edit-overlay').classList.add('open');
-}
-
-function buildEditRow(i,origIdx){
-  const tr=document.createElement('tr');
-  // Recheios/Topo Info da subrow original são preservados no dataset e reenviados
-  // junto — a edição do admin troca produto/qtd/preço, não os detalhes do item.
-  tr.dataset.recheios=(i&&i.recheios)||'';
-  tr.dataset.topoinfo=(i&&i.topoInfo)||'';
-  // origIdx casa a linha com o item do snapshot original (pra detectar A → B na
-  // mesma linha vs item adicionado/removido). Linhas novas ficam sem o atributo.
-  if(origIdx!=null)tr.dataset.origIdx=String(origIdx);
-  tr.style.borderTop='1px solid var(--border)';
-  tr.innerHTML=`
-    <td style="padding:7px 0">
-      ${buildProdutoSelect('edit',i?i.produto:'')}
-      ${i&&i.recheios?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(i.recheios)}</div>`:''}
-    </td>
-    <td style="padding:7px 4px;text-align:center"><input class="inp-qty" type="number" value="${i?(i.quantidade||1):1}" min="0.1" step="0.1" oninput="recalcEdit()" style="${IS}width:52px;text-align:center"></td>
-    <td style="padding:7px 4px;text-align:center"><input class="inp-unit" type="number" value="${i?Number(i.valorUnit||0).toFixed(2):'0.00'}" min="0" step="0.01" oninput="recalcEdit()" style="${IS}width:72px;text-align:center"></td>
-    <td class="td-sub" style="padding:7px 0 7px 4px;text-align:right;font-size:13px;font-weight:600;white-space:nowrap">R$ 0,00</td>
-    <td style="padding:7px 0 7px 8px"><button onclick="this.closest('tr').remove();recalcEdit()" style="background:none;border:none;cursor:pointer;color:#c0725a;font-size:18px;line-height:1;padding:0" title="Remover">×</button></td>`;
-  return tr;
-}
-
-function addEditItem(){
-  document.getElementById('edit-itens-body').appendChild(buildEditRow(null));
-}
-
-function recalcEdit(){
-  let total=0;
-  document.querySelectorAll('#edit-itens-body tr').forEach(tr=>{
-    const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
-    const unit=parseFloat(tr.querySelector('.inp-unit')?.value)||0;
-    const sub=Math.round(qty*unit*100)/100;
-    total+=sub;
-    const td=tr.querySelector('.td-sub');
-    if(td)td.textContent=fmtBRL(sub);
-  });
-  total+=parseFloat(document.getElementById('edit-frete')?.value)||0;
-  const el=document.getElementById('edit-total');
-  if(el)el.textContent=fmtBRL(Math.round(total*100)/100);
-}
-
-function closeEditModal(){
-  document.getElementById('edit-overlay').classList.remove('open');
-  _editRowId=null;
-}
-
 // Formata quantidade sem casas decimais desnecessárias (10 em vez de 10.0).
 function _fmtQty(n){const v=Number(n)||0;return Number.isInteger(v)?String(v):String(v);}
-
-// Monta o resumo legível das alterações comparando o snapshot original (_editSnap)
-// com as linhas atuais. Cada linha nova carrega origIdx (índice no snapshot) quando
-// veio de um item existente; sem origIdx = item adicionado. Índices do snapshot
-// não consumidos = itens removidos.
-function _montarResumoEdicao(cliente,linhas,taxaDepois){
-  const partes=[];
-  const usados=new Set();
-  linhas.forEach(l=>{
-    if(l.origIdx==null||!_editSnap[l.origIdx]){
-      // Item adicionado
-      partes.push(`+ ${l.nome} (x${_fmtQty(l.qty)})`);
-      return;
-    }
-    usados.add(l.origIdx);
-    const o=_editSnap[l.origIdx];
-    const nomeMudou=o.produto!==l.nome;
-    const qtdMudou=Number(o.quantidade)!==Number(l.qty);
-    const valMudou=Math.round(Number(o.valorUnit)*100)!==Math.round(Number(l.unit)*100);
-    if(nomeMudou){
-      partes.push(`${o.produto} → ${l.nome}`);
-      if(qtdMudou)partes.push(`${l.nome}: ${_fmtQty(o.quantidade)} → ${_fmtQty(l.qty)}`);
-      if(valMudou)partes.push(`${l.nome}: ${fmtBRL(o.valorUnit)} → ${fmtBRL(l.unit)}`);
-    }else{
-      if(qtdMudou)partes.push(`${l.nome}: ${_fmtQty(o.quantidade)} → ${_fmtQty(l.qty)}`);
-      if(valMudou)partes.push(`${l.nome}: ${fmtBRL(o.valorUnit)} → ${fmtBRL(l.unit)}`);
-    }
-  });
-  // Itens removidos (no snapshot mas sem linha correspondente)
-  _editSnap.forEach((o,idx)=>{
-    if(!usados.has(idx))partes.push(`− ${o.produto} (x${_fmtQty(o.quantidade)})`);
-  });
-  // Mudança da taxa de entrega
-  if(Math.round(Number(_editSnapTaxa)*100)!==Math.round(Number(taxaDepois)*100)){
-    partes.push(`🛵 Taxa de entrega: ${fmtBRL(_editSnapTaxa)} → ${fmtBRL(taxaDepois)}`);
-  }
-  if(!partes.length)return '';
-  return `Pedido de ${cliente||'—'}\n`+partes.join('\n');
-}
-
-async function salvarEditItens(){
-  const p=_pedidosCache[_editRowId];
-  if(!p){closeEditModal();return;}
-  const itens=[];
-  const linhas=[]; // paralelo a itens, com origIdx pra montar o diff
-  document.querySelectorAll('#edit-itens-body tr').forEach(tr=>{
-    const nome=(tr.querySelector('.inp-nome')?.value||'').trim();
-    const qty=parseFloat(tr.querySelector('.inp-qty')?.value)||0;
-    const unit=parseFloat(tr.querySelector('.inp-unit')?.value)||0;
-    if(!nome||qty<=0)return;
-    if(nome.includes('Taxa de Entrega'))return; // taxa nunca vai como item — vai em taxaFrete
-    itens.push({nome,qty,unit,recheios:tr.dataset.recheios||'',topoInfo:tr.dataset.topoinfo||''});
-    const origIdx=tr.dataset.origIdx!==undefined?parseInt(tr.dataset.origIdx,10):null;
-    linhas.push({nome,qty,unit,origIdx});
-  });
-  if(!itens.length){showToast('O pedido precisa de pelo menos 1 item.');return;}
-  const taxa=Math.max(0,parseFloat(document.getElementById('edit-frete').value)||0);
-  const alteracoesResumo=_montarResumoEdicao(p.cliente||_editSnapCliente,linhas,taxa);
-  const notificar=!!alteracoesResumo;
-  const total=Math.round((itens.reduce((s,i)=>s+i.qty*i.unit,0)+taxa)*100)/100;
-  // Contexto replicado nas subrows — mesmo padrão do fluxo de edição do cliente
-  const ctx=[
-    {column:'Cliente',value:p.cliente||''},
-    {column:'WhatsApp',value:p.telefone||''},
-    {column:'Entrega',value:p.entrega||''},
-    {column:'Pagamento',value:p.pagamento||''},
-    {column:'Data Desejada',value:p.data||''},
-    {column:'Hora',value:p.hora||''},
-  ];
-  const subrows=itens.map(i=>[
-    {column:'Produto',value:i.nome},
-    {column:'Quantidade',value:i.qty},
-    {column:'Valor Unit',value:i.unit},
-    ...(i.recheios?[{column:'Recheios',value:i.recheios}]:[]),
-    ...(i.topoInfo?[{column:'Topo Info',value:i.topoInfo}]:[]),
-    ...ctx,
-  ]);
-  const btn=document.getElementById('edit-save-btn');
-  btn.disabled=true;btn.textContent='Salvando...';
-  try{
-    const res=await fetch(`${WORKER}/editar-pedido`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({paiId:_editRowId,pai:[{column:'Total',value:total}],subrows,taxaFrete:taxa,origem:'admin',alteracoesResumo,notificar})
-    });
-    const d=await res.json().catch(()=>({}));
-    if(!res.ok||d.ok===false)throw new Error(d.error||'Falha ao salvar edição no Coda');
-    const novoTotal=(d.novoTotal!=null)?d.novoTotal:total;
-    // Idem salvarDetalhesPedido(): cliente não é avisado na hora, só entra na fila.
-    const qtdAlt=Number(d.alteracoesRegistradas)||0;
-    const aviso=qtdAlt>0
-      ?` · Telegram avisado · cliente entra na fila de alterações (${qtdAlt})`
-      :' · Telegram avisado · nenhuma alteração para o cliente';
-    showToast(`Itens atualizados ✅ Novo total: ${fmtBRL(novoTotal)}${(d.reembolso||0)>0?` · reembolso devido: ${fmtBRL(d.reembolso)}`:''}${aviso}`);
-    closeEditModal();
-    _estoqueSig=null; // itens mudaram — força re-render da aba Estoque também
-    carregarStatus();
-  }catch(e){
-    showToast('Erro ao editar: '+e.message);
-  }finally{
-    btn.disabled=false;btn.textContent='Salvar alterações';
-  }
-}
 
 // ── PEDIDO MANUAL — o atendente faz o pedido "como se fosse o cliente" ──
 // Envia pro MESMO POST /novo-pedido do site (mesmo payload do checkout), então
